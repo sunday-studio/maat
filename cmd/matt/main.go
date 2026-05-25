@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/sunday-studio/maat/internal/maat"
+	"github.com/sunday-studio/maat/internal/version"
 )
 
 func main() {
@@ -30,6 +31,8 @@ func run(args []string) error {
 	case "help", "-h", "--help":
 		printHelp()
 		return nil
+	case "version":
+		return versionCommand(args[1:])
 	case "init":
 		return initConfig(args[1:])
 	case "storage":
@@ -98,6 +101,7 @@ func printHelp() {
 
 Usage:
   matt init [storage-path]
+  matt version [--json]
   matt storage link <storage-path>
   matt index rebuild [--storage <path>]
   matt projects [--storage <path>] [--json]
@@ -121,6 +125,19 @@ Usage:
 
 Git plus Markdown remains the source of truth. The local index is rebuildable.
 `)
+}
+
+func versionCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	if len(filtered) > 0 {
+		return errors.New("usage: matt version [--json]")
+	}
+	info := version.Current()
+	if jsonOut {
+		return writeJSON(info)
+	}
+	fmt.Println(info.String())
+	return nil
 }
 
 func initConfig(args []string) error {

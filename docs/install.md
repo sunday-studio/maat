@@ -55,6 +55,38 @@ Install a specific binary with:
 MATT_SOURCE_BIN="./dist/matt" scripts/install.sh
 ```
 
+## Build From Source
+
+Build the local binary into `dist/matt`:
+
+```sh
+make build
+```
+
+The build stamps version metadata when Git is available. Check it with:
+
+```sh
+dist/matt version
+```
+
+Build release archives for macOS and Linux:
+
+```sh
+make release
+```
+
+This writes tarballs and checksums under `dist/`:
+
+```text
+dist/matt-<version>-darwin-amd64.tar.gz
+dist/matt-<version>-darwin-arm64.tar.gz
+dist/matt-<version>-linux-amd64.tar.gz
+dist/matt-<version>-linux-arm64.tar.gz
+dist/checksums-<version>.txt
+```
+
+No publish step is included. GitHub Actions can build and upload these artifacts on tag pushes or manual dispatch.
+
 ## Storage Repo
 
 Maat storage is a normal Git repository containing Markdown files.
@@ -131,6 +163,7 @@ matt --help
 Query a storage repo:
 
 ```sh
+matt version
 matt status --storage /absolute/path/to/maat-state
 matt projects --storage /absolute/path/to/maat-state
 matt index rebuild --storage /absolute/path/to/maat-state

@@ -46,6 +46,28 @@ func TestProjectsJSON(t *testing.T) {
 	}
 }
 
+func TestVersionCommand(t *testing.T) {
+	output, err := captureRun("version")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "matt dev") {
+		t.Fatalf("unexpected version output: %q", output)
+	}
+
+	output, err = captureRun("version", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]string
+	if err := json.Unmarshal([]byte(output), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["version"] != "dev" || got["commit"] == "" || got["date"] == "" {
+		t.Fatalf("unexpected version json: %#v", got)
+	}
+}
+
 func TestValidateCommand(t *testing.T) {
 	store := writeCommandFixture(t)
 
