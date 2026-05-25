@@ -377,9 +377,19 @@ func projectShowCommand(args []string) error {
 		return err
 	}
 	project, err := maat.LoadProject(store, projectID)
-	if err != nil {
+	if err == nil {
+		printLegacyProject(project)
+		return nil
+	}
+	objectProject, objectErr := maat.LoadObjectProject(store, projectID)
+	if objectErr != nil {
 		return err
 	}
+	printObjectProject(objectProject)
+	return nil
+}
+
+func printLegacyProject(project maat.Project) {
 	fmt.Printf("# %s\n\n", project.Title)
 	fmt.Printf("ID:      %s\n", project.ID)
 	fmt.Printf("Status:  %s\n", project.Status)
@@ -399,7 +409,42 @@ func projectShowCommand(args []string) error {
 			fmt.Printf("  - [%s] %s %s\n", box, ticket.ID, ticket.Title)
 		}
 	}
-	return nil
+}
+
+func printObjectProject(project maat.ObjectProject) {
+	fmt.Printf("# %s\n\n", project.DisplayName)
+	fmt.Printf("Key:     %s\n", project.Key)
+	fmt.Printf("Status:  %s\n", project.Status)
+	fmt.Printf("Updated: %s\n", project.Updated)
+	if len(project.Tags) > 0 {
+		fmt.Printf("Tags:    %s\n", strings.Join(project.Tags, " "))
+	}
+	if project.Identity["Primary Repo"] != "" {
+		fmt.Printf("Repo:    %s\n", project.Identity["Primary Repo"])
+	}
+	if project.Identity["Remote"] != "" {
+		fmt.Printf("Remote:  %s\n", project.Identity["Remote"])
+	}
+	if project.Summary != "" {
+		fmt.Println()
+		fmt.Println(project.Summary)
+	}
+	if len(project.Goals) > 0 {
+		fmt.Println()
+		for _, goal := range project.Goals {
+			fmt.Printf("- %s [%s] %s\n", goal.ID, goal.Status, goal.Title)
+		}
+	}
+	if len(project.Tickets) > 0 {
+		fmt.Println()
+		for _, ticket := range project.Tickets {
+			goal := "standalone"
+			if ticket.GoalID != "" {
+				goal = ticket.GoalID
+			}
+			fmt.Printf("- %s [%s] %s (%s)\n", ticket.ID, ticket.Status, ticket.Title, goal)
+		}
+	}
 }
 
 func projectLinkCommand(args []string) error {

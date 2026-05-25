@@ -214,6 +214,29 @@ func TestProjectLinkCommandJSONAndIdempotent(t *testing.T) {
 	}
 }
 
+func TestProjectShowCommandSupportsObjectProject(t *testing.T) {
+	store := t.TempDir()
+	source := t.TempDir()
+	if _, err := maat.LinkProject(t.Context(), maat.LinkProjectInput{
+		Store:       store,
+		SourcePath:  source,
+		ProjectKey:  "photo-system",
+		DisplayName: "Photo System",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := captureRun("project", "show", "photo-system", "--storage", store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"# Photo System", "Key:     photo-system", "Repo:    " + source} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to include %q, got %q", want, output)
+		}
+	}
+}
+
 func TestGoalCreateCommand(t *testing.T) {
 	t.Setenv("MAAT_ACTOR", "codex")
 	store := writeObjectCommandFixture(t)

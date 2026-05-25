@@ -150,6 +150,7 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 - [x] T-002: Infer project key and display name from Git remote or source directory.
 - [x] T-003: Infer project automatically for write commands when run from a linked repo.
 - [ ] T-004: Add source path aliases or repo identity records beyond project identity metadata.
+- [x] T-005: Show target-layout linked projects with `matt project show`.
 
 ## Blockers
 
