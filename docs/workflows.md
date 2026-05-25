@@ -2,58 +2,66 @@
 
 ## Start A New Project
 
-1. Create `projects/<project-id>.md` from `projects/_template.md`.
-2. Fill in the project metadata table.
-3. Add the first goal if known.
-4. Append a `project.created` ledger event.
-5. Commit the project file and ledger file together.
+1. Run `matt project link` from the source repo or provide a path.
+2. Create `projects/<project-key>/project.md`.
+3. Record repository metadata under `projects/<project-key>/repos/`.
+4. Create a `project.created` event file.
+5. Validate, index, commit, and sync.
 
 ## Add A Goal
 
-1. Open the project file.
-2. Add the next goal ID under `## Goals`.
-3. Set the goal status to `proposed`, `active`, or `waiting`.
-4. Append a `goal.added` ledger event.
-5. Commit.
+1. Create `projects/<project-key>/goals/<goal-id>.md`.
+2. Create a `goal.created` event file.
+3. Validate, index, commit, and sync.
 
-## Add A Task
+## Add A Ticket
 
-1. Find the relevant goal.
-2. Add the next task ID under that goal's `#### Tasks`.
-3. Append a `task.added` ledger event.
-4. Commit.
+1. Create `projects/<project-key>/tickets/<ticket-id>.md`.
+2. Attach a goal ID if the ticket belongs to a goal.
+3. Create a `ticket.created` event file.
+4. Validate, index, commit, and sync.
 
-## Complete A Task
+## Claim A Ticket
 
-1. Change `- [ ] T-###` to `- [x] T-###`.
-2. Update the goal or project status if the completion changes the current state.
-3. Append a `task.completed` ledger event with evidence.
-4. Commit.
+1. Create a `ticket.claimed` event with an expiration time.
+2. Do not block other agents after the claim expires.
+3. Validate, index, commit, and sync.
+
+## Comment On A Ticket
+
+1. Create a `ticket.commented` event.
+2. Include useful progress, findings, or handoff context.
+3. Validate, index, commit, and sync.
+
+## Complete A Ticket
+
+1. Create a `ticket.completed` event.
+2. Include evidence.
+3. Update computed state through the index.
+4. Validate, index, commit, and sync.
 
 ## Record A Blocker
 
-1. Add the blocker under `## Blockers`.
-2. Set the project or goal status to `waiting` if the blocker stops progress.
-3. Append a `blocker.added` ledger event.
-4. Commit.
+1. Create a `blocker.added` event for the affected object.
+2. Include the reason and required unblock action.
+3. Let current state compute `waiting` where appropriate.
+4. Validate, index, commit, and sync.
 
 ## Clear A Blocker
 
-1. Mark the blocker cleared or move it to the relevant decision/context note.
-2. Restore project or goal status if work can continue.
-3. Append a `blocker.cleared` ledger event.
-4. Commit.
+1. Create a `blocker.cleared` event.
+2. Include evidence that work can continue.
+3. Validate, index, commit, and sync.
 
 ## Record A Decision
 
-1. Add the decision to the project `## Decisions` section if local to a project.
-2. Create a file in `decisions/` if it affects the system or multiple projects.
-3. Append a `decision.recorded` ledger event.
-4. Commit.
+1. Create a decision file in `decisions/` or inside the project.
+2. Create a `decision.recorded` event.
+3. Validate, index, commit, and sync.
 
 ## Create A Cross-Project Report
 
 1. Read all relevant project files.
 2. Write `reports/YYYY-MM-DD-<scope>.md`.
-3. Append a `report.created` ledger event for each project that materially changed, or one `report.created` event with `Project` set to `maat` if it is only a summary.
-4. Commit.
+3. Create a `report.created` event when the report is part of durable history.
+4. Validate, index, commit, and sync.

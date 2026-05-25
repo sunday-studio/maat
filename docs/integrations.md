@@ -7,8 +7,8 @@ Maat should work with any agent that can operate on a Git repository.
 Agents need only four capabilities:
 
 1. Read Markdown files.
-2. Edit Markdown files.
-3. Append a ledger event.
+2. Create Markdown object and event files.
+3. Run `matt` commands when available.
 4. Commit and sync with Git.
 
 No agent-specific database or API is required for the core system.
@@ -19,13 +19,14 @@ Codex can use Maat directly:
 
 1. Open the Maat repo as a workspace.
 2. Read `AGENTS.md`.
-3. Update project state and ledger files.
+3. Prefer `matt` commands when the binary exists.
+4. Otherwise create object and event files following the docs.
 4. Commit and push.
 
 Recommended instruction:
 
 ```text
-Before and after material work, update the Maat repository according to AGENTS.md.
+Before and after material work, update Maat according to AGENTS.md. Prefer the `matt` CLI. Create or claim a ticket before work, record useful progress, complete work only with evidence, and sync afterward.
 ```
 
 ## Claude
@@ -35,7 +36,7 @@ Claude-style agents can use the same contract when they have filesystem and Git 
 Recommended instruction:
 
 ```text
-Use the Maat repository as the canonical project tracker. Update Markdown project state and append ledger events for every meaningful project-management change.
+Use the Maat repository as the canonical project tracker. Prefer the `matt` CLI. Create or claim a ticket before work, record useful progress, complete work only with evidence, and sync afterward.
 ```
 
 ## Agents Without Git Push Access
@@ -43,15 +44,15 @@ Use the Maat repository as the canonical project tracker. Update Markdown projec
 If an agent cannot push:
 
 1. Write a complete handoff report in `reports/`.
-2. Include proposed project-file changes.
-3. Include proposed ledger events.
+2. Include proposed object changes.
+3. Include proposed event files.
 4. Ask a Git-capable agent to apply and commit the update.
 
 ## Future Adapter Ideas
 
 The Markdown and Git core should remain the source of truth. Optional adapters can be layered on top:
 
-- MCP server exposing project, goal, task, and ledger operations.
+- MCP server exposing project, goal, ticket, and event operations.
 - CLI wrapper that validates templates before commit.
 - GitHub Action that checks ledger/project consistency.
 - Static dashboard generated from Markdown.

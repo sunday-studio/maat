@@ -2,7 +2,7 @@
 
 Maat is a Git-native project memory for agent-run work.
 
-It is intentionally plain Markdown. Agents update project files, append transactional events to the ledger, and commit every meaningful change to Git. Humans can read the repo directly; agent systems can integrate by cloning it, following `AGENTS.md`, and writing normal commits.
+It is intentionally plain Markdown at rest. Agents update project state through the `matt` CLI or future MCP tools, and every meaningful change is recorded in Git. Humans can read the repo directly, query it from the terminal, or open a local UI.
 
 ## What This Is For
 
@@ -10,21 +10,21 @@ Use Maat when you have multiple projects moving through multiple agents and you 
 
 - What projects exist?
 - What is each project trying to achieve?
-- What goals and tasks are active, blocked, or done?
+- What goals and tickets are active, blocked, or done?
 - Who changed what, when, and why?
 - What happened across all projects in chronological order?
 
 ## Core Idea
 
-Maat separates current state from history.
+Maat separates durable state from fast local views.
 
-- `projects/` contains the current readable state of each project.
-- `ledger/` contains the append-only transactional history.
-- `agents/` contains agent identity notes and integration expectations.
-- `reports/` contains periodic summaries produced by agents.
-- `decisions/` contains durable decisions that should outlive task chatter.
+- Git plus Markdown is the source of truth.
+- SQLite is a rebuildable index for status, search, timelines, and UI queries.
+- The CLI is the primary write interface for agents.
+- A Bubble Tea TUI and local web UI provide browsable views.
+- Events are append-only and should be stored as small files to reduce merge conflicts.
 
-Every agent action should update current state and append a ledger event in the same commit.
+The early repository has flat project files and a monthly ledger. The target architecture moves to per-project directories, per-object Markdown files, and generated ledgers.
 
 ## Repository Layout
 
@@ -40,15 +40,26 @@ Every agent action should update current state and append a ledger event in the 
 └── reports/
 ```
 
+## Architecture Docs
+
+- [Architecture](docs/architecture.md)
+- [Storage Model](docs/storage-model.md)
+- [Search And Indexing](docs/search-index.md)
+- [CLI, TUI, And UI](docs/cli-tui-ui.md)
+- [Agent Protocol](docs/agent-protocol.md)
+- [Implementation Plan](docs/implementation-plan.md)
+- [Markdown Schema](docs/schema.md)
+- [Workflows](docs/workflows.md)
+- [Integrations](docs/integrations.md)
+
 ## Minimum Agent Workflow
 
-1. Pull the latest Git state.
-2. Read `AGENTS.md`.
-3. Find or create the relevant project in `projects/`.
-4. Make the smallest useful state update.
-5. Append an event to the monthly ledger in `ledger/`.
-6. Commit with a clear message.
-7. Push or otherwise sync the commit back to the central remote.
+1. Sync Maat.
+2. Inspect the relevant project, goals, and tickets.
+3. Claim or create a ticket.
+4. Record progress as comments or events.
+5. Complete or update the ticket with evidence.
+6. Sync the Maat storage repo.
 
 ## Status Vocabulary
 
@@ -63,28 +74,30 @@ Use these statuses consistently:
 
 ## Event Vocabulary
 
-Use these event names in the ledger:
+Use these event names for append-only events:
 
 - `project.created`
 - `project.updated`
-- `goal.added`
+- `project.linked`
+- `goal.created`
 - `goal.updated`
 - `goal.completed`
-- `task.added`
-- `task.updated`
-- `task.completed`
+- `ticket.created`
+- `ticket.claimed`
+- `ticket.commented`
+- `ticket.updated`
+- `ticket.completed`
 - `blocker.added`
 - `blocker.cleared`
 - `decision.recorded`
 - `report.created`
 - `handoff.created`
 
-## First Projects To Register
+## Existing Project Records
 
-Nearby workspaces suggest these projects may be good initial entries:
+Initial project records exist for:
 
 - `aether`: human-facing personal/productivity app with docs around journal, tasks, goals, settings, sync, and updater.
 - `orion`: self-hosted monitoring app with Agent, Core, Console, incidents, monitors, and deployment docs.
 - `neptune`: photo management system with local indexing, public API, and blog frontend.
-
-Agents should create these project files only when they have enough current context to avoid inventing stale state.
+- `maat`: this project.

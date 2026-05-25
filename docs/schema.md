@@ -1,15 +1,17 @@
 # Markdown Schema
 
-Maat uses plain Markdown conventions instead of a database.
+Maat uses plain Markdown conventions as the durable store.
 
-The schema is designed to be readable by humans and reliable enough for agents.
+The schema is designed to be readable by humans, reliable enough for agents, and easy to index into SQLite.
 
-## Project File
+The repository currently contains early flat files. The target schema is directory-per-project and object-per-file. See [Storage Model](./storage-model.md) for the full rationale.
+
+## Target Project File
 
 Path:
 
 ```text
-projects/<project-id>.md
+projects/<project-key>/project.md
 ```
 
 Required shape:
@@ -19,43 +21,76 @@ Required shape:
 
 | Field | Value |
 |---|---|
-| ID | <project-id> |
+| Project Key | <project-key> |
+| Display Name | <name> |
 | Status | active |
-| Owner | agents |
-| Updated | 2026-05-25 |
+| Created | 2026-05-25T19:05:00+02:00 |
+| Updated | 2026-05-25T19:05:00+02:00 |
 | Tags | #example #tag |
 
-## Current
+## Summary
 
 Short current-state summary.
+```
 
-## Goals
+## Goal File
 
-### G-001: Goal name
+Path:
+
+```text
+projects/<project-key>/goals/<goal-id>.md
+```
+
+Required shape:
+
+```markdown
+# Goal: Goal name
 
 | Field | Value |
 |---|---|
+| Goal ID | G-20260525-190533-a7f3 |
+| Project | <project-key> |
 | Status | active |
-| Updated | 2026-05-25 |
+| Created | 2026-05-25T19:05:33+02:00 |
 | Tags | #example |
 
-#### Tasks
+## Outcome
 
-- [ ] T-001: Task name
-- [x] T-002: Completed task name
-
-## Blockers
-
-- None.
-
-## Decisions
-
-- None.
-
-## Links
-
-- None.
+The outcome this goal is trying to achieve.
 ```
+
+## Ticket File
+
+Path:
+
+```text
+projects/<project-key>/tickets/<ticket-id>.md
+```
+
+Required shape:
+
+```markdown
+# Ticket: Ticket name
+
+| Field | Value |
+|---|---|
+| Ticket ID | T-20260525-190700-b91c |
+| Project | <project-key> |
+| Goal | G-20260525-190533-a7f3 |
+| Status | active |
+| Created | 2026-05-25T19:07:00+02:00 |
+| Tags | #example |
+
+## Description
+
+The concrete work to do.
+
+## Acceptance
+
+- Clear completion condition.
+```
+
+Tickets may be standalone. If no goal is attached, use `Goal | none`.
 
 ## Status Values
 
@@ -85,37 +120,51 @@ Examples:
 
 Add new tags to `tags.md` when they become reusable across projects.
 
-## Ledger Event
+## Event File
 
-Ledger events live in monthly files:
+Events live under the project they affect:
 
 ```text
-ledger/YYYY-MM.md
+projects/<project-key>/events/YYYY/MM/<event-id>.md
 ```
 
 Required shape:
 
 ```markdown
-### EVT-YYYYMMDD-HHMMSS-<short-project>-<short-action>
+# Event: ticket.completed
 
 | Field | Value |
 |---|---|
+| Event ID | E-20260525-192000-codex-a1b2 |
 | Time | 2026-05-25T19:20:00+02:00 |
 | Actor | codex |
-| Project | example |
-| Event | task.completed |
-| Files | projects/example.md |
+| Project | <project-key> |
+| Type | ticket.completed |
+| Object | T-20260525-190700-b91c |
 | Summary | Marked T-001 complete after verification. |
 
-#### Details
+## Evidence
 
 - Evidence: tests passed locally.
 - Follow-up: none.
 ```
 
+Events are append-only. Correction events should be used instead of rewriting committed history.
+
+## Legacy Flat Files
+
+The current repository still includes:
+
+```text
+projects/<project-id>.md
+ledger/YYYY-MM.md
+```
+
+These are v0 planning artifacts. The implementation should either migrate them to the target layout or read them as legacy input.
+
 ## Report File
 
-Reports are agent-written summaries. They do not replace ledger events.
+Reports are agent-written summaries. They do not replace append-only events.
 
 Path:
 

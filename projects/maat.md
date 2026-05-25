@@ -10,9 +10,9 @@
 
 ## Current
 
-Maat is being established as a Git-native Markdown project management system for agent-run work. The first version defines the repository structure, agent operating instructions, current-state project files, and an append-only monthly ledger.
+Maat is being established as a Git-native Markdown project management system for agent-run work. The first version defines the repository structure, agent operating instructions, current-state project files, and an append-only history model.
 
-The system is intentionally file-first: agents should be able to clone the repo, update Markdown, append ledger events, and commit without needing a separate database or web app.
+The system is intentionally file-first: agents should be able to clone the repo, update Markdown, create events, and commit without needing a separate authoritative database or hosted app.
 
 ## Goals
 
@@ -32,6 +32,22 @@ The system is intentionally file-first: agents should be able to clone the repo,
 - [x] T-004: Register active external projects after reading their current state.
 - [ ] T-005: Add validation or automation once the Markdown workflow stabilizes.
 
+### G-002: Design the installable Maat architecture
+
+| Field | Value |
+|---|---|
+| Status | done |
+| Updated | 2026-05-25 |
+| Tags | #architecture #cli #search #docs |
+
+#### Tasks
+
+- [x] T-001: Capture repository and commit conventions from Orion and Aether.
+- [x] T-002: Document the durable Git and Markdown storage architecture.
+- [x] T-003: Document the SQLite search and indexing architecture.
+- [x] T-004: Document the CLI, Bubble Tea TUI, local web UI, and agent protocol.
+- [x] T-005: Document the phased implementation plan.
+
 ## Blockers
 
 - None.
@@ -39,7 +55,7 @@ The system is intentionally file-first: agents should be able to clone the repo,
 ## Decisions
 
 - Use Markdown files as the source of truth rather than a database.
-- Use Git commits plus an append-only ledger for transactional history.
+- Use Git commits plus append-only event files for transactional history.
 - Keep optional adapters, dashboards, MCP servers, and CLIs layered on top of the Markdown core.
 
 ## Links
