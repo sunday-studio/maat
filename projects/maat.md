@@ -14,13 +14,15 @@ Maat is being established as a Git-native Markdown project management system for
 
 The system is intentionally file-first: agents should be able to clone the repo, update Markdown, create events, and commit without needing a separate authoritative database or hosted app.
 
+The implementation now has a usable read CLI, validation, SQLite-backed search/indexing, target object parsing, write-path core operations, Git sync primitives, migration planning, a first Bubble Tea dashboard, and local install documentation.
+
 ## Goals
 
 ### G-001: Define the agent-operable project system
 
 | Field | Value |
 |---|---|
-| Status | active |
+| Status | done |
 | Updated | 2026-05-25 |
 | Tags | #agent-run #git-native #docs |
 
@@ -62,14 +64,14 @@ The system is intentionally file-first: agents should be able to clone the repo,
 - [x] T-002: Parse and validate legacy flat project Markdown files.
 - [x] T-003: Add `projects`, `project show`, `status`, and `search` read commands.
 - [x] T-004: Add a rebuildable bootstrap index command.
-- [ ] T-005: Replace the bootstrap JSON index with SQLite FTS.
-- [ ] T-006: Add target object layout parsing for project directories, goals, tickets, and event files.
+- [x] T-005: Replace the bootstrap JSON index with SQLite FTS.
+- [x] T-006: Add target object layout parsing for project directories, goals, tickets, and event files.
 
 ### G-004: Parallelize the next implementation tracks
 
 | Field | Value |
 |---|---|
-| Status | active |
+| Status | done |
 | Updated | 2026-05-25 |
 | Tags | #agent-run #planning #cli |
 
@@ -92,13 +94,13 @@ The system is intentionally file-first: agents should be able to clone the repo,
 
 #### Tasks
 
-- [ ] T-001: Wire validation, SQLite search, index rebuild, and JSON query output into the CLI.
-- [ ] T-002: Add write-path core operations for projects, goals, tickets, claims, comments, and completion events.
-- [ ] T-003: Add Git sync primitives for repository detection, status, pull, commit, and push.
-- [ ] T-004: Add migration core from legacy flat files to target object layout.
-- [ ] T-005: Add the first Bubble Tea TUI skeleton.
-- [ ] T-006: Add local install and distribution documentation.
-- [ ] T-007: Integrate and verify all worker commits.
+- [x] T-001: Wire validation, SQLite search, index rebuild, and JSON query output into the CLI.
+- [x] T-002: Add write-path core operations for projects, goals, tickets, claims, comments, and completion events.
+- [x] T-003: Add Git sync primitives for repository detection, status, pull, commit, and push.
+- [x] T-004: Add migration core from legacy flat files to target object layout.
+- [x] T-005: Add the first Bubble Tea TUI skeleton.
+- [x] T-006: Add local install and distribution documentation.
+- [x] T-007: Integrate and verify all worker commits.
 
 ## Blockers
 
@@ -110,6 +112,7 @@ The system is intentionally file-first: agents should be able to clone the repo,
 - Use Git commits plus append-only event files for transactional history.
 - Keep optional adapters, dashboards, MCP servers, and CLIs layered on top of the Markdown core.
 - Keep the JSON bootstrap index temporarily while SQLite FTS lands behind the core API.
+- Use SQLite-backed search as the CLI default, with direct Markdown search as a fallback.
 
 ## Links
 

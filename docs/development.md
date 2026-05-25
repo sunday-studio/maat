@@ -42,7 +42,8 @@ The first executable slice is intentionally small:
 - parse legacy flat project files from `projects/*.md`
 - validate known status values
 - compute status totals
-- search Markdown files directly
+- search through the rebuildable SQLite index, with direct Markdown search as a fallback
 - write a rebuildable JSON index to `.maat/index.json`
+- write a rebuildable SQLite index to `.maat/index.sqlite`
 
-The architecture still targets SQLite FTS and optional vector search. The JSON index is a bootstrap artifact so the CLI can work before the SQLite layer lands.
+The architecture still targets optional vector search. The JSON and SQLite indexes are rebuildable artifacts; Markdown in Git remains canonical.

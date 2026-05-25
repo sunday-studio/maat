@@ -107,6 +107,10 @@ Initial owner:
 - Worker 1: read-path CLI wiring for validation, SQLite-backed search, index rebuild, and JSON output.
 - Later integration: write commands after write-path core lands.
 
+Status:
+
+- Done in `84b1db1 feat(cli): wire read path commands`.
+
 ## Group 6: TUI
 
 Goal: give the human a polished terminal dashboard.
@@ -121,6 +125,10 @@ Tasks:
 Initial owner:
 
 - Worker 5: Bubble Tea skeleton and callable TUI entrypoint.
+
+Status:
+
+- Done in `9965baf feat(tui): add bubble tea dashboard`.
 
 ## Group 7: Local Web UI
 
@@ -154,6 +162,10 @@ Initial owner:
 
 - Worker 6: local install script and install documentation.
 
+Status:
+
+- Done in `ea4ea32 feat(sync): add git primitives` and `da8372b docs(install): clarify offline installer`.
+
 ## Group 9: Git Sync Primitives
 
 Goal: prepare safe sync flows without rushing user-facing commands.
@@ -170,6 +182,10 @@ Initial owner:
 
 - Worker 3: Git sync core under `internal/maat`.
 
+Status:
+
+- Done in `ea4ea32 feat(sync): add git primitives`.
+
 ## Group 10: Migration Core
 
 Goal: move from v0 flat project files to the target object layout safely.
@@ -185,6 +201,10 @@ Tasks:
 Initial owner:
 
 - Worker 4: migration planner and apply functions under `internal/maat`.
+
+Status:
+
+- Done in `982ae4d feat(migration): add legacy object planner`.
 
 ## Integration Rules
 
