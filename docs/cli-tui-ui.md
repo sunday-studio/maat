@@ -30,6 +30,7 @@ matt projects
 matt project show orion
 matt project link
 matt project link /absolute/path/to/source-repo
+matt project link /absolute/path/to/source-repo --key orion --name "Orion"
 matt project status orion active
 ```
 

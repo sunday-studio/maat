@@ -154,6 +154,66 @@ func TestMigrateApplyCommandWritesDestinationOnly(t *testing.T) {
 	}
 }
 
+func TestProjectLinkCommand(t *testing.T) {
+	store := t.TempDir()
+	source := t.TempDir()
+	if err := os.WriteFile(filepath.Join(source, "README.md"), []byte("# Orion\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	initGitStore(t, source)
+	runGit(t, source, "remote", "add", "origin", "git@github.com:sunday-studio/orion.git")
+
+	output, err := captureRun("project", "link", source, "--storage", store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "linked project orion") || !strings.Contains(output, "remote git@github.com:sunday-studio/orion.git") {
+		t.Fatalf("unexpected output: %q", output)
+	}
+
+	project, err := maat.LoadObjectProject(store, "orion")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if project.DisplayName != "Orion" || project.Identity["Remote"] != "git@github.com:sunday-studio/orion.git" {
+		t.Fatalf("unexpected linked project: %#v", project)
+	}
+	if _, err := os.Stat(filepath.Join(store, ".maat", "index.json")); err != nil {
+		t.Fatalf("expected json index after link: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(store, ".maat", "index.sqlite")); err != nil {
+		t.Fatalf("expected sqlite index after link: %v", err)
+	}
+}
+
+func TestProjectLinkCommandJSONAndIdempotent(t *testing.T) {
+	store := t.TempDir()
+	source := t.TempDir()
+
+	output, err := captureRun("project", "link", source, "--storage", store, "--key", "photo-system", "--name", "Photo System", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var linked maat.LinkedProject
+	if err := json.Unmarshal([]byte(output), &linked); err != nil {
+		t.Fatal(err)
+	}
+	if !linked.Created || linked.ProjectKey != "photo-system" || linked.DisplayName != "Photo System" {
+		t.Fatalf("unexpected link json: %#v", linked)
+	}
+
+	output, err = captureRun("project", "link", source, "--storage", store, "--key", "photo-system", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(output), &linked); err != nil {
+		t.Fatal(err)
+	}
+	if !linked.Existing || linked.Created {
+		t.Fatalf("expected idempotent existing project, got %#v", linked)
+	}
+}
+
 func TestGoalCreateCommand(t *testing.T) {
 	t.Setenv("MAAT_ACTOR", "codex")
 	store := writeObjectCommandFixture(t)

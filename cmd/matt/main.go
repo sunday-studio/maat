@@ -102,6 +102,7 @@ Usage:
   matt index rebuild [--storage <path>]
   matt projects [--storage <path>] [--json]
   matt project show <project-id> [--storage <path>]
+  matt project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]
   matt goal create <project-key> <title> [--storage <path>] [--json]
   matt ticket create <project-key> <title> [--goal <goal-id>] [--storage <path>] [--json]
   matt ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
@@ -353,11 +354,25 @@ func migrateCommand(args []string) error {
 }
 
 func projectCommand(args []string) error {
-	if len(args) < 2 || args[0] != "show" {
+	if len(args) == 0 {
+		return errors.New("usage: matt project <show|link>")
+	}
+	switch args[0] {
+	case "show":
+		return projectShowCommand(args[1:])
+	case "link":
+		return projectLinkCommand(args[1:])
+	default:
+		return fmt.Errorf("unknown project command %q", args[0])
+	}
+}
+
+func projectShowCommand(args []string) error {
+	if len(args) < 1 {
 		return errors.New("usage: matt project show <project-id> [--storage <path>]")
 	}
-	projectID := args[1]
-	store, err := loadStore(args[2:])
+	projectID := args[0]
+	store, err := loadStore(args[1:])
 	if err != nil {
 		return err
 	}
@@ -383,6 +398,55 @@ func projectCommand(args []string) error {
 			}
 			fmt.Printf("  - [%s] %s %s\n", box, ticket.ID, ticket.Title)
 		}
+	}
+	return nil
+}
+
+func projectLinkCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	store, rest, err := loadStoreAndRest(filtered)
+	if err != nil {
+		return err
+	}
+	key, rest, err := consumeFlagValue(rest, "--key", false)
+	if err != nil {
+		return err
+	}
+	name, rest, err := consumeFlagValue(rest, "--name", false)
+	if err != nil {
+		return err
+	}
+	if len(rest) > 1 {
+		return errors.New("usage: matt project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]")
+	}
+	sourcePath := "."
+	if len(rest) == 1 {
+		sourcePath = rest[0]
+	}
+	linked, err := maat.LinkProject(context.Background(), maat.LinkProjectInput{
+		Store:       store,
+		SourcePath:  sourcePath,
+		ProjectKey:  key,
+		DisplayName: name,
+	})
+	if err != nil {
+		return err
+	}
+	if err := refreshIndexes(store); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(linked)
+	}
+	if linked.Created {
+		fmt.Printf("linked project %s\n", linked.ProjectKey)
+	} else {
+		fmt.Printf("project %s already linked\n", linked.ProjectKey)
+	}
+	fmt.Printf("name %s\n", linked.DisplayName)
+	fmt.Printf("source %s\n", linked.SourcePath)
+	if linked.RemoteURL != "" {
+		fmt.Printf("remote %s\n", linked.RemoteURL)
 	}
 	return nil
 }
