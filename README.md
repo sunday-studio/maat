@@ -48,6 +48,7 @@ The early repository has flat project files and a monthly ledger. The target arc
 - [CLI, TUI, And UI](docs/cli-tui-ui.md)
 - [Agent Protocol](docs/agent-protocol.md)
 - [Implementation Plan](docs/implementation-plan.md)
+- [Work Plan](docs/work-plan.md)
 - [Development](docs/development.md)
 - [Markdown Schema](docs/schema.md)
 - [Workflows](docs/workflows.md)

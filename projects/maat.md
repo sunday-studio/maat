@@ -65,6 +65,23 @@ The system is intentionally file-first: agents should be able to clone the repo,
 - [ ] T-005: Replace the bootstrap JSON index with SQLite FTS.
 - [ ] T-006: Add target object layout parsing for project directories, goals, tickets, and event files.
 
+### G-004: Parallelize the next implementation tracks
+
+| Field | Value |
+|---|---|
+| Status | active |
+| Updated | 2026-05-25 |
+| Tags | #agent-run #planning #cli |
+
+#### Tasks
+
+- [x] T-001: Group the remaining implementation work into independent tracks.
+- [x] T-002: Assign SQLite indexing to a worker agent.
+- [x] T-003: Assign target storage parsing to a worker agent.
+- [x] T-004: Assign validation improvements to a worker agent.
+- [x] T-005: Assign ID and event helper foundations to a worker agent.
+- [ ] T-006: Integrate worker commits after review.
+
 ## Blockers
 
 - None.
@@ -81,3 +98,4 @@ The system is intentionally file-first: agents should be able to clone the repo,
 - [Schema](../docs/schema.md)
 - [Workflows](../docs/workflows.md)
 - [Development](../docs/development.md)
+- [Work plan](../docs/work-plan.md)
