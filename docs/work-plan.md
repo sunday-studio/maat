@@ -116,6 +116,7 @@ Status:
 - Next write-command UX and JSON output assigned to Worker 3.
 - Sync command wiring done in `1787757 feat(cli): wire sync command`.
 - Write-command ergonomics coverage done in `fdd4341 test(cli): cover write command ergonomics`.
+- Next project inference, JSON show, and ticket list/show work assigned to Worker 1.
 
 ## Group 6: TUI
 
@@ -139,6 +140,7 @@ Status:
 - Detail-pane and selection improvements done in `b2c593d feat(tui): refine dashboard navigation`.
 - Next ticket/search view improvements assigned to Worker 4.
 - Ticket detail mode done in `bb890b2 feat(tui): add ticket detail mode`.
+- Next TUI search/timeline/detail improvements assigned to Worker 3.
 
 ## Group 7: Local Web UI
 
@@ -175,6 +177,7 @@ Initial owner:
 Status:
 
 - Done in `ea4ea32 feat(sync): add git primitives` and `da8372b docs(install): clarify offline installer`.
+- Build and release setup assigned to Worker 4.
 
 ## Group 9: Git Sync Primitives
 
@@ -252,6 +255,38 @@ Status:
 - Done in `7654ed2 docs(agent): define command protocol`.
 - Next `matt agent instructions` command wiring assigned to Worker 2.
 - `matt agent instructions` command is live via `1787757 feat(cli): wire sync command`; docs marked live in `29db45e docs(agent): mark instructions command live`.
+
+## Group 12: README And Product Packaging
+
+Goal: make Maat understandable and installable from a clean checkout.
+
+Tasks:
+
+- Rewrite README around current commands and workflows.
+- Keep advanced architecture in docs.
+- Add build and release commands.
+- Add GitHub Actions release/check workflow.
+- Keep install documentation aligned with scripts.
+
+Initial owners:
+
+- Worker 4: build and release setup.
+- Worker 5: simple current README.
+
+## Group 13: Search And State Hardening
+
+Goal: improve query quality for agents and humans.
+
+Tasks:
+
+- Improve target-layout object indexing.
+- Add stale/active/blocked internal query APIs.
+- Add claim-expiration awareness.
+- Keep search and state behavior covered with tests.
+
+Initial owner:
+
+- Worker 2: storage/search hardening.
 
 Status:
 

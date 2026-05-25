@@ -152,6 +152,23 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 - [ ] T-004: Add source path aliases or repo identity records beyond project identity metadata.
 - [x] T-005: Show target-layout linked projects with `matt project show`.
 
+### G-009: Package the first usable release shape
+
+| Field | Value |
+|---|---|
+| Status | active |
+| Updated | 2026-05-25 |
+| Tags | #release #cli #docs #tui |
+
+#### Tasks
+
+- [ ] T-001: Fill remaining CLI query gaps, including ticket list/show and project JSON output.
+- [ ] T-002: Harden storage/search state queries.
+- [ ] T-003: Improve TUI read views.
+- [ ] T-004: Add build and release setup.
+- [ ] T-005: Rewrite README as a simple current product guide.
+- [ ] T-006: Integrate and verify this packaging worker round.
+
 ## Blockers
 
 - None.

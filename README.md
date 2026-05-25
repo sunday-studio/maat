@@ -1,133 +1,137 @@
 # Maat
 
-Maat is a Git-native project memory for agent-run work.
+Maat is a Git-backed project memory for agent-run work.
 
-It is intentionally plain Markdown at rest. Agents update project state through the `matt` CLI or future MCP tools, and every meaningful change is recorded in Git. Humans can read the repo directly, query it from the terminal, or open a local UI.
+It gives agents a shared place to create goals, create and claim tickets, record progress, complete work with evidence, and sync status through Git. Humans can query the same state from the terminal or browse it in a Bubble Tea TUI.
 
-## What This Is For
+## How It Works
 
-Use Maat when you have multiple projects moving through multiple agents and you need one central, durable place to answer:
+Maat keeps durable state in a normal Git repository full of Markdown files. That repo is the source of truth.
 
-- What projects exist?
-- What is each project trying to achieve?
-- What goals and tickets are active, blocked, or done?
-- Who changed what, when, and why?
-- What happened across all projects in chronological order?
+The `matt` CLI builds local indexes from that Markdown for faster search and dashboard views:
 
-## Core Idea
+- Markdown in Git is canonical.
+- `.maat/index.json` and `.maat/index.sqlite` are rebuildable.
+- Agents should write through `matt` instead of hand-editing files.
+- Events are stored as small object files to reduce merge conflicts.
 
-Maat separates durable state from fast local views.
+## Install Or Build
 
-- Git plus Markdown is the source of truth.
-- SQLite is a rebuildable index for status, search, timelines, and UI queries.
-- The CLI is the primary write interface for agents.
-- A Bubble Tea TUI and local web UI provide browsable views.
-- Events are append-only and should be stored as small files to reduce merge conflicts.
-
-The early repository has flat project files and a monthly ledger. The target architecture moves to per-project directories, per-object Markdown files, and generated ledgers.
-
-## Repository Layout
-
-```text
-.
-├── AGENTS.md
-├── README.md
-├── agents/
-├── decisions/
-├── docs/
-├── ledger/
-├── projects/
-├── reports/
-└── scripts/
-```
-
-## Architecture Docs
-
-- [Architecture](docs/architecture.md)
-- [Storage Model](docs/storage-model.md)
-- [Search And Indexing](docs/search-index.md)
-- [CLI, TUI, And UI](docs/cli-tui-ui.md)
-- [Agent Protocol](docs/agent-protocol.md)
-- [Implementation Plan](docs/implementation-plan.md)
-- [Work Plan](docs/work-plan.md)
-- [Development](docs/development.md)
-- [Install](docs/install.md)
-- [Markdown Schema](docs/schema.md)
-- [Workflows](docs/workflows.md)
-- [Integrations](docs/integrations.md)
-
-## Install
-
-The install foundation is local-first and does not publish or fetch artifacts:
+From a checkout:
 
 ```sh
 scripts/install.sh
 ```
 
-It installs an existing `matt` binary from the checkout when present, or builds `./cmd/matt` locally with Go in offline mode. See [Install](docs/install.md) for macOS/Linux paths, storage setup, and run commands.
+Build directly:
 
-## Current CLI
+```sh
+go build -o matt ./cmd/matt
+```
 
-The first implementation is a Go CLI named `matt`.
-
-Run it locally:
+Run from source:
 
 ```sh
 go run ./cmd/matt status --storage .
-go run ./cmd/matt projects --storage .
-go run ./cmd/matt project show orion --storage .
-go run ./cmd/matt search "agent health" --storage .
-go run ./cmd/matt index rebuild --storage .
 ```
 
-The current index command writes a rebuildable bootstrap index to `.maat/index.json`. The target architecture still calls for SQLite FTS and optional vector search.
+Link your storage repo once:
 
-## Minimum Agent Workflow
+```sh
+matt init /absolute/path/to/maat-state
+```
 
-1. Sync Maat.
-2. Inspect the relevant project, goals, and tickets.
-3. Claim or create a ticket.
-4. Record progress as comments or events.
-5. Complete or update the ticket with evidence.
-6. Sync the Maat storage repo.
+Or pass it explicitly:
 
-## Status Vocabulary
+```sh
+matt status --storage /absolute/path/to/maat-state
+```
 
-Use these statuses consistently:
+## Core Workflows
 
-- `proposed`: captured but not started.
-- `active`: work is in progress.
-- `waiting`: blocked by a person, system, dependency, or decision.
-- `paused`: intentionally not moving now.
-- `done`: finished for the stated scope.
-- `archived`: no longer active, retained for history.
+Set up and inspect:
 
-## Event Vocabulary
+```sh
+matt init /absolute/path/to/maat-state
+matt index rebuild
+matt validate
+matt status
+matt projects
+matt search "blocked deploy"
+```
 
-Use these event names for append-only events:
+Link a source repo:
 
-- `project.created`
-- `project.updated`
-- `project.linked`
-- `goal.created`
-- `goal.updated`
-- `goal.completed`
-- `ticket.created`
-- `ticket.claimed`
-- `ticket.commented`
-- `ticket.updated`
-- `ticket.completed`
-- `blocker.added`
-- `blocker.cleared`
-- `decision.recorded`
-- `report.created`
-- `handoff.created`
+```sh
+cd /absolute/path/to/source-repo
+matt project link
+matt project show <project-key>
+```
 
-## Existing Project Records
+Create work:
 
-Initial project records exist for:
+```sh
+matt goal create <project-key> "Ship first deploy"
+matt ticket create <project-key> "Verify installer"
+matt ticket create <project-key> "Fix deploy docs" --goal <goal-id>
+```
 
-- `aether`: human-facing personal/productivity app with docs around journal, tasks, goals, settings, sync, and updater.
-- `orion`: self-hosted monitoring app with Agent, Core, Console, incidents, monitors, and deployment docs.
-- `neptune`: photo management system with local indexing, public API, and blog frontend.
-- `maat`: this project.
+Work a ticket:
+
+```sh
+matt ticket claim <ticket-id> --agent codex --ttl 2h
+matt ticket comment <ticket-id> "Found the failing path."
+matt ticket complete <ticket-id> --evidence "go test ./... passed"
+```
+
+Sync changes:
+
+```sh
+matt sync --message "status(orion): complete installer ticket"
+matt sync --push
+matt sync --status --json
+```
+
+Migrate legacy flat project files into the object layout:
+
+```sh
+matt migrate plan --json
+matt migrate apply --dest /tmp/maat-migrated
+```
+
+## Agent Workflow
+
+Agents should follow this loop:
+
+1. Run `matt sync` or otherwise pull the Maat storage repo.
+2. Inspect state with `matt status`, `matt project show`, or `matt search`.
+3. Create or claim a ticket before doing material work.
+4. Record meaningful progress with `matt ticket comment`.
+5. Complete tickets only with evidence.
+6. Run `matt validate` and `matt sync`.
+
+Install the project instruction snippet into another repo with:
+
+```sh
+matt agent instructions --output AGENTS.md
+```
+
+## TUI
+
+Launch the terminal dashboard:
+
+```sh
+matt tui
+```
+
+The TUI currently shows projects, status totals, project detail, and ticket lists. Search and timeline views are planned next.
+
+## Useful Docs
+
+- [Architecture](docs/architecture.md)
+- [Storage Model](docs/storage-model.md)
+- [CLI, TUI, And UI](docs/cli-tui-ui.md)
+- [Agent Protocol](docs/agent-protocol.md)
+- [Install](docs/install.md)
+- [Development](docs/development.md)
+- [Migration Dogfood](docs/migration-dogfood.md)
