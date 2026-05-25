@@ -21,7 +21,7 @@ Install this into each project repo's `AGENTS.md` or equivalent agent instructio
 Use Maat as the canonical project memory for this repo. Before material work, run `matt sync` if available, then inspect state with `matt status`, `matt project show <project>`, or `matt search <query>`. Create or claim a ticket before working. Record meaningful progress with ticket comments or events. When finished, complete the ticket with evidence, validate Maat, and sync. Do not mark work done without evidence.
 ```
 
-The future `matt agent instructions` command should print this snippet so project setup can stay copy/pasteable and consistent.
+`matt agent instructions` prints this snippet so project setup can stay copy/pasteable and consistent. Use `--output <path>` to write it directly.
 
 ## Current CLI Surface
 
@@ -36,6 +36,7 @@ matt projects [--storage <path>] [--json]
 matt project show <project-id> [--storage <path>]
 matt validate [--storage <path>] [--json]
 matt search <query> [--storage <path>] [--json]
+matt agent instructions [--json] [--output <path>]
 matt tui [--storage <path>]
 ```
 
