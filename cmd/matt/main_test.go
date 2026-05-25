@@ -83,6 +83,76 @@ func TestIndexRebuildAndSearchCommand(t *testing.T) {
 	}
 }
 
+func TestMigratePlanCommandJSON(t *testing.T) {
+	store := writeCommandFixture(t)
+
+	output, err := captureRun("migrate", "plan", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var plan maat.MigrationPlan
+	if err := json.Unmarshal([]byte(output), &plan); err != nil {
+		t.Fatal(err)
+	}
+	if plan.Source != store {
+		t.Fatalf("unexpected source: %q", plan.Source)
+	}
+	if len(plan.Projects) != 1 {
+		t.Fatalf("expected one project plan, got %d", len(plan.Projects))
+	}
+	project := plan.Projects[0]
+	if project.LegacyPath != "projects/orion.md" || project.ProjectPath != "projects/orion/project.md" {
+		t.Fatalf("unexpected project plan: %#v", project)
+	}
+	if len(project.GoalPaths) != 1 || len(project.TicketPaths) != 2 || len(project.EventPaths) != 1 {
+		t.Fatalf("unexpected migrated object paths: %#v", project)
+	}
+	if strings.Contains(output, "Content") || strings.Contains(output, "Current state.") {
+		t.Fatalf("plan json should not expose planned file contents: %q", output)
+	}
+}
+
+func TestMigrateApplyCommandWritesDestinationOnly(t *testing.T) {
+	store := writeCommandFixture(t)
+	dest := t.TempDir()
+	legacyPath := filepath.Join(store, "projects", "orion.md")
+	before, err := os.ReadFile(legacyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := captureRun("migrate", "apply", "--storage", store, "--dest", dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "migrated 1 projects into") || !strings.Contains(output, "wrote 5 files") {
+		t.Fatalf("unexpected output: %q", output)
+	}
+
+	after, err := os.ReadFile(legacyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(before) {
+		t.Fatal("legacy source file changed")
+	}
+	if _, err := os.Stat(filepath.Join(dest, "projects", "orion", "project.md")); err != nil {
+		t.Fatalf("expected migrated project file: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(store, "projects", "orion", "project.md")); !os.IsNotExist(err) {
+		t.Fatalf("source store should not receive target layout file, got err=%v", err)
+	}
+
+	objectStore, err := maat.LoadObjectStore(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(objectStore.Projects) != 1 || objectStore.Projects[0].Key != "orion" {
+		t.Fatalf("unexpected migrated object store: %#v", objectStore.Projects)
+	}
+}
+
 func captureRun(args ...string) (string, error) {
 	oldStdout := os.Stdout
 	reader, writer, err := os.Pipe()
