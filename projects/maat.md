@@ -88,7 +88,7 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 
 | Field | Value |
 |---|---|
-| Status | active |
+| Status | done |
 | Updated | 2026-05-25 |
 | Tags | #agent-run #cli #tui #sync |
 
@@ -106,7 +106,7 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 
 | Field | Value |
 |---|---|
-| Status | active |
+| Status | done |
 | Updated | 2026-05-25 |
 | Tags | #agent-run #cli #sync #tui |
 
@@ -123,7 +123,7 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 
 | Field | Value |
 |---|---|
-| Status | active |
+| Status | done |
 | Updated | 2026-05-25 |
 | Tags | #agent-run #cli #tui #migration |
 
@@ -140,7 +140,7 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 
 | Field | Value |
 |---|---|
-| Status | active |
+| Status | done |
 | Updated | 2026-05-25 |
 | Tags | #cli #agent-run #git |
 
@@ -156,18 +156,18 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 
 | Field | Value |
 |---|---|
-| Status | active |
+| Status | done |
 | Updated | 2026-05-25 |
 | Tags | #release #cli #docs #tui |
 
 #### Tasks
 
-- [ ] T-001: Fill remaining CLI query gaps, including ticket list/show and project JSON output.
-- [ ] T-002: Harden storage/search state queries.
-- [ ] T-003: Improve TUI read views.
-- [ ] T-004: Add build and release setup.
-- [ ] T-005: Rewrite README as a simple current product guide.
-- [ ] T-006: Integrate and verify this packaging worker round.
+- [x] T-001: Fill remaining CLI query gaps, including ticket list/show and project JSON output.
+- [x] T-002: Harden storage/search state queries.
+- [x] T-003: Improve TUI read views.
+- [x] T-004: Add build and release setup.
+- [x] T-005: Rewrite README as a simple current product guide.
+- [x] T-006: Integrate and verify this packaging worker round.
 
 ## Blockers
 
@@ -184,6 +184,7 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 - Do not run in-place migration until generated IDs and target object ergonomics are reviewed after dogfood.
 - Let `matt project link` be idempotent so agents can safely run it before project work.
 - Let `goal create` and `ticket create` infer the project when the current directory is inside a linked source path.
+- Keep release artifacts under `dist/` and build them with `make build` or `make release`.
 
 ## Links
 
