@@ -29,7 +29,7 @@ The system is intentionally file-first: agents should be able to clone the repo,
 - [x] T-001: Define the core repository structure.
 - [x] T-002: Add instructions for agents.
 - [x] T-003: Add project and ledger templates.
-- [ ] T-004: Register active external projects after reading their current state.
+- [x] T-004: Register active external projects after reading their current state.
 - [ ] T-005: Add validation or automation once the Markdown workflow stabilizes.
 
 ## Blockers
