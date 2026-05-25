@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/sunday-studio/maat/internal/maat"
 )
@@ -53,6 +54,10 @@ func run(args []string) error {
 		return nil
 	case "project":
 		return projectCommand(args[1:])
+	case "goal":
+		return goalCommand(args[1:])
+	case "ticket":
+		return ticketCommand(args[1:])
 	case "status":
 		filtered, jsonOut := splitJSONFlag(args[1:])
 		store, err := loadStore(filtered)
@@ -72,6 +77,8 @@ func run(args []string) error {
 		return nil
 	case "validate":
 		return validateCommand(args[1:])
+	case "migrate":
+		return migrateCommand(args[1:])
 	case "search":
 		return searchCommand(args[1:])
 	case "tui":
@@ -90,8 +97,15 @@ Usage:
   matt index rebuild [--storage <path>]
   matt projects [--storage <path>] [--json]
   matt project show <project-id> [--storage <path>]
+  matt goal create <project-key> <title> [--storage <path>]
+  matt ticket create <project-key> <title> [--goal <goal-id>] [--storage <path>]
+  matt ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>]
+  matt ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>]
+  matt ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>]
   matt status [--storage <path>] [--json]
   matt validate [--storage <path>] [--json]
+  matt migrate plan [--storage <path>] [--json]
+  matt migrate apply --dest <path> [--storage <path>]
   matt search <query> [--storage <path>] [--json]
   matt tui [--storage <path>]
 
@@ -182,6 +196,60 @@ func validateCommand(args []string) error {
 	return nil
 }
 
+func migrateCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: matt migrate plan [--storage <path>] [--json] or matt migrate apply --dest <path> [--storage <path>]")
+	}
+	switch args[0] {
+	case "plan":
+		filtered, jsonOut := splitJSONFlag(args[1:])
+		store, err := loadStore(filtered)
+		if err != nil {
+			return err
+		}
+		plan, err := maat.PlanLegacyMigration(store, maat.MigrationOptions{})
+		if err != nil {
+			return err
+		}
+		if jsonOut {
+			return writeJSON(plan)
+		}
+		fmt.Printf("planned %d projects and %d files\n", len(plan.Projects), len(plan.Files))
+		for _, project := range plan.Projects {
+			fmt.Printf("%s -> %s (%d goals, %d tickets, %d events)\n",
+				project.LegacyPath,
+				project.ProjectPath,
+				len(project.GoalPaths),
+				len(project.TicketPaths),
+				len(project.EventPaths),
+			)
+		}
+		return nil
+	case "apply":
+		filtered, dest, err := splitDestinationFlag(args[1:])
+		if err != nil {
+			return err
+		}
+		store, err := loadStore(filtered)
+		if err != nil {
+			return err
+		}
+		absDest, err := filepath.Abs(dest)
+		if err != nil {
+			return err
+		}
+		plan, err := maat.ApplyLegacyMigration(store, absDest, maat.MigrationOptions{})
+		if err != nil {
+			return err
+		}
+		fmt.Printf("migrated %d projects into %s\n", len(plan.Projects), absDest)
+		fmt.Printf("wrote %d files\n", len(plan.Files))
+		return nil
+	default:
+		return fmt.Errorf("unknown migrate command %q", args[0])
+	}
+}
+
 func projectCommand(args []string) error {
 	if len(args) < 2 || args[0] != "show" {
 		return errors.New("usage: matt project show <project-id> [--storage <path>]")
@@ -214,6 +282,201 @@ func projectCommand(args []string) error {
 			fmt.Printf("  - [%s] %s %s\n", box, ticket.ID, ticket.Title)
 		}
 	}
+	return nil
+}
+
+func goalCommand(args []string) error {
+	if len(args) == 0 || args[0] != "create" {
+		return errors.New("usage: matt goal create <project-key> <title> [--storage <path>]")
+	}
+	store, rest, err := loadStoreAndRest(args[1:])
+	if err != nil {
+		return err
+	}
+	if len(rest) != 2 {
+		return errors.New("usage: matt goal create <project-key> <title> [--storage <path>]")
+	}
+	writer := maat.NewWriteStore(store)
+	goal, event, err := writer.CreateGoal(maat.CreateGoalInput{
+		ProjectKey: rest[0],
+		Title:      rest[1],
+		Actor:      defaultActor(),
+	})
+	if err != nil {
+		return err
+	}
+	refreshIndexes(store)
+	fmt.Printf("created goal %s in %s\n", goal.ID, goal.ProjectKey)
+	fmt.Printf("event %s\n", event.ID)
+	return nil
+}
+
+func ticketCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: matt ticket <create|claim|comment|complete>")
+	}
+	switch args[0] {
+	case "create":
+		return ticketCreateCommand(args[1:])
+	case "claim":
+		return ticketClaimCommand(args[1:])
+	case "comment":
+		return ticketCommentCommand(args[1:])
+	case "complete":
+		return ticketCompleteCommand(args[1:])
+	default:
+		return fmt.Errorf("unknown ticket command %q", args[0])
+	}
+}
+
+func ticketCreateCommand(args []string) error {
+	store, rest, err := loadStoreAndRest(args)
+	if err != nil {
+		return err
+	}
+	goalID, rest, err := consumeFlagValue(rest, "--goal", false)
+	if err != nil {
+		return err
+	}
+	if len(rest) != 2 {
+		return errors.New("usage: matt ticket create <project-key> <title> [--goal <goal-id>] [--storage <path>]")
+	}
+	writer := maat.NewWriteStore(store)
+	ticket, event, err := writer.CreateTicket(maat.CreateTicketInput{
+		ProjectKey: rest[0],
+		Title:      rest[1],
+		GoalID:     goalID,
+		Actor:      defaultActor(),
+	})
+	if err != nil {
+		return err
+	}
+	refreshIndexes(store)
+	fmt.Printf("created ticket %s in %s\n", ticket.ID, ticket.ProjectKey)
+	fmt.Printf("event %s\n", event.ID)
+	return nil
+}
+
+func ticketClaimCommand(args []string) error {
+	store, rest, err := loadStoreAndRest(args)
+	if err != nil {
+		return err
+	}
+	agent, rest, err := consumeFlagValue(rest, "--agent", false)
+	if err != nil {
+		return err
+	}
+	ttlText, rest, err := consumeFlagValue(rest, "--ttl", false)
+	if err != nil {
+		return err
+	}
+	projectKey, rest, err := consumeFlagValue(rest, "--project", false)
+	if err != nil {
+		return err
+	}
+	if len(rest) != 1 {
+		return errors.New("usage: matt ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>]")
+	}
+	if agent == "" {
+		agent = defaultActor()
+	}
+	ttl := 2 * time.Hour
+	if ttlText != "" {
+		ttl, err = time.ParseDuration(ttlText)
+		if err != nil {
+			return fmt.Errorf("invalid --ttl %q: %w", ttlText, err)
+		}
+	}
+	ticketID := rest[0]
+	projectKey, err = resolveTicketProject(store, projectKey, ticketID)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	writer := maat.NewWriteStore(store)
+	event, err := writer.ClaimTicket(maat.ClaimTicketInput{
+		ProjectKey: projectKey,
+		TicketID:   ticketID,
+		Actor:      agent,
+		ExpiresAt:  now.Add(ttl),
+		At:         now,
+	})
+	if err != nil {
+		return err
+	}
+	refreshIndexes(store)
+	fmt.Printf("claimed ticket %s in %s until %s\n", ticketID, projectKey, now.Add(ttl).Format(time.RFC3339))
+	fmt.Printf("event %s\n", event.ID)
+	return nil
+}
+
+func ticketCommentCommand(args []string) error {
+	store, rest, err := loadStoreAndRest(args)
+	if err != nil {
+		return err
+	}
+	projectKey, rest, err := consumeFlagValue(rest, "--project", false)
+	if err != nil {
+		return err
+	}
+	if len(rest) != 2 {
+		return errors.New("usage: matt ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>]")
+	}
+	ticketID := rest[0]
+	projectKey, err = resolveTicketProject(store, projectKey, ticketID)
+	if err != nil {
+		return err
+	}
+	writer := maat.NewWriteStore(store)
+	event, err := writer.CommentTicket(maat.TicketCommentInput{
+		ProjectKey: projectKey,
+		TicketID:   ticketID,
+		Actor:      defaultActor(),
+		Comment:    rest[1],
+	})
+	if err != nil {
+		return err
+	}
+	refreshIndexes(store)
+	fmt.Printf("commented on ticket %s in %s\n", ticketID, projectKey)
+	fmt.Printf("event %s\n", event.ID)
+	return nil
+}
+
+func ticketCompleteCommand(args []string) error {
+	store, rest, err := loadStoreAndRest(args)
+	if err != nil {
+		return err
+	}
+	evidence, rest, err := consumeFlagValue(rest, "--evidence", true)
+	if err != nil {
+		return err
+	}
+	projectKey, rest, err := consumeFlagValue(rest, "--project", false)
+	if err != nil {
+		return err
+	}
+	if len(rest) != 1 {
+		return errors.New("usage: matt ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>]")
+	}
+	ticketID := rest[0]
+	projectKey, err = resolveTicketProject(store, projectKey, ticketID)
+	if err != nil {
+		return err
+	}
+	writer := maat.NewWriteStore(store)
+	event, err := writer.CompleteTicket(maat.CompleteTicketInput{
+		ProjectKey: projectKey,
+		TicketID:   ticketID,
+		Actor:      defaultActor(),
+		Evidence:   []string{evidence},
+	})
+	if err != nil {
+		return err
+	}
+	refreshIndexes(store)
+	fmt.Printf("completed ticket %s in %s\n", ticketID, projectKey)
+	fmt.Printf("event %s\n", event.ID)
 	return nil
 }
 
@@ -262,6 +525,74 @@ func searchWithSQLite(store, query string) ([]maat.SearchResult, error) {
 	return maat.Search(store, query)
 }
 
+func refreshIndexes(store string) {
+	if idx, err := maat.BuildIndex(store); err == nil {
+		_, _ = maat.WriteIndex(store, idx)
+	}
+	_, _ = maat.RebuildSQLiteIndex(store)
+}
+
+func resolveTicketProject(store, projectKey, ticketID string) (string, error) {
+	if strings.TrimSpace(projectKey) != "" {
+		return projectKey, nil
+	}
+	objectStore, err := maat.LoadObjectStore(store)
+	if err != nil {
+		return "", err
+	}
+	matches := make([]string, 0, 1)
+	for _, project := range objectStore.Projects {
+		for _, ticket := range project.Tickets {
+			if ticket.ID == ticketID {
+				matches = append(matches, project.Key)
+				break
+			}
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return "", fmt.Errorf("ticket %q not found; pass --project <project-key> if it is in a legacy project", ticketID)
+	case 1:
+		return matches[0], nil
+	default:
+		return "", fmt.Errorf("ticket %q exists in multiple projects; pass --project <project-key>", ticketID)
+	}
+}
+
+func consumeFlagValue(args []string, flag string, required bool) (string, []string, error) {
+	filtered := make([]string, 0, len(args))
+	value := ""
+	found := false
+	for i := 0; i < len(args); i++ {
+		if args[i] != flag {
+			filtered = append(filtered, args[i])
+			continue
+		}
+		if found {
+			return "", nil, fmt.Errorf("%s can only be provided once", flag)
+		}
+		if i+1 >= len(args) {
+			return "", nil, fmt.Errorf("%s requires a value", flag)
+		}
+		value = args[i+1]
+		found = true
+		i++
+	}
+	if required && !found {
+		return "", nil, fmt.Errorf("%s is required", flag)
+	}
+	return value, filtered, nil
+}
+
+func defaultActor() string {
+	for _, key := range []string{"MAAT_ACTOR", "USER", "USERNAME"} {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	return "agent"
+}
+
 func splitJSONFlag(args []string) ([]string, bool) {
 	filtered := make([]string, 0, len(args))
 	jsonOut := false
@@ -273,6 +604,26 @@ func splitJSONFlag(args []string) ([]string, bool) {
 		filtered = append(filtered, arg)
 	}
 	return filtered, jsonOut
+}
+
+func splitDestinationFlag(args []string) ([]string, string, error) {
+	filtered := make([]string, 0, len(args))
+	dest := ""
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--dest" {
+			if i+1 >= len(args) {
+				return nil, "", errors.New("--dest requires a path")
+			}
+			dest = args[i+1]
+			i++
+			continue
+		}
+		filtered = append(filtered, args[i])
+	}
+	if strings.TrimSpace(dest) == "" {
+		return nil, "", errors.New("usage: matt migrate apply --dest <path> [--storage <path>]")
+	}
+	return filtered, dest, nil
 }
 
 func writeJSON(value any) error {

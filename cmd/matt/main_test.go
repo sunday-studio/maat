@@ -153,6 +153,101 @@ func TestMigrateApplyCommandWritesDestinationOnly(t *testing.T) {
 	}
 }
 
+func TestGoalCreateCommand(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := writeObjectCommandFixture(t)
+
+	output, err := captureRun("goal", "create", "orion", "Ship command writes", "--storage", store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "created goal") || !strings.Contains(output, "event") {
+		t.Fatalf("unexpected output: %q", output)
+	}
+
+	project, err := maat.LoadObjectProject(store, "orion")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(project.Goals) != 1 || project.Goals[0].Title != "Ship command writes" {
+		t.Fatalf("unexpected goals: %#v", project.Goals)
+	}
+	if len(project.Events) != 1 || project.Events[0].Type != "goal.created" {
+		t.Fatalf("unexpected events: %#v", project.Events)
+	}
+}
+
+func TestTicketCreateCommand(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := writeObjectCommandFixture(t)
+	goalID := createCommandGoal(t, store)
+
+	output, err := captureRun("ticket", "create", "orion", "Wire ticket command", "--goal", goalID, "--storage", store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "created ticket") || !strings.Contains(output, "event") {
+		t.Fatalf("unexpected output: %q", output)
+	}
+
+	project, err := maat.LoadObjectProject(store, "orion")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(project.Tickets) != 1 || project.Tickets[0].Title != "Wire ticket command" {
+		t.Fatalf("unexpected tickets: %#v", project.Tickets)
+	}
+	if project.Tickets[0].GoalID != goalID {
+		t.Fatalf("expected goal link %q, got %q", goalID, project.Tickets[0].GoalID)
+	}
+}
+
+func TestTicketEventCommands(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := writeObjectCommandFixture(t)
+	ticketID := createCommandTicket(t, store)
+
+	if output, err := captureRun("ticket", "claim", ticketID, "--agent", "claude", "--ttl", "30m", "--storage", store); err != nil {
+		t.Fatal(err)
+	} else if !strings.Contains(output, "claimed ticket") {
+		t.Fatalf("unexpected claim output: %q", output)
+	}
+	if output, err := captureRun("ticket", "comment", ticketID, "Progress note", "--storage", store); err != nil {
+		t.Fatal(err)
+	} else if !strings.Contains(output, "commented on ticket") {
+		t.Fatalf("unexpected comment output: %q", output)
+	}
+	if output, err := captureRun("ticket", "complete", ticketID, "--evidence", "go test ./...", "--storage", store); err != nil {
+		t.Fatal(err)
+	} else if !strings.Contains(output, "completed ticket") {
+		t.Fatalf("unexpected complete output: %q", output)
+	}
+
+	project, err := maat.LoadObjectProject(store, "orion")
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventTypes := map[string]bool{}
+	for _, event := range project.Events {
+		eventTypes[event.Type] = true
+	}
+	for _, eventType := range []string{"ticket.claimed", "ticket.commented", "ticket.completed"} {
+		if !eventTypes[eventType] {
+			t.Fatalf("missing event type %s in %#v", eventType, project.Events)
+		}
+	}
+}
+
+func TestTicketCompleteRequiresEvidence(t *testing.T) {
+	store := writeObjectCommandFixture(t)
+	ticketID := createCommandTicket(t, store)
+
+	_, err := captureRun("ticket", "complete", ticketID, "--storage", store)
+	if err == nil || !strings.Contains(err.Error(), "--evidence is required") {
+		t.Fatalf("expected evidence error, got %v", err)
+	}
+}
+
 func captureRun(args ...string) (string, error) {
 	oldStdout := os.Stdout
 	reader, writer, err := os.Pipe()
@@ -172,6 +267,50 @@ func captureRun(args ...string) (string, error) {
 		return "", readErr
 	}
 	return string(data), runErr
+}
+
+func writeObjectCommandFixture(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	writer := maat.NewWriteStore(root)
+	if _, err := writer.CreateProject(maat.CreateProjectInput{
+		Key:         "orion",
+		DisplayName: "Orion",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+func createCommandGoal(t *testing.T, store string) string {
+	t.Helper()
+
+	writer := maat.NewWriteStore(store)
+	goal, _, err := writer.CreateGoal(maat.CreateGoalInput{
+		ProjectKey: "orion",
+		Title:      "Existing goal",
+		Actor:      "test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return goal.ID
+}
+
+func createCommandTicket(t *testing.T, store string) string {
+	t.Helper()
+
+	writer := maat.NewWriteStore(store)
+	ticket, _, err := writer.CreateTicket(maat.CreateTicketInput{
+		ProjectKey: "orion",
+		Title:      "Existing ticket",
+		Actor:      "test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ticket.ID
 }
 
 func writeCommandFixture(t *testing.T) string {
