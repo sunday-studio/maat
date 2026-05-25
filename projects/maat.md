@@ -48,6 +48,23 @@ The system is intentionally file-first: agents should be able to clone the repo,
 - [x] T-004: Document the CLI, Bubble Tea TUI, local web UI, and agent protocol.
 - [x] T-005: Document the phased implementation plan.
 
+### G-003: Build the first usable `matt` CLI slice
+
+| Field | Value |
+|---|---|
+| Status | active |
+| Updated | 2026-05-25 |
+| Tags | #cli #search #go |
+
+#### Tasks
+
+- [x] T-001: Add the Go module and `cmd/matt` entrypoint.
+- [x] T-002: Parse and validate legacy flat project Markdown files.
+- [x] T-003: Add `projects`, `project show`, `status`, and `search` read commands.
+- [x] T-004: Add a rebuildable bootstrap index command.
+- [ ] T-005: Replace the bootstrap JSON index with SQLite FTS.
+- [ ] T-006: Add target object layout parsing for project directories, goals, tickets, and event files.
+
 ## Blockers
 
 - None.
@@ -63,3 +80,4 @@ The system is intentionally file-first: agents should be able to clone the repo,
 - [Agent instructions](../AGENTS.md)
 - [Schema](../docs/schema.md)
 - [Workflows](../docs/workflows.md)
+- [Development](../docs/development.md)

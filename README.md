@@ -48,9 +48,26 @@ The early repository has flat project files and a monthly ledger. The target arc
 - [CLI, TUI, And UI](docs/cli-tui-ui.md)
 - [Agent Protocol](docs/agent-protocol.md)
 - [Implementation Plan](docs/implementation-plan.md)
+- [Development](docs/development.md)
 - [Markdown Schema](docs/schema.md)
 - [Workflows](docs/workflows.md)
 - [Integrations](docs/integrations.md)
+
+## Current CLI
+
+The first implementation is a Go CLI named `matt`.
+
+Run it locally:
+
+```sh
+go run ./cmd/matt status --storage .
+go run ./cmd/matt projects --storage .
+go run ./cmd/matt project show orion --storage .
+go run ./cmd/matt search "agent health" --storage .
+go run ./cmd/matt index rebuild --storage .
+```
+
+The current index command writes a rebuildable bootstrap index to `.maat/index.json`. The target architecture still calls for SQLite FTS and optional vector search.
 
 ## Minimum Agent Workflow
 

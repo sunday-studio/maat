@@ -16,6 +16,13 @@ This plan keeps implementation small while preserving the target architecture.
 - Detect malformed events.
 - Support the existing flat v0 files enough to migrate or inspect them.
 
+Current bootstrap status:
+
+- legacy flat project parsing exists for `projects/*.md`
+- known status validation exists for project and goal state
+- status totals can be computed from parsed projects
+- target object layout parsing remains future work
+
 ## Phase 2: CLI Read Path
 
 - `matt init`
@@ -25,6 +32,13 @@ This plan keeps implementation small while preserving the target architecture.
 - `matt project show`
 - `matt status`
 - `matt search` with SQLite FTS
+
+Current bootstrap status:
+
+- `matt init` and `matt storage link` write local config
+- `matt index rebuild` writes `.maat/index.json` as a temporary rebuildable index
+- `matt projects`, `matt project show`, `matt status`, and direct Markdown `matt search` work
+- SQLite FTS remains future work
 
 ## Phase 3: CLI Write Path
 
