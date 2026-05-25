@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/sunday-studio/maat/internal/maat"
 )
 
@@ -14,6 +16,7 @@ func TestDashboardFromLegacyProjectsCountsStatus(t *testing.T) {
 			Title:   "Orion",
 			Status:  "active",
 			Updated: "2026-05-25",
+			Current: "Current Orion summary.",
 			Goals: []maat.Goal{
 				{
 					ID:     "G-001",
@@ -39,6 +42,15 @@ func TestDashboardFromLegacyProjectsCountsStatus(t *testing.T) {
 	}
 	if len(dashboard.Projects) != 1 || dashboard.Projects[0].Tickets != 2 {
 		t.Fatalf("project rows = %+v", dashboard.Projects)
+	}
+	if dashboard.Projects[0].OpenTickets != 1 || dashboard.Projects[0].DoneTickets != 1 {
+		t.Fatalf("project ticket counts = %+v", dashboard.Projects[0])
+	}
+	if dashboard.Projects[0].Summary != "Current Orion summary." {
+		t.Fatalf("project summary = %q", dashboard.Projects[0].Summary)
+	}
+	if len(dashboard.Projects[0].GoalRows) != 2 || dashboard.Projects[0].GoalRows[0].Tickets != 2 {
+		t.Fatalf("goal rows = %+v", dashboard.Projects[0].GoalRows)
 	}
 }
 
@@ -75,5 +87,76 @@ func TestRenderProjectTable(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderProjectTable() missing %q in:\n%s", want, got)
 		}
+	}
+}
+
+func TestRenderSelectableProjectTableMarksSelectedProject(t *testing.T) {
+	got := RenderSelectableProjectTable([]ProjectRow{
+		{Key: "orion", DisplayName: "Orion", Status: "active"},
+		{Key: "aether", DisplayName: "Aether", Status: "waiting"},
+	}, 1)
+
+	for _, want := range []string{"> Aether", "  Orion"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderSelectableProjectTable() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderProjectDetailShowsSummaryGoalsAndTicketCounts(t *testing.T) {
+	got := RenderProjectDetail(ProjectRow{
+		Key:         "orion",
+		DisplayName: "Orion",
+		Status:      "active",
+		Summary:     "Shipping the agent monitor.",
+		Tickets:     3,
+		OpenTickets: 2,
+		DoneTickets: 1,
+		Updated:     "2026-05-25",
+		GoalRows: []GoalRow{
+			{ID: "G-001", Title: "Improve monitor clarity", Status: "active", Tickets: 3},
+		},
+	})
+
+	for _, want := range []string{"Project Detail", "Orion", "2 open / 1 done / 3 total", "Shipping the agent monitor.", "G-001", "Improve monitor clarity"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderProjectDetail() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestModelSelectionMovesWithArrowKeys(t *testing.T) {
+	model := NewModel(Dashboard{Projects: []ProjectRow{
+		{Key: "orion"},
+		{Key: "aether"},
+	}}, nil)
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if cmd != nil {
+		t.Fatalf("down command = %v, want nil", cmd)
+	}
+	got := updated.(Model)
+	if got.selected != 1 {
+		t.Fatalf("selected after down = %d, want 1", got.selected)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyDown})
+	got = updated.(Model)
+	if got.selected != 1 {
+		t.Fatalf("selected after second down = %d, want clamped 1", got.selected)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyUp})
+	got = updated.(Model)
+	if got.selected != 0 {
+		t.Fatalf("selected after up = %d, want 0", got.selected)
+	}
+}
+
+func TestModelQuitKeyReturnsCommand(t *testing.T) {
+	model := NewModel(Dashboard{}, nil)
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	if cmd == nil {
+		t.Fatal("quit command is nil")
 	}
 }
