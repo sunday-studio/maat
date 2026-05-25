@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -16,6 +17,7 @@ type Event struct {
 	Type     string
 	Object   string
 	Commit   string
+	Metadata map[string]string
 	Summary  string
 	Evidence []string
 }
@@ -71,6 +73,9 @@ func RenderEventMarkdown(event Event) (string, error) {
 	if strings.TrimSpace(event.Commit) != "" {
 		writeMarkdownField(&buffer, "Commit", event.Commit)
 	}
+	for _, key := range sortedMetadataKeys(event.Metadata) {
+		writeMarkdownField(&buffer, key, event.Metadata[key])
+	}
 	buffer.WriteString("\n## Summary\n\n")
 	buffer.WriteString(strings.TrimSpace(event.Summary))
 	buffer.WriteString("\n")
@@ -110,6 +115,19 @@ func validateEvent(event Event) error {
 		return fmt.Errorf("event summary is required")
 	}
 	return nil
+}
+
+func sortedMetadataKeys(metadata map[string]string) []string {
+	keys := make([]string, 0, len(metadata))
+	for key, value := range metadata {
+		key = strings.TrimSpace(key)
+		if key == "" || strings.TrimSpace(value) == "" {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func writeMarkdownField(buffer *bytes.Buffer, key, value string) {

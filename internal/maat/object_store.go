@@ -205,7 +205,7 @@ func ParseObjectTicketFile(store, path string) (ObjectTicket, error) {
 	ticket := ObjectTicket{
 		ID:          doc.Fields["ticket id"],
 		ProjectKey:  doc.Fields["project"],
-		GoalID:      doc.Fields["goal"],
+		GoalID:      optionalObjectLink(doc.Fields["goal"]),
 		Title:       strings.TrimSpace(strings.TrimPrefix(doc.Title, "Ticket:")),
 		Status:      doc.Fields["status"],
 		Created:     doc.Fields["created"],
@@ -420,4 +420,12 @@ func parseBulletList(content string) []string {
 		}
 	}
 	return items
+}
+
+func optionalObjectLink(value string) string {
+	value = strings.TrimSpace(value)
+	if strings.EqualFold(value, "none") {
+		return ""
+	}
+	return value
 }
