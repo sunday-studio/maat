@@ -80,7 +80,7 @@ The system is intentionally file-first: agents should be able to clone the repo,
 - [x] T-003: Assign target storage parsing to a worker agent.
 - [x] T-004: Assign validation improvements to a worker agent.
 - [x] T-005: Assign ID and event helper foundations to a worker agent.
-- [ ] T-006: Integrate worker commits after review.
+- [x] T-006: Integrate worker commits after review.
 
 ## Blockers
 
@@ -91,6 +91,7 @@ The system is intentionally file-first: agents should be able to clone the repo,
 - Use Markdown files as the source of truth rather than a database.
 - Use Git commits plus append-only event files for transactional history.
 - Keep optional adapters, dashboards, MCP servers, and CLIs layered on top of the Markdown core.
+- Keep the JSON bootstrap index temporarily while SQLite FTS lands behind the core API.
 
 ## Links
 

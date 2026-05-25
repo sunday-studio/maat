@@ -21,6 +21,10 @@ Initial owner:
 
 - Worker A: SQLite/FTS implementation under `internal/maat`.
 
+Status:
+
+- Done in `51f57df feat(index): add sqlite search index`.
+
 ## Group 2: Target Storage Parser
 
 Goal: support the conflict-resistant target layout from `docs/storage-model.md`.
@@ -37,6 +41,10 @@ Tasks:
 Initial owner:
 
 - Worker B: target object parser under `internal/maat`.
+
+Status:
+
+- Done in `6011fb7 feat(parser): load object storage layout`.
 
 ## Group 3: Validation And Store Health
 
@@ -56,6 +64,10 @@ Initial owner:
 
 - Worker C: validation API and tests under `internal/maat`.
 
+Status:
+
+- Done in `1af445b feat(validation): add legacy store checks`.
+
 ## Group 4: Write Path Foundations
 
 Goal: prepare safe agent writes without rushing CLI commands.
@@ -71,6 +83,10 @@ Tasks:
 Initial owner:
 
 - Worker D: ID and event helpers under `internal/maat`.
+
+Status:
+
+- Done in `ef82244 feat(core): add event write helpers`.
 
 ## Group 5: CLI Commands
 
