@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | ID | maat |
-| Status | active |
+| Status | done |
 | Owner | agents |
 | Updated | 2026-05-25 |
 | Tags | #agent-run #git-native #product |
@@ -112,12 +112,12 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 
 #### Tasks
 
-- [ ] T-001: Add CLI write commands for goals and tickets.
-- [ ] T-002: Add sync orchestration internals for validate, index, commit, and optional push.
-- [ ] T-003: Add migration plan/apply CLI commands.
-- [ ] T-004: Improve the TUI with project selection and detail view.
-- [ ] T-005: Package the agent protocol snippet for other repos.
-- [ ] T-006: Integrate and verify the workflow worker commits.
+- [x] T-001: Add CLI write commands for goals and tickets.
+- [x] T-002: Add sync orchestration internals for validate, index, commit, and optional push.
+- [x] T-003: Add migration plan/apply CLI commands.
+- [x] T-004: Improve the TUI with project selection and detail view.
+- [x] T-005: Package the agent protocol snippet for other repos.
+- [x] T-006: Integrate and verify the workflow worker commits.
 
 ## Blockers
 
@@ -130,6 +130,7 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 - Keep optional adapters, dashboards, MCP servers, and CLIs layered on top of the Markdown core.
 - Keep the JSON bootstrap index temporarily while SQLite FTS lands behind the core API.
 - Use SQLite-backed search as the CLI default, with direct Markdown search as a fallback.
+- Keep migration apply non-destructive by writing target-layout files to a destination path instead of rewriting legacy files.
 
 ## Links
 

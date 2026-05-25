@@ -111,6 +111,7 @@ Status:
 
 - Done in `84b1db1 feat(cli): wire read path commands`.
 - Next write-command wiring assigned to Worker A for goal and ticket create/claim/comment/complete.
+- Write-command wiring done in `43e7e47 feat(cli): add agent write commands`.
 
 ## Group 6: TUI
 
@@ -131,6 +132,7 @@ Status:
 
 - Done in `9965baf feat(tui): add bubble tea dashboard`.
 - Next detail-pane and selection improvements assigned to Worker D.
+- Detail-pane and selection improvements done in `b2c593d feat(tui): refine dashboard navigation`.
 
 ## Group 7: Local Web UI
 
@@ -188,6 +190,7 @@ Status:
 
 - Done in `ea4ea32 feat(sync): add git primitives`.
 - Next orchestration API assigned to Worker B.
+- Sync orchestration API done in `024f39b feat(sync): orchestrate store sync`.
 
 ## Group 10: Migration Core
 
@@ -209,6 +212,7 @@ Status:
 
 - Done in `982ae4d feat(migration): add legacy object planner`.
 - Next CLI migration command wiring assigned to Worker C.
+- Migration command coverage landed in `4149bea test(cli): cover migration commands`; command wiring landed with `43e7e47 feat(cli): add agent write commands`.
 
 ## Group 11: Agent Protocol Packaging
 
@@ -225,6 +229,10 @@ Tasks:
 Initial owner:
 
 - Worker E: agent protocol docs and optional snippet helper.
+
+Status:
+
+- Done in `7654ed2 docs(agent): define command protocol`.
 
 Status:
 
