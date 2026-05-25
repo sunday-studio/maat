@@ -125,6 +125,18 @@ func TestRenderProjectDetailShowsSummaryGoalsAndTicketCounts(t *testing.T) {
 	}
 }
 
+func TestRenderDashboardShowsNavigationHelp(t *testing.T) {
+	got := RenderDashboardWithSelection(Dashboard{Projects: []ProjectRow{
+		{Key: "orion", DisplayName: "Orion", Status: "active"},
+	}}, 0)
+
+	for _, want := range []string{"Search and timeline views are planned", "up/down or k/j", "q to quit"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderDashboardWithSelection() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
 func TestModelSelectionMovesWithArrowKeys(t *testing.T) {
 	model := NewModel(Dashboard{Projects: []ProjectRow{
 		{Key: "orion"},

@@ -230,7 +230,7 @@ func RenderDashboardWithSelection(dashboard Dashboard, selected int) string {
 	b.WriteString("\n\n")
 	b.WriteString(RenderProjectDetail(selectedProject(dashboard.Projects, selected)))
 	b.WriteString("\n\n")
-	b.WriteString(mutedStyle.Render("Search and timeline views are planned. Use up/down to select, q to quit."))
+	b.WriteString(mutedStyle.Render("Search and timeline views are planned. Use up/down or k/j to select, q to quit."))
 	b.WriteString("\n")
 	return b.String()
 }
