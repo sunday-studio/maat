@@ -217,6 +217,15 @@ Status:
 - Next CLI migration command wiring assigned to Worker C.
 - Migration command coverage landed in `4149bea test(cli): cover migration commands`; command wiring landed with `43e7e47 feat(cli): add agent write commands`.
 - Migration dogfood and safety report assigned to Worker 5.
+- Dogfood migration run documented in `docs/migration-dogfood.md`.
+- Migration apply now refuses to overwrite existing target files.
+
+Remaining:
+
+- Add a preflight collision scan that reports all target conflicts before writing.
+- Preserve legacy updated metadata where possible.
+- Migrate blockers and decisions into first-class target objects.
+- Design an explicit, backed-up in-place migration command.
 
 ## Group 11: Agent Protocol Packaging
 

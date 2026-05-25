@@ -76,7 +76,18 @@ func ApplyLegacyMigration(source, destination string, options MigrationOptions) 
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return MigrationPlan{}, err
 		}
-		if err := os.WriteFile(path, []byte(file.Content), 0o644); err != nil {
+		handle, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+		if err != nil {
+			if os.IsExist(err) {
+				return MigrationPlan{}, fmt.Errorf("migration destination already has %s", file.Path)
+			}
+			return MigrationPlan{}, err
+		}
+		if _, err := handle.WriteString(file.Content); err != nil {
+			_ = handle.Close()
+			return MigrationPlan{}, err
+		}
+		if err := handle.Close(); err != nil {
 			return MigrationPlan{}, err
 		}
 	}

@@ -120,6 +120,22 @@ func TestApplyLegacyMigrationWritesTargetLayoutWithoutTouchingSource(t *testing.
 	}
 }
 
+func TestApplyLegacyMigrationRefusesExistingTargetFile(t *testing.T) {
+	source := t.TempDir()
+	writeLegacyMigrationFixture(t, source)
+
+	destination := t.TempDir()
+	writeFile(t, filepath.Join(destination, "projects", "orion", "project.md"), "existing")
+
+	_, err := ApplyLegacyMigration(source, destination, MigrationOptions{})
+	if err == nil {
+		t.Fatal("expected migration to fail on existing target file")
+	}
+	if !strings.Contains(err.Error(), "projects/orion/project.md") {
+		t.Fatalf("expected target path in error, got %v", err)
+	}
+}
+
 func writeLegacyMigrationFixture(t *testing.T, root string) {
 	t.Helper()
 	writeFile(t, filepath.Join(root, "projects", "orion.md"), `# Project: Orion
