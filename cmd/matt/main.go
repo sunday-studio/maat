@@ -74,6 +74,8 @@ func run(args []string) error {
 		return validateCommand(args[1:])
 	case "search":
 		return searchCommand(args[1:])
+	case "tui":
+		return tuiCommand(args[1:])
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -91,6 +93,7 @@ Usage:
   matt status [--storage <path>] [--json]
   matt validate [--storage <path>] [--json]
   matt search <query> [--storage <path>] [--json]
+  matt tui [--storage <path>]
 
 Git plus Markdown remains the source of truth. The local index is rebuildable.
 `)
