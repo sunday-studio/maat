@@ -2,6 +2,7 @@ package maatui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -38,9 +39,21 @@ type TicketRow struct {
 	GoalID string
 }
 
+type EventRow struct {
+	ID          string
+	Time        string
+	Actor       string
+	ProjectKey  string
+	ProjectName string
+	Type        string
+	ObjectID    string
+	Summary     string
+}
+
 type Dashboard struct {
 	Projects []ProjectRow
 	Summary  maat.StatusSummary
+	Events   []EventRow
 }
 
 type DetailMode int
@@ -48,6 +61,7 @@ type DetailMode int
 const (
 	DetailModeProject DetailMode = iota
 	DetailModeTickets
+	DetailModeTimeline
 )
 
 type Model struct {
@@ -135,6 +149,7 @@ func LoadDashboard(storage string) (Dashboard, error) {
 
 func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 	rows := make([]ProjectRow, 0, len(projects))
+	events := make([]EventRow, 0)
 	var summary maat.StatusSummary
 	summary.Projects = len(projects)
 	for _, project := range projects {
@@ -189,8 +204,26 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 				summary.OpenTickets++
 			}
 		}
+		for _, event := range project.Events {
+			events = append(events, EventRow{
+				ID:          event.ID,
+				Time:        event.Time,
+				Actor:       event.Actor,
+				ProjectKey:  event.ProjectKey,
+				ProjectName: project.DisplayName,
+				Type:        event.Type,
+				ObjectID:    event.ObjectID,
+				Summary:     event.Summary,
+			})
+		}
 	}
-	return Dashboard{Projects: rows, Summary: summary}
+	sort.Slice(events, func(i, j int) bool {
+		if events[i].Time == events[j].Time {
+			return events[i].ID > events[j].ID
+		}
+		return events[i].Time > events[j].Time
+	})
+	return Dashboard{Projects: rows, Summary: summary, Events: events}
 }
 
 func DashboardFromLegacyProjects(projects []maat.Project) Dashboard {
@@ -271,13 +304,16 @@ func RenderDashboardWithSelectionAndMode(dashboard Dashboard, selected int, mode
 	b.WriteString(RenderSelectableProjectTable(dashboard.Projects, selected))
 	b.WriteString("\n\n")
 	project := selectedProject(dashboard.Projects, selected)
-	if mode == DetailModeTickets {
+	switch mode {
+	case DetailModeTickets:
 		b.WriteString(RenderProjectTickets(project))
-	} else {
+	case DetailModeTimeline:
+		b.WriteString(RenderTimeline(dashboard.Events))
+	default:
 		b.WriteString(RenderProjectDetail(project))
 	}
 	b.WriteString("\n\n")
-	b.WriteString(mutedStyle.Render("Search and timeline views are planned. Use up/down or k/j to select, tab to switch detail/tickets, q to quit."))
+	b.WriteString(mutedStyle.Render("Use up/down or k/j to select, tab/right to switch project/tickets/timeline, left to go back, q to quit."))
 	b.WriteString("\n")
 	return b.String()
 }
@@ -398,6 +434,39 @@ func RenderProjectTickets(project ProjectRow) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
+func RenderTimeline(events []EventRow) string {
+	var b strings.Builder
+	b.WriteString(headerStyle.Render("Timeline"))
+	b.WriteString("\n")
+	if len(events) == 0 {
+		b.WriteString(mutedStyle.Render("No events recorded."))
+		return b.String()
+	}
+	for index, event := range events {
+		if index >= 12 {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("+ %d more events", len(events)-index)))
+			break
+		}
+		project := event.ProjectName
+		if project == "" {
+			project = event.ProjectKey
+		}
+		if project == "" {
+			project = "project"
+		}
+		object := event.ObjectID
+		if object == "" {
+			object = "object"
+		}
+		summary := event.Summary
+		if summary == "" {
+			summary = event.Type
+		}
+		b.WriteString(fmt.Sprintf("- %s %s %s %s by %s: %s\n", compactTime(event.Time), truncate(project, 16), event.Type, object, emptyFallback(event.Actor, "unknown"), truncate(summary, 56)))
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
 func truncate(value string, limit int) string {
 	if len(value) <= limit {
 		return value
@@ -429,17 +498,17 @@ func selectedProject(projects []ProjectRow, selected int) ProjectRow {
 }
 
 func nextDetailMode(mode DetailMode) DetailMode {
-	if mode == DetailModeTickets {
+	if mode == DetailModeTimeline {
 		return DetailModeProject
 	}
-	return DetailModeTickets
+	return mode + 1
 }
 
 func previousDetailMode(mode DetailMode) DetailMode {
 	if mode == DetailModeProject {
-		return DetailModeTickets
+		return DetailModeTimeline
 	}
-	return DetailModeProject
+	return mode - 1
 }
 
 func countObjectTickets(tickets []maat.ObjectTicket) (int, int) {
@@ -478,4 +547,11 @@ func emptyFallback(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func compactTime(value string) string {
+	if len(value) >= len("2006-01-02T15:04") {
+		return strings.Replace(value[:len("2006-01-02T15:04")], "T", " ", 1)
+	}
+	return emptyFallback(value, "unknown time")
 }

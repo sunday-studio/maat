@@ -70,6 +70,17 @@ func TestDashboardFromObjectProjectsIncludesTicketRows(t *testing.T) {
 				{ID: "T-001", Title: "Add status table", Status: "active", GoalID: "G-001"},
 				{ID: "T-002", Title: "Fix deploy note", Status: "done"},
 			},
+			Events: []maat.ObjectEvent{
+				{
+					ID:         "E-20260525-190700-codex-a111",
+					Time:       "2026-05-25T19:07:00+02:00",
+					Actor:      "codex",
+					ProjectKey: "orion",
+					Type:       "ticket.created",
+					ObjectID:   "T-001",
+					Summary:    "Created the status table ticket.",
+				},
+			},
 		},
 	})
 
@@ -79,6 +90,9 @@ func TestDashboardFromObjectProjectsIncludesTicketRows(t *testing.T) {
 	}
 	if len(project.TicketRows) != 2 || project.TicketRows[0].GoalID != "G-001" || project.TicketRows[1].GoalID != "" {
 		t.Fatalf("ticket rows = %+v", project.TicketRows)
+	}
+	if len(dashboard.Events) != 1 || dashboard.Events[0].ProjectName != "Orion" || dashboard.Events[0].Type != "ticket.created" {
+		t.Fatalf("event rows = %+v", dashboard.Events)
 	}
 }
 
@@ -186,7 +200,48 @@ func TestRenderDashboardCanShowTicketMode(t *testing.T) {
 		},
 	}}, 0, DetailModeTickets)
 
-	for _, want := range []string{"Tickets", "T-001", "tab to switch detail/tickets"} {
+	for _, want := range []string{"Tickets", "T-001", "project/tickets/timeline"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderDashboardWithSelectionAndMode() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderTimelineShowsRecentEvents(t *testing.T) {
+	got := RenderTimeline([]EventRow{
+		{
+			ID:          "E-older",
+			Time:        "2026-05-25T18:00:00+02:00",
+			Actor:       "claude",
+			ProjectName: "Aether",
+			Type:        "ticket.commented",
+			ObjectID:    "T-010",
+			Summary:     "Added implementation notes.",
+		},
+	})
+
+	for _, want := range []string{"Timeline", "2026-05-25 18:00", "Aether", "ticket.commented", "T-010", "claude", "Added implementation notes"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderTimeline() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderDashboardCanShowTimelineMode(t *testing.T) {
+	got := RenderDashboardWithSelectionAndMode(Dashboard{
+		Projects: []ProjectRow{{Key: "orion", DisplayName: "Orion"}},
+		Events: []EventRow{
+			{
+				Time:        "2026-05-25T19:07:00+02:00",
+				Actor:       "codex",
+				ProjectName: "Orion",
+				Type:        "ticket.created",
+				ObjectID:    "T-001",
+			},
+		},
+	}, 0, DetailModeTimeline)
+
+	for _, want := range []string{"Timeline", "ticket.created", "T-001", "project/tickets/timeline"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderDashboardWithSelectionAndMode() missing %q in:\n%s", want, got)
 		}
@@ -198,7 +253,7 @@ func TestRenderDashboardShowsNavigationHelp(t *testing.T) {
 		{Key: "orion", DisplayName: "Orion", Status: "active"},
 	}}, 0)
 
-	for _, want := range []string{"Search and timeline views are planned", "up/down or k/j", "tab to switch detail/tickets", "q to quit"} {
+	for _, want := range []string{"up/down or k/j", "tab/right to switch project/tickets/timeline", "left to go back", "q to quit"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderDashboardWithSelection() missing %q in:\n%s", want, got)
 		}
@@ -247,14 +302,20 @@ func TestModelTogglesDetailMode(t *testing.T) {
 
 	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyRight})
 	got = updated.(Model)
+	if got.mode != DetailModeTimeline {
+		t.Fatalf("mode after right = %v, want timeline", got.mode)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyRight})
+	got = updated.(Model)
 	if got.mode != DetailModeProject {
-		t.Fatalf("mode after right = %v, want project", got.mode)
+		t.Fatalf("mode after second right = %v, want project", got.mode)
 	}
 
 	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyLeft})
 	got = updated.(Model)
-	if got.mode != DetailModeTickets {
-		t.Fatalf("mode after left = %v, want tickets", got.mode)
+	if got.mode != DetailModeTimeline {
+		t.Fatalf("mode after left = %v, want timeline", got.mode)
 	}
 }
 
