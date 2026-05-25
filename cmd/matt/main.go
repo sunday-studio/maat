@@ -35,13 +35,17 @@ func run(args []string) error {
 	case "index":
 		return indexCommand(args[1:])
 	case "projects":
-		store, err := loadStore(args[1:])
+		filtered, jsonOut := splitJSONFlag(args[1:])
+		store, err := loadStore(filtered)
 		if err != nil {
 			return err
 		}
 		projects, err := maat.LoadProjects(store)
 		if err != nil {
 			return err
+		}
+		if jsonOut {
+			return writeJSON(projects)
 		}
 		for _, project := range projects {
 			fmt.Printf("%-12s %-9s %s\n", project.ID, project.Status, project.Title)
@@ -50,7 +54,8 @@ func run(args []string) error {
 	case "project":
 		return projectCommand(args[1:])
 	case "status":
-		store, err := loadStore(args[1:])
+		filtered, jsonOut := splitJSONFlag(args[1:])
+		store, err := loadStore(filtered)
 		if err != nil {
 			return err
 		}
@@ -58,10 +63,15 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
+		if jsonOut {
+			return writeJSON(summary)
+		}
 		fmt.Printf("Projects: %d\n", summary.Projects)
 		fmt.Printf("Goals:    %d active, %d done, %d total\n", summary.ActiveGoals, summary.DoneGoals, summary.Goals)
 		fmt.Printf("Tickets:  %d open, %d done, %d total\n", summary.OpenTickets, summary.DoneTickets, summary.Tickets)
 		return nil
+	case "validate":
+		return validateCommand(args[1:])
 	case "search":
 		return searchCommand(args[1:])
 	default:
@@ -76,9 +86,10 @@ Usage:
   matt init [storage-path]
   matt storage link <storage-path>
   matt index rebuild [--storage <path>]
-  matt projects [--storage <path>]
+  matt projects [--storage <path>] [--json]
   matt project show <project-id> [--storage <path>]
-  matt status [--storage <path>]
+  matt status [--storage <path>] [--json]
+  matt validate [--storage <path>] [--json]
   matt search <query> [--storage <path>] [--json]
 
 Git plus Markdown remains the source of truth. The local index is rebuildable.
@@ -122,8 +133,49 @@ func indexCommand(args []string) error {
 	if err != nil {
 		return err
 	}
+	sqliteInfo, err := maat.RebuildSQLiteIndex(store)
+	if err != nil {
+		return err
+	}
 	fmt.Printf("indexed %d projects and %d documents\n", len(idx.Projects), len(idx.Documents))
-	fmt.Println(path)
+	fmt.Printf("json:   %s\n", path)
+	fts := "disabled"
+	if sqliteInfo.FTS {
+		fts = "enabled"
+	}
+	fmt.Printf("sqlite: %s (%d documents, fts %s)\n", sqliteInfo.Path, sqliteInfo.Documents, fts)
+	return nil
+}
+
+func validateCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	store, err := loadStore(filtered)
+	if err != nil {
+		return err
+	}
+	report, err := maat.ValidateStore(store)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := writeJSON(report); err != nil {
+			return err
+		}
+	} else if report.OK() {
+		fmt.Printf("validated %d files: ok\n", report.Files)
+	} else {
+		fmt.Printf("validated %d files: %d issues\n", report.Files, len(report.Issues))
+		for _, issue := range report.Issues {
+			location := issue.Path
+			if issue.Line > 0 {
+				location = fmt.Sprintf("%s:%d", location, issue.Line)
+			}
+			fmt.Printf("%s [%s] %s\n", location, issue.Code, issue.Message)
+		}
+	}
+	if !report.OK() {
+		return fmt.Errorf("validation failed with %d issues", len(report.Issues))
+	}
 	return nil
 }
 
@@ -179,14 +231,13 @@ func searchCommand(args []string) error {
 	if len(rest) == 0 {
 		return errors.New("usage: matt search <query> [--storage <path>] [--json]")
 	}
-	results, err := maat.Search(store, strings.Join(rest, " "))
+	query := strings.Join(rest, " ")
+	results, err := searchWithSQLite(store, query)
 	if err != nil {
 		return err
 	}
 	if jsonOut {
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		return enc.Encode(results)
+		return writeJSON(results)
 	}
 	for _, result := range results {
 		fmt.Printf("%s:%d [%s] %s\n", result.Path, result.Line, result.Type, result.Title)
@@ -195,6 +246,36 @@ func searchCommand(args []string) error {
 		}
 	}
 	return nil
+}
+
+func searchWithSQLite(store, query string) ([]maat.SearchResult, error) {
+	info, err := maat.RebuildSQLiteIndex(store)
+	if err == nil {
+		results, err := maat.SearchSQLiteIndex(info.Path, query)
+		if err == nil {
+			return results, nil
+		}
+	}
+	return maat.Search(store, query)
+}
+
+func splitJSONFlag(args []string) ([]string, bool) {
+	filtered := make([]string, 0, len(args))
+	jsonOut := false
+	for _, arg := range args {
+		if arg == "--json" {
+			jsonOut = true
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+	return filtered, jsonOut
+}
+
+func writeJSON(value any) error {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(value)
 }
 
 func loadStore(args []string) (string, error) {
