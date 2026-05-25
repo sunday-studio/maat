@@ -13,6 +13,8 @@ The installed binary is only an interface. The durable source of truth is still 
 
 The installer does not require network access. If it needs to build from source, it runs Go with `GOPROXY=off`, so any module dependencies must already be available locally.
 
+If local module dependencies are missing, build or download them before running the installer, then rerun `scripts/install.sh`. The installer should not be the step that reaches out to the network.
+
 ## Install From A Checkout
 
 From the repository root:
