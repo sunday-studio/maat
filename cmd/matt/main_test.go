@@ -176,6 +176,30 @@ func TestGoalCreateCommand(t *testing.T) {
 	if len(project.Events) != 1 || project.Events[0].Type != "goal.created" {
 		t.Fatalf("unexpected events: %#v", project.Events)
 	}
+	if _, err := os.Stat(filepath.Join(store, ".maat", "index.json")); err != nil {
+		t.Fatalf("expected json index after write: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(store, ".maat", "index.sqlite")); err != nil {
+		t.Fatalf("expected sqlite index after write: %v", err)
+	}
+}
+
+func TestGoalCreateCommandJSON(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := writeObjectCommandFixture(t)
+
+	output, err := captureRun("goal", "create", "orion", "Ship json writes", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result writeCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Action != "goal.created" || result.ProjectKey != "orion" || result.GoalID == "" || result.EventID == "" {
+		t.Fatalf("unexpected json result: %#v", result)
+	}
 }
 
 func TestTicketCreateCommand(t *testing.T) {
@@ -200,6 +224,25 @@ func TestTicketCreateCommand(t *testing.T) {
 	}
 	if project.Tickets[0].GoalID != goalID {
 		t.Fatalf("expected goal link %q, got %q", goalID, project.Tickets[0].GoalID)
+	}
+}
+
+func TestTicketCreateCommandJSON(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := writeObjectCommandFixture(t)
+	goalID := createCommandGoal(t, store)
+
+	output, err := captureRun("ticket", "create", "orion", "Wire json ticket", "--goal", goalID, "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result writeCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Action != "ticket.created" || result.ProjectKey != "orion" || result.GoalID != goalID || result.TicketID == "" || result.EventID == "" {
+		t.Fatalf("unexpected json result: %#v", result)
 	}
 }
 
@@ -236,6 +279,57 @@ func TestTicketEventCommands(t *testing.T) {
 		if !eventTypes[eventType] {
 			t.Fatalf("missing event type %s in %#v", eventType, project.Events)
 		}
+	}
+}
+
+func TestTicketEventCommandsJSON(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := writeObjectCommandFixture(t)
+	ticketID := createCommandTicket(t, store)
+
+	output, err := captureRun("ticket", "claim", ticketID, "--agent", "claude", "--ttl", "30m", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var claim writeCommandResult
+	if err := json.Unmarshal([]byte(output), &claim); err != nil {
+		t.Fatal(err)
+	}
+	if claim.Action != "ticket.claimed" || claim.TicketID != ticketID || claim.ProjectKey != "orion" || claim.Agent != "claude" || claim.ExpiresAt == "" || claim.EventID == "" {
+		t.Fatalf("unexpected claim json: %#v", claim)
+	}
+
+	output, err = captureRun("ticket", "comment", ticketID, "Progress note", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var comment writeCommandResult
+	if err := json.Unmarshal([]byte(output), &comment); err != nil {
+		t.Fatal(err)
+	}
+	if comment.Action != "ticket.commented" || comment.TicketID != ticketID || comment.ProjectKey != "orion" || comment.EventID == "" {
+		t.Fatalf("unexpected comment json: %#v", comment)
+	}
+
+	output, err = captureRun("ticket", "complete", ticketID, "--evidence", "go test ./...", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var complete writeCommandResult
+	if err := json.Unmarshal([]byte(output), &complete); err != nil {
+		t.Fatal(err)
+	}
+	if complete.Action != "ticket.completed" || complete.TicketID != ticketID || complete.ProjectKey != "orion" || complete.EventID == "" {
+		t.Fatalf("unexpected complete json: %#v", complete)
+	}
+}
+
+func TestTicketCreateCommandRequiresProjectAndTitle(t *testing.T) {
+	store := writeObjectCommandFixture(t)
+
+	_, err := captureRun("ticket", "create", "Only title", "--storage", store)
+	if err == nil || !strings.Contains(err.Error(), "project key and ticket title are required") {
+		t.Fatalf("expected project/title error, got %v", err)
 	}
 }
 
