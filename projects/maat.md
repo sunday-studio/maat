@@ -119,6 +119,23 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 - [x] T-005: Package the agent protocol snippet for other repos.
 - [x] T-006: Integrate and verify the workflow worker commits.
 
+### G-007: Finish first agent-operable CLI loop
+
+| Field | Value |
+|---|---|
+| Status | active |
+| Updated | 2026-05-25 |
+| Tags | #agent-run #cli #tui #migration |
+
+#### Tasks
+
+- [ ] T-001: Wire the `matt sync` CLI command.
+- [ ] T-002: Wire the `matt agent instructions` CLI command.
+- [ ] T-003: Improve write command human and JSON output.
+- [ ] T-004: Improve the TUI ticket/search surface.
+- [ ] T-005: Dogfood migration into a temporary destination and document safety.
+- [ ] T-006: Integrate and verify this worker round.
+
 ## Blockers
 
 - None.

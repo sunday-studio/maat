@@ -112,6 +112,8 @@ Status:
 - Done in `84b1db1 feat(cli): wire read path commands`.
 - Next write-command wiring assigned to Worker A for goal and ticket create/claim/comment/complete.
 - Write-command wiring done in `43e7e47 feat(cli): add agent write commands`.
+- Next sync command wiring assigned to Worker 1.
+- Next write-command UX and JSON output assigned to Worker 3.
 
 ## Group 6: TUI
 
@@ -133,6 +135,7 @@ Status:
 - Done in `9965baf feat(tui): add bubble tea dashboard`.
 - Next detail-pane and selection improvements assigned to Worker D.
 - Detail-pane and selection improvements done in `b2c593d feat(tui): refine dashboard navigation`.
+- Next ticket/search view improvements assigned to Worker 4.
 
 ## Group 7: Local Web UI
 
@@ -213,6 +216,7 @@ Status:
 - Done in `982ae4d feat(migration): add legacy object planner`.
 - Next CLI migration command wiring assigned to Worker C.
 - Migration command coverage landed in `4149bea test(cli): cover migration commands`; command wiring landed with `43e7e47 feat(cli): add agent write commands`.
+- Migration dogfood and safety report assigned to Worker 5.
 
 ## Group 11: Agent Protocol Packaging
 
@@ -233,6 +237,7 @@ Initial owner:
 Status:
 
 - Done in `7654ed2 docs(agent): define command protocol`.
+- Next `matt agent instructions` command wiring assigned to Worker 2.
 
 Status:
 
