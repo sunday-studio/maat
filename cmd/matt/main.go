@@ -101,10 +101,12 @@ Usage:
   matt storage link <storage-path>
   matt index rebuild [--storage <path>]
   matt projects [--storage <path>] [--json]
-  matt project show <project-id> [--storage <path>]
+  matt project show <project-id> [--storage <path>] [--json]
   matt project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]
   matt goal create [project-key] <title> [--storage <path>] [--json]
   matt ticket create [project-key] <title> [--goal <goal-id>] [--storage <path>] [--json]
+  matt ticket list [--project <project-key>] [--storage <path>] [--json]
+  matt ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]
   matt ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
   matt ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
   matt ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]
@@ -369,21 +371,28 @@ func projectCommand(args []string) error {
 
 func projectShowCommand(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: matt project show <project-id> [--storage <path>]")
+		return errors.New("usage: matt project show <project-id> [--storage <path>] [--json]")
 	}
-	projectID := args[0]
-	store, err := loadStore(args[1:])
+	filtered, jsonOut := splitJSONFlag(args)
+	projectID := filtered[0]
+	store, err := loadStore(filtered[1:])
 	if err != nil {
 		return err
 	}
 	project, err := maat.LoadProject(store, projectID)
 	if err == nil {
+		if jsonOut {
+			return writeJSON(project)
+		}
 		printLegacyProject(project)
 		return nil
 	}
 	objectProject, objectErr := maat.LoadObjectProject(store, projectID)
 	if objectErr != nil {
 		return err
+	}
+	if jsonOut {
+		return writeJSON(objectProject)
 	}
 	printObjectProject(objectProject)
 	return nil
@@ -528,11 +537,15 @@ func goalCommand(args []string) error {
 
 func ticketCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: matt ticket <create|claim|comment|complete>")
+		return errors.New("usage: matt ticket <create|list|show|claim|comment|complete>")
 	}
 	switch args[0] {
 	case "create":
 		return ticketCreateCommand(args[1:])
+	case "list":
+		return ticketListCommand(args[1:])
+	case "show":
+		return ticketShowCommand(args[1:])
 	case "claim":
 		return ticketClaimCommand(args[1:])
 	case "comment":
@@ -542,6 +555,99 @@ func ticketCommand(args []string) error {
 	default:
 		return fmt.Errorf("unknown ticket command %q", args[0])
 	}
+}
+
+type ticketView struct {
+	ID         string `json:"id"`
+	ProjectKey string `json:"project_key"`
+	GoalID     string `json:"goal_id,omitempty"`
+	Title      string `json:"title"`
+	Status     string `json:"status"`
+	Created    string `json:"created,omitempty"`
+	Path       string `json:"path,omitempty"`
+	Legacy     bool   `json:"legacy,omitempty"`
+}
+
+func ticketListCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	store, rest, err := loadStoreAndRest(filtered)
+	if err != nil {
+		return err
+	}
+	projectKey, rest, err := consumeFlagValue(rest, "--project", false)
+	if err != nil {
+		return err
+	}
+	if len(rest) != 0 {
+		return errors.New("usage: matt ticket list [--project <project-key>] [--storage <path>] [--json]")
+	}
+	if projectKey == "" {
+		if project, err := inferProjectFromWorkingDirectory(store); err == nil {
+			projectKey = project.Key
+		}
+	}
+	tickets, err := loadTicketViews(store, projectKey)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(tickets)
+	}
+	for _, ticket := range tickets {
+		goal := "standalone"
+		if ticket.GoalID != "" {
+			goal = ticket.GoalID
+		}
+		fmt.Printf("%-30s %-10s %-9s %-12s %s\n", ticket.ID, ticket.ProjectKey, ticket.Status, goal, ticket.Title)
+	}
+	return nil
+}
+
+func ticketShowCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	store, rest, err := loadStoreAndRest(filtered)
+	if err != nil {
+		return err
+	}
+	projectKey, rest, err := consumeFlagValue(rest, "--project", false)
+	if err != nil {
+		return err
+	}
+	if len(rest) != 1 {
+		return errors.New("usage: matt ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]")
+	}
+	ticketID := rest[0]
+	projectKey, err = resolveReadableTicketProject(store, projectKey, ticketID)
+	if err != nil {
+		return err
+	}
+	tickets, err := loadTicketViews(store, projectKey)
+	if err != nil {
+		return err
+	}
+	for _, ticket := range tickets {
+		if ticket.ID != ticketID {
+			continue
+		}
+		if jsonOut {
+			return writeJSON(ticket)
+		}
+		fmt.Printf("# %s\n\n", ticket.Title)
+		fmt.Printf("ID:      %s\n", ticket.ID)
+		fmt.Printf("Project: %s\n", ticket.ProjectKey)
+		fmt.Printf("Status:  %s\n", ticket.Status)
+		if ticket.GoalID != "" {
+			fmt.Printf("Goal:    %s\n", ticket.GoalID)
+		}
+		if ticket.Created != "" {
+			fmt.Printf("Created: %s\n", ticket.Created)
+		}
+		if ticket.Path != "" {
+			fmt.Printf("Path:    %s\n", ticket.Path)
+		}
+		return nil
+	}
+	return fmt.Errorf("ticket %q not found in project %q", ticketID, projectKey)
 }
 
 func ticketCreateCommand(args []string) error {
@@ -862,6 +968,11 @@ func resolveTicketProject(store, projectKey, ticketID string) (string, error) {
 	if strings.TrimSpace(projectKey) != "" {
 		return projectKey, nil
 	}
+	if project, err := inferProjectFromWorkingDirectory(store); err == nil {
+		if objectProjectHasTicket(project, ticketID) {
+			return project.Key, nil
+		}
+	}
 	objectStore, err := maat.LoadObjectStore(store)
 	if err != nil {
 		return "", err
@@ -883,6 +994,118 @@ func resolveTicketProject(store, projectKey, ticketID string) (string, error) {
 	default:
 		return "", fmt.Errorf("ticket %q exists in multiple projects; pass --project <project-key>", ticketID)
 	}
+}
+
+func resolveReadableTicketProject(store, projectKey, ticketID string) (string, error) {
+	if strings.TrimSpace(projectKey) != "" {
+		return projectKey, nil
+	}
+	if project, err := inferProjectFromWorkingDirectory(store); err == nil {
+		if objectProjectHasTicket(project, ticketID) {
+			return project.Key, nil
+		}
+		for _, ticket := range legacyTicketViewsForProject(project.Key, nil) {
+			if ticket.ID == ticketID {
+				return project.Key, nil
+			}
+		}
+	}
+	tickets, err := loadTicketViews(store, "")
+	if err != nil {
+		return "", err
+	}
+	matches := make([]string, 0, 1)
+	for _, ticket := range tickets {
+		if ticket.ID == ticketID {
+			matches = append(matches, ticket.ProjectKey)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return "", fmt.Errorf("ticket %q not found", ticketID)
+	case 1:
+		return matches[0], nil
+	default:
+		return "", fmt.Errorf("ticket %q exists in multiple projects; pass --project <project-key>", ticketID)
+	}
+}
+
+func objectProjectHasTicket(project maat.ObjectProject, ticketID string) bool {
+	for _, ticket := range project.Tickets {
+		if ticket.ID == ticketID {
+			return true
+		}
+	}
+	return false
+}
+
+func loadTicketViews(store, projectKey string) ([]ticketView, error) {
+	var tickets []ticketView
+	if projectKey != "" {
+		if project, err := maat.LoadObjectProject(store, projectKey); err == nil {
+			tickets = append(tickets, objectTicketViews(project)...)
+		} else if !os.IsNotExist(err) {
+			return nil, err
+		}
+		if project, err := maat.LoadProject(store, projectKey); err == nil {
+			tickets = append(tickets, legacyTicketViewsForProject(project.ID, project.Goals)...)
+		} else if !os.IsNotExist(err) && !strings.Contains(err.Error(), "not found") {
+			return nil, err
+		}
+		return tickets, nil
+	}
+	objectStore, err := maat.LoadObjectStore(store)
+	if err != nil {
+		return nil, err
+	}
+	for _, project := range objectStore.Projects {
+		tickets = append(tickets, objectTicketViews(project)...)
+	}
+	legacyProjects, err := maat.LoadProjects(store)
+	if err != nil {
+		return nil, err
+	}
+	for _, project := range legacyProjects {
+		tickets = append(tickets, legacyTicketViewsForProject(project.ID, project.Goals)...)
+	}
+	return tickets, nil
+}
+
+func objectTicketViews(project maat.ObjectProject) []ticketView {
+	tickets := make([]ticketView, 0, len(project.Tickets))
+	for _, ticket := range project.Tickets {
+		tickets = append(tickets, ticketView{
+			ID:         ticket.ID,
+			ProjectKey: ticket.ProjectKey,
+			GoalID:     ticket.GoalID,
+			Title:      ticket.Title,
+			Status:     ticket.Status,
+			Created:    ticket.Created,
+			Path:       ticket.Path,
+		})
+	}
+	return tickets
+}
+
+func legacyTicketViewsForProject(projectKey string, goals []maat.Goal) []ticketView {
+	var tickets []ticketView
+	for _, goal := range goals {
+		for _, ticket := range goal.Tickets {
+			status := "active"
+			if ticket.Done {
+				status = "done"
+			}
+			tickets = append(tickets, ticketView{
+				ID:         ticket.ID,
+				ProjectKey: projectKey,
+				GoalID:     goal.ID,
+				Title:      ticket.Title,
+				Status:     status,
+				Legacy:     true,
+			})
+		}
+	}
+	return tickets
 }
 
 func resolveCreateProjectAndTitle(store string, args []string, kind string) (string, string, error) {

@@ -237,6 +237,35 @@ func TestProjectShowCommandSupportsObjectProject(t *testing.T) {
 	}
 }
 
+func TestProjectShowCommandJSON(t *testing.T) {
+	store := writeCommandFixture(t)
+
+	output, err := captureRun("project", "show", "orion", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var legacy maat.Project
+	if err := json.Unmarshal([]byte(output), &legacy); err != nil {
+		t.Fatal(err)
+	}
+	if legacy.ID != "orion" || legacy.Title != "Orion" || len(legacy.Goals) != 1 {
+		t.Fatalf("unexpected legacy project json: %#v", legacy)
+	}
+
+	objectStore := writeObjectCommandFixture(t)
+	output, err = captureRun("project", "show", "orion", "--storage", objectStore, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var object maat.ObjectProject
+	if err := json.Unmarshal([]byte(output), &object); err != nil {
+		t.Fatal(err)
+	}
+	if object.Key != "orion" || object.DisplayName != "Orion" {
+		t.Fatalf("unexpected object project json: %#v", object)
+	}
+}
+
 func TestGoalCreateCommand(t *testing.T) {
 	t.Setenv("MAAT_ACTOR", "codex")
 	store := writeObjectCommandFixture(t)
@@ -383,6 +412,83 @@ func TestTicketCreateCommandInfersLinkedProject(t *testing.T) {
 	}
 }
 
+func TestTicketListAndShowCommands(t *testing.T) {
+	store := writeObjectCommandFixture(t)
+	ticketID := createCommandTicket(t, store)
+
+	output, err := captureRun("ticket", "list", "--project", "orion", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tickets []ticketView
+	if err := json.Unmarshal([]byte(output), &tickets); err != nil {
+		t.Fatal(err)
+	}
+	if len(tickets) != 1 || tickets[0].ID != ticketID || tickets[0].ProjectKey != "orion" {
+		t.Fatalf("unexpected tickets: %#v", tickets)
+	}
+
+	output, err = captureRun("ticket", "show", ticketID, "--project", "orion", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ticket ticketView
+	if err := json.Unmarshal([]byte(output), &ticket); err != nil {
+		t.Fatal(err)
+	}
+	if ticket.ID != ticketID || ticket.Status != "active" || ticket.Title != "Existing ticket" {
+		t.Fatalf("unexpected ticket: %#v", ticket)
+	}
+}
+
+func TestTicketListInfersLinkedProject(t *testing.T) {
+	store := t.TempDir()
+	source := t.TempDir()
+	if _, err := maat.LinkProject(t.Context(), maat.LinkProjectInput{
+		Store:       store,
+		SourcePath:  source,
+		ProjectKey:  "orion",
+		DisplayName: "Orion",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	writer := maat.NewWriteStore(store)
+	if _, err := writer.CreateProject(maat.CreateProjectInput{
+		Key:         "neptune",
+		DisplayName: "Neptune",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	orionTicket, _, err := writer.CreateTicket(maat.CreateTicketInput{
+		ProjectKey: "orion",
+		Title:      "Orion ticket",
+		Actor:      "test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := writer.CreateTicket(maat.CreateTicketInput{
+		ProjectKey: "neptune",
+		Title:      "Neptune ticket",
+		Actor:      "test",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(source)
+
+	output, err := captureRun("ticket", "list", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tickets []ticketView
+	if err := json.Unmarshal([]byte(output), &tickets); err != nil {
+		t.Fatal(err)
+	}
+	if len(tickets) != 1 || tickets[0].ID != orionTicket.ID || tickets[0].ProjectKey != "orion" {
+		t.Fatalf("expected linked project ticket only, got %#v", tickets)
+	}
+}
+
 func TestTicketEventCommands(t *testing.T) {
 	t.Setenv("MAAT_ACTOR", "codex")
 	store := writeObjectCommandFixture(t)
@@ -416,6 +522,49 @@ func TestTicketEventCommands(t *testing.T) {
 		if !eventTypes[eventType] {
 			t.Fatalf("missing event type %s in %#v", eventType, project.Events)
 		}
+	}
+}
+
+func TestTicketEventCommandsInferLinkedProjectWhenTicketIDIsDuplicated(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := t.TempDir()
+	source := t.TempDir()
+	if _, err := maat.LinkProject(t.Context(), maat.LinkProjectInput{
+		Store:       store,
+		SourcePath:  source,
+		ProjectKey:  "orion",
+		DisplayName: "Orion",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	writer := maat.NewWriteStore(store)
+	ticket, _, err := writer.CreateTicket(maat.CreateTicketInput{
+		ProjectKey: "orion",
+		Title:      "Shared ticket id",
+		Actor:      "test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.CreateProject(maat.CreateProjectInput{
+		Key:         "neptune",
+		DisplayName: "Neptune",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	writeDuplicateTicket(t, store, "neptune", ticket.ID)
+	t.Chdir(source)
+
+	output, err := captureRun("ticket", "comment", ticket.ID, "Inferred duplicate", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result writeCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.ProjectKey != "orion" || result.TicketID != ticket.ID {
+		t.Fatalf("expected linked project inference, got %#v", result)
 	}
 }
 
@@ -720,4 +869,25 @@ Current state.
 		t.Fatal(err)
 	}
 	return root
+}
+
+func writeDuplicateTicket(t *testing.T, store, projectKey, ticketID string) {
+	t.Helper()
+	path := filepath.Join(store, "projects", projectKey, "tickets", ticketID+".md")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `# Ticket: Duplicate Ticket
+
+| Field | Value |
+|---|---|
+| Ticket ID | ` + ticketID + ` |
+| Project | ` + projectKey + ` |
+| Goal | none |
+| Status | active |
+| Created | 2026-05-25T10:00:00Z |
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
