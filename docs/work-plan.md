@@ -102,9 +102,10 @@ Tasks:
 - Add `matt sync` with safe Git flow.
 - Add JSON output for query commands.
 
-Suggested owner:
+Initial owner:
 
-- Main integration agent after Groups 1-4 land.
+- Worker 1: read-path CLI wiring for validation, SQLite-backed search, index rebuild, and JSON output.
+- Later integration: write commands after write-path core lands.
 
 ## Group 6: TUI
 
@@ -117,9 +118,9 @@ Tasks:
 - Show projects, active tickets, blocked tickets, timeline, and search.
 - Keep mutations routed through the same core operations as the CLI.
 
-Suggested owner:
+Initial owner:
 
-- A later UI-focused agent after CLI read/write APIs stabilize.
+- Worker 5: Bubble Tea skeleton and callable TUI entrypoint.
 
 ## Group 7: Local Web UI
 
@@ -149,9 +150,41 @@ Tasks:
 - Add storage linking flow.
 - Add upgrade notes.
 
-Suggested owner:
+Initial owner:
 
-- A packaging-focused agent once the CLI shape settles.
+- Worker 6: local install script and install documentation.
+
+## Group 9: Git Sync Primitives
+
+Goal: prepare safe sync flows without rushing user-facing commands.
+
+Tasks:
+
+- Detect whether the storage path is a Git repository.
+- Read branch and remote metadata.
+- Parse dirty status.
+- Provide pull, commit, and push primitives.
+- Use a fake command runner in tests to avoid network access.
+
+Initial owner:
+
+- Worker 3: Git sync core under `internal/maat`.
+
+## Group 10: Migration Core
+
+Goal: move from v0 flat project files to the target object layout safely.
+
+Tasks:
+
+- Plan migration from `projects/*.md` to `projects/<project-key>/`.
+- Preserve legacy source files.
+- Write target files into a separate destination or temp path first.
+- Generate enough event history to explain migrated objects.
+- Add tests for a project with goals and tickets.
+
+Initial owner:
+
+- Worker 4: migration planner and apply functions under `internal/maat`.
 
 ## Integration Rules
 

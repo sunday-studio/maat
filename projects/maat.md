@@ -82,6 +82,24 @@ The system is intentionally file-first: agents should be able to clone the repo,
 - [x] T-005: Assign ID and event helper foundations to a worker agent.
 - [x] T-006: Integrate worker commits after review.
 
+### G-005: Wire the next product slices
+
+| Field | Value |
+|---|---|
+| Status | active |
+| Updated | 2026-05-25 |
+| Tags | #agent-run #cli #tui #sync |
+
+#### Tasks
+
+- [ ] T-001: Wire validation, SQLite search, index rebuild, and JSON query output into the CLI.
+- [ ] T-002: Add write-path core operations for projects, goals, tickets, claims, comments, and completion events.
+- [ ] T-003: Add Git sync primitives for repository detection, status, pull, commit, and push.
+- [ ] T-004: Add migration core from legacy flat files to target object layout.
+- [ ] T-005: Add the first Bubble Tea TUI skeleton.
+- [ ] T-006: Add local install and distribution documentation.
+- [ ] T-007: Integrate and verify all worker commits.
+
 ## Blockers
 
 - None.
