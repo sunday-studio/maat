@@ -220,10 +220,15 @@ Tasks:
 - Define the copy/paste snippet for external project `AGENTS.md` files.
 - Optionally expose a helper that returns the snippet for a future `matt agent instructions` command.
 - Keep the snippet short enough that agents actually follow it.
+- Add tests that pin the command names and evidence rule.
 
 Initial owner:
 
 - Worker E: agent protocol docs and optional snippet helper.
+
+Status:
+
+- Done in this slice. Remaining CLI hook: add `matt agent instructions` without changing the snippet text.
 
 ## Integration Rules
 

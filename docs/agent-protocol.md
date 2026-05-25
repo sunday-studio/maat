@@ -2,16 +2,19 @@
 
 Agents should use Maat as their shared project memory.
 
-The preferred path is through the `matt` CLI or future MCP tools. Direct Markdown edits are acceptable during early development, but they should follow the same object and event rules.
+The preferred path is through the `matt` CLI or future MCP tools. Direct Markdown edits are acceptable during early development, but they should follow the same object and event rules in `docs/storage-model.md`.
+
+Git plus Markdown is canonical. SQLite, TUI screens, and generated views are rebuildable.
 
 ## Agent Lifecycle
 
 Before work:
 
-1. Sync Maat.
-2. Query project state.
-3. Check active goals and open tickets.
-4. Claim or create a ticket.
+1. Sync or pull the Maat storage repo.
+2. Run `matt validate`.
+3. Query project state with `matt status`, `matt project show`, or `matt search`.
+4. Check active goals and open tickets.
+5. Claim or create a ticket when write commands are available.
 
 During work:
 
@@ -24,9 +27,30 @@ After work:
 1. Complete or update the ticket.
 2. Attach evidence.
 3. Record decisions if the work changed direction.
-4. Sync Maat.
+4. Run `matt validate`.
+5. Sync and commit Maat changes.
 
-## Agent Commands
+## Current Agent Commands
+
+These commands are available now and are safe for agents to rely on:
+
+```sh
+matt init [storage-path]
+matt storage link <storage-path>
+matt index rebuild [--storage <path>]
+matt status [--storage <path>] [--json]
+matt projects [--storage <path>] [--json]
+matt project show <project-id> [--storage <path>]
+matt validate [--storage <path>] [--json]
+matt search <query> [--storage <path>] [--json]
+matt tui [--storage <path>]
+```
+
+Use JSON output when another tool or agent needs to parse results.
+
+## Next Write Commands
+
+These commands define the intended agent write protocol. Until they are wired into `cmd/matt`, agents should use the same object files and event rules directly in the Maat storage repo.
 
 Typical start:
 
@@ -56,6 +80,21 @@ Completion:
 ```sh
 matt ticket complete T-20260525-190700-b91c --evidence "go test ./... passed"
 matt sync
+```
+
+Migration and setup:
+
+```sh
+matt project link
+matt migrate plan --storage <path>
+matt migrate apply --storage <path> --destination <path>
+```
+
+Sync:
+
+```sh
+matt sync
+matt sync --push
 ```
 
 ## Evidence Rules
@@ -110,8 +149,16 @@ When an agent sees conflicting state:
 
 ## Instruction Snippet
 
-This is the future snippet Maat can install into project repos:
+This is the minimal snippet Maat should install into project repos. It is intentionally short enough to paste into an existing `AGENTS.md` without taking over the whole file:
 
 ```text
-Use Maat as the canonical project memory. Before starting material work, run `matt sync` and inspect the relevant project and tickets. Create or claim a ticket before working. Record meaningful progress as comments or events. When finished, complete the ticket with evidence and sync Maat. Do not mark work done without evidence.
+Use Maat as the canonical project memory for this repo. Before material work, run `matt sync` if available, then inspect state with `matt status`, `matt project show <project>`, or `matt search <query>`. Create or claim a ticket before working. Record meaningful progress with ticket comments or events. When finished, complete the ticket with evidence, validate Maat, and sync. Do not mark work done without evidence.
 ```
+
+Future CLI:
+
+```sh
+matt agent instructions
+```
+
+should print exactly this snippet.
