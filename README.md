@@ -37,7 +37,8 @@ The early repository has flat project files and a monthly ledger. The target arc
 ├── docs/
 ├── ledger/
 ├── projects/
-└── reports/
+├── reports/
+└── scripts/
 ```
 
 ## Architecture Docs
@@ -50,9 +51,20 @@ The early repository has flat project files and a monthly ledger. The target arc
 - [Implementation Plan](docs/implementation-plan.md)
 - [Work Plan](docs/work-plan.md)
 - [Development](docs/development.md)
+- [Install](docs/install.md)
 - [Markdown Schema](docs/schema.md)
 - [Workflows](docs/workflows.md)
 - [Integrations](docs/integrations.md)
+
+## Install
+
+The install foundation is local-first and does not publish or fetch artifacts:
+
+```sh
+scripts/install.sh
+```
+
+It installs an existing `matt` binary from the checkout when present, or builds `./cmd/matt` locally with Go in offline mode. See [Install](docs/install.md) for macOS/Linux paths, storage setup, and run commands.
 
 ## Current CLI
 

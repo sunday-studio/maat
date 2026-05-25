@@ -19,6 +19,16 @@ GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt search "agent health" --sto
 GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt index rebuild --storage .
 ```
 
+## Install Locally
+
+Use the local installer when you need a `matt` binary on `PATH`:
+
+```sh
+scripts/install.sh
+```
+
+The installer copies an existing checkout binary when available, or builds `./cmd/matt` with Go in offline mode. See [Install](./install.md) for install targets, storage paths, and index paths.
+
 ## Test
 
 ```sh
