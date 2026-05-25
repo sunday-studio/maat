@@ -22,8 +22,8 @@ func TestDashboardFromLegacyProjectsCountsStatus(t *testing.T) {
 					ID:     "G-001",
 					Status: "active",
 					Tickets: []maat.Ticket{
-						{ID: "T-001", Done: false},
-						{ID: "T-002", Done: true},
+						{ID: "T-001", Title: "Open monitor ticket", Done: false},
+						{ID: "T-002", Title: "Done monitor ticket", Done: true},
 					},
 				},
 				{ID: "G-002", Status: "done"},
@@ -51,6 +51,34 @@ func TestDashboardFromLegacyProjectsCountsStatus(t *testing.T) {
 	}
 	if len(dashboard.Projects[0].GoalRows) != 2 || dashboard.Projects[0].GoalRows[0].Tickets != 2 {
 		t.Fatalf("goal rows = %+v", dashboard.Projects[0].GoalRows)
+	}
+	if len(dashboard.Projects[0].TicketRows) != 2 || dashboard.Projects[0].TicketRows[0].Status != "active" || dashboard.Projects[0].TicketRows[1].Status != "done" {
+		t.Fatalf("ticket rows = %+v", dashboard.Projects[0].TicketRows)
+	}
+}
+
+func TestDashboardFromObjectProjectsIncludesTicketRows(t *testing.T) {
+	dashboard := DashboardFromObjectProjects([]maat.ObjectProject{
+		{
+			Key:         "orion",
+			DisplayName: "Orion",
+			Status:      "active",
+			Goals: []maat.ObjectGoal{
+				{ID: "G-001", Status: "active", Title: "Improve monitor clarity"},
+			},
+			Tickets: []maat.ObjectTicket{
+				{ID: "T-001", Title: "Add status table", Status: "active", GoalID: "G-001"},
+				{ID: "T-002", Title: "Fix deploy note", Status: "done"},
+			},
+		},
+	})
+
+	project := dashboard.Projects[0]
+	if project.OpenTickets != 1 || project.DoneTickets != 1 || project.Tickets != 2 {
+		t.Fatalf("project ticket counts = %+v", project)
+	}
+	if len(project.TicketRows) != 2 || project.TicketRows[0].GoalID != "G-001" || project.TicketRows[1].GoalID != "" {
+		t.Fatalf("ticket rows = %+v", project.TicketRows)
 	}
 }
 
@@ -125,12 +153,52 @@ func TestRenderProjectDetailShowsSummaryGoalsAndTicketCounts(t *testing.T) {
 	}
 }
 
+func TestRenderProjectTicketsShowsGoalAndStandaloneTickets(t *testing.T) {
+	got := RenderProjectTickets(ProjectRow{
+		Key:         "orion",
+		DisplayName: "Orion",
+		Tickets:     2,
+		OpenTickets: 1,
+		DoneTickets: 1,
+		TicketRows: []TicketRow{
+			{ID: "T-001", Title: "Add status table", Status: "active", GoalID: "G-001"},
+			{ID: "T-002", Title: "Fix deploy note", Status: "done"},
+		},
+	})
+
+	for _, want := range []string{"Tickets", "Orion", "1 open / 1 done / 2 total", "T-001", "Add status table", "G-001", "T-002", "standalone"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderProjectTickets() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderDashboardCanShowTicketMode(t *testing.T) {
+	got := RenderDashboardWithSelectionAndMode(Dashboard{Projects: []ProjectRow{
+		{
+			Key:         "orion",
+			DisplayName: "Orion",
+			Tickets:     1,
+			OpenTickets: 1,
+			TicketRows: []TicketRow{
+				{ID: "T-001", Title: "Add status table", Status: "active"},
+			},
+		},
+	}}, 0, DetailModeTickets)
+
+	for _, want := range []string{"Tickets", "T-001", "tab to switch detail/tickets"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderDashboardWithSelectionAndMode() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
 func TestRenderDashboardShowsNavigationHelp(t *testing.T) {
 	got := RenderDashboardWithSelection(Dashboard{Projects: []ProjectRow{
 		{Key: "orion", DisplayName: "Orion", Status: "active"},
 	}}, 0)
 
-	for _, want := range []string{"Search and timeline views are planned", "up/down or k/j", "q to quit"} {
+	for _, want := range []string{"Search and timeline views are planned", "up/down or k/j", "tab to switch detail/tickets", "q to quit"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderDashboardWithSelection() missing %q in:\n%s", want, got)
 		}
@@ -162,6 +230,31 @@ func TestModelSelectionMovesWithArrowKeys(t *testing.T) {
 	got = updated.(Model)
 	if got.selected != 0 {
 		t.Fatalf("selected after up = %d, want 0", got.selected)
+	}
+}
+
+func TestModelTogglesDetailMode(t *testing.T) {
+	model := NewModel(Dashboard{Projects: []ProjectRow{{Key: "orion"}}}, nil)
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if cmd != nil {
+		t.Fatalf("tab command = %v, want nil", cmd)
+	}
+	got := updated.(Model)
+	if got.mode != DetailModeTickets {
+		t.Fatalf("mode after tab = %v, want tickets", got.mode)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyRight})
+	got = updated.(Model)
+	if got.mode != DetailModeProject {
+		t.Fatalf("mode after right = %v, want project", got.mode)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	got = updated.(Model)
+	if got.mode != DetailModeTickets {
+		t.Fatalf("mode after left = %v, want tickets", got.mode)
 	}
 }
 

@@ -21,6 +21,7 @@ type ProjectRow struct {
 	DoneTickets int
 	Updated     string
 	GoalRows    []GoalRow
+	TicketRows  []TicketRow
 }
 
 type GoalRow struct {
@@ -30,16 +31,31 @@ type GoalRow struct {
 	Tickets int
 }
 
+type TicketRow struct {
+	ID     string
+	Title  string
+	Status string
+	GoalID string
+}
+
 type Dashboard struct {
 	Projects []ProjectRow
 	Summary  maat.StatusSummary
 }
+
+type DetailMode int
+
+const (
+	DetailModeProject DetailMode = iota
+	DetailModeTickets
+)
 
 type Model struct {
 	dashboard Dashboard
 	err       error
 	width     int
 	selected  int
+	mode      DetailMode
 }
 
 var (
@@ -83,6 +99,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selected = clampSelection(m.selected-1, len(m.dashboard.Projects))
 		case "down", "j":
 			m.selected = clampSelection(m.selected+1, len(m.dashboard.Projects))
+		case "tab", "right", "l":
+			m.mode = nextDetailMode(m.mode)
+		case "left", "h":
+			m.mode = previousDetailMode(m.mode)
 		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -94,7 +114,7 @@ func (m Model) View() string {
 	if m.err != nil {
 		return errorStyle.Render(fmt.Sprintf("Maat TUI failed: %v", m.err)) + "\n\n" + mutedStyle.Render("Press q to quit.") + "\n"
 	}
-	return RenderDashboardWithSelection(m.dashboard, m.selected)
+	return RenderDashboardWithSelectionAndMode(m.dashboard, m.selected, m.mode)
 }
 
 func LoadDashboard(storage string) (Dashboard, error) {
@@ -119,6 +139,7 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 	summary.Projects = len(projects)
 	for _, project := range projects {
 		goalRows := make([]GoalRow, 0, len(project.Goals))
+		ticketRows := make([]TicketRow, 0, len(project.Tickets))
 		ticketsByGoal := countObjectTicketsByGoal(project.Tickets)
 		openTickets, doneTickets := countObjectTickets(project.Tickets)
 		for _, goal := range project.Goals {
@@ -127,6 +148,14 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 				Title:   goal.Title,
 				Status:  goal.Status,
 				Tickets: ticketsByGoal[goal.ID],
+			})
+		}
+		for _, ticket := range project.Tickets {
+			ticketRows = append(ticketRows, TicketRow{
+				ID:     ticket.ID,
+				Title:  ticket.Title,
+				Status: ticket.Status,
+				GoalID: ticket.GoalID,
 			})
 		}
 		row := ProjectRow{
@@ -140,6 +169,7 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 			DoneTickets: doneTickets,
 			Updated:     project.Updated,
 			GoalRows:    goalRows,
+			TicketRows:  ticketRows,
 		}
 		rows = append(rows, row)
 		summary.Goals += len(project.Goals)
@@ -172,6 +202,7 @@ func DashboardFromLegacyProjects(projects []maat.Project) Dashboard {
 		openTickets := 0
 		doneTickets := 0
 		goalRows := make([]GoalRow, 0, len(project.Goals))
+		ticketRows := make([]TicketRow, 0)
 		for _, goal := range project.Goals {
 			ticketCount += len(goal.Tickets)
 			summary.Goals++
@@ -190,6 +221,12 @@ func DashboardFromLegacyProjects(projects []maat.Project) Dashboard {
 					summary.OpenTickets++
 					openTickets++
 				}
+				ticketRows = append(ticketRows, TicketRow{
+					ID:     ticket.ID,
+					Title:  ticket.Title,
+					Status: legacyTicketStatus(ticket.Done),
+					GoalID: goal.ID,
+				})
 			}
 			goalRows = append(goalRows, GoalRow{
 				ID:      goal.ID,
@@ -209,6 +246,7 @@ func DashboardFromLegacyProjects(projects []maat.Project) Dashboard {
 			DoneTickets: doneTickets,
 			Updated:     project.Updated,
 			GoalRows:    goalRows,
+			TicketRows:  ticketRows,
 		})
 	}
 	return Dashboard{Projects: rows, Summary: summary}
@@ -219,6 +257,10 @@ func RenderDashboard(dashboard Dashboard) string {
 }
 
 func RenderDashboardWithSelection(dashboard Dashboard, selected int) string {
+	return RenderDashboardWithSelectionAndMode(dashboard, selected, DetailModeProject)
+}
+
+func RenderDashboardWithSelectionAndMode(dashboard Dashboard, selected int, mode DetailMode) string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Maat"))
 	b.WriteString("\n")
@@ -228,9 +270,14 @@ func RenderDashboardWithSelection(dashboard Dashboard, selected int) string {
 	b.WriteString("\n\n")
 	b.WriteString(RenderSelectableProjectTable(dashboard.Projects, selected))
 	b.WriteString("\n\n")
-	b.WriteString(RenderProjectDetail(selectedProject(dashboard.Projects, selected)))
+	project := selectedProject(dashboard.Projects, selected)
+	if mode == DetailModeTickets {
+		b.WriteString(RenderProjectTickets(project))
+	} else {
+		b.WriteString(RenderProjectDetail(project))
+	}
 	b.WriteString("\n\n")
-	b.WriteString(mutedStyle.Render("Search and timeline views are planned. Use up/down or k/j to select, q to quit."))
+	b.WriteString(mutedStyle.Render("Search and timeline views are planned. Use up/down or k/j to select, tab to switch detail/tickets, q to quit."))
 	b.WriteString("\n")
 	return b.String()
 }
@@ -314,6 +361,43 @@ func RenderProjectDetail(project ProjectRow) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
+func RenderProjectTickets(project ProjectRow) string {
+	if project.Key == "" && project.DisplayName == "" {
+		return mutedStyle.Render("Select a project to see tickets.")
+	}
+
+	name := project.DisplayName
+	if name == "" {
+		name = project.Key
+	}
+
+	var b strings.Builder
+	b.WriteString(headerStyle.Render("Tickets"))
+	b.WriteString("\n")
+	b.WriteString(fmt.Sprintf("%s  %d open / %d done / %d total\n", titleStyle.Render(name), project.OpenTickets, project.DoneTickets, project.Tickets))
+	b.WriteString("\n")
+	if len(project.TicketRows) == 0 {
+		b.WriteString(mutedStyle.Render("No tickets recorded."))
+		return b.String()
+	}
+	for index, ticket := range project.TicketRows {
+		if index >= 10 {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("+ %d more tickets", len(project.TicketRows)-index)))
+			break
+		}
+		label := ticket.ID
+		if label == "" {
+			label = "ticket"
+		}
+		goal := "standalone"
+		if ticket.GoalID != "" {
+			goal = ticket.GoalID
+		}
+		b.WriteString(fmt.Sprintf("- %s [%s] %s (%s)\n", label, ticket.Status, truncate(ticket.Title, 52), goal))
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
 func truncate(value string, limit int) string {
 	if len(value) <= limit {
 		return value
@@ -344,6 +428,20 @@ func selectedProject(projects []ProjectRow, selected int) ProjectRow {
 	return projects[clampSelection(selected, len(projects))]
 }
 
+func nextDetailMode(mode DetailMode) DetailMode {
+	if mode == DetailModeTickets {
+		return DetailModeProject
+	}
+	return DetailModeTickets
+}
+
+func previousDetailMode(mode DetailMode) DetailMode {
+	if mode == DetailModeProject {
+		return DetailModeTickets
+	}
+	return DetailModeProject
+}
+
 func countObjectTickets(tickets []maat.ObjectTicket) (int, int) {
 	openTickets := 0
 	doneTickets := 0
@@ -366,6 +464,13 @@ func countObjectTicketsByGoal(tickets []maat.ObjectTicket) map[string]int {
 		counts[ticket.GoalID]++
 	}
 	return counts
+}
+
+func legacyTicketStatus(done bool) string {
+	if done {
+		return "done"
+	}
+	return "active"
 }
 
 func emptyFallback(value, fallback string) string {
