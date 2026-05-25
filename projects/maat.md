@@ -54,7 +54,7 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 
 | Field | Value |
 |---|---|
-| Status | active |
+| Status | done |
 | Updated | 2026-05-25 |
 | Tags | #cli #search #go |
 
@@ -129,12 +129,12 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 
 #### Tasks
 
-- [ ] T-001: Wire the `matt sync` CLI command.
-- [ ] T-002: Wire the `matt agent instructions` CLI command.
-- [ ] T-003: Improve write command human and JSON output.
-- [ ] T-004: Improve the TUI ticket/search surface.
-- [ ] T-005: Dogfood migration into a temporary destination and document safety.
-- [ ] T-006: Integrate and verify this worker round.
+- [x] T-001: Wire the `matt sync` CLI command.
+- [x] T-002: Wire the `matt agent instructions` CLI command.
+- [x] T-003: Improve write command human and JSON output.
+- [x] T-004: Improve the TUI ticket/search surface.
+- [x] T-005: Dogfood migration into a temporary destination and document safety.
+- [x] T-006: Integrate and verify this worker round.
 
 ## Blockers
 
@@ -148,6 +148,7 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 - Keep the JSON bootstrap index temporarily while SQLite FTS lands behind the core API.
 - Use SQLite-backed search as the CLI default, with direct Markdown search as a fallback.
 - Keep migration apply non-destructive by writing target-layout files to a destination path instead of rewriting legacy files.
+- Do not run in-place migration until generated IDs and target object ergonomics are reviewed after dogfood.
 
 ## Links
 

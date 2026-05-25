@@ -114,6 +114,8 @@ Status:
 - Write-command wiring done in `43e7e47 feat(cli): add agent write commands`.
 - Next sync command wiring assigned to Worker 1.
 - Next write-command UX and JSON output assigned to Worker 3.
+- Sync command wiring done in `1787757 feat(cli): wire sync command`.
+- Write-command ergonomics coverage done in `fdd4341 test(cli): cover write command ergonomics`.
 
 ## Group 6: TUI
 
@@ -136,6 +138,7 @@ Status:
 - Next detail-pane and selection improvements assigned to Worker D.
 - Detail-pane and selection improvements done in `b2c593d feat(tui): refine dashboard navigation`.
 - Next ticket/search view improvements assigned to Worker 4.
+- Ticket detail mode done in `bb890b2 feat(tui): add ticket detail mode`.
 
 ## Group 7: Local Web UI
 
@@ -217,6 +220,7 @@ Status:
 - Next CLI migration command wiring assigned to Worker C.
 - Migration command coverage landed in `4149bea test(cli): cover migration commands`; command wiring landed with `43e7e47 feat(cli): add agent write commands`.
 - Migration dogfood and safety report assigned to Worker 5.
+- Migration dogfood and overwrite protection done in `d5ea878 fix(migration): dogfood legacy apply`.
 - Dogfood migration run documented in `docs/migration-dogfood.md`.
 - Migration apply now refuses to overwrite existing target files.
 
@@ -247,6 +251,7 @@ Status:
 
 - Done in `7654ed2 docs(agent): define command protocol`.
 - Next `matt agent instructions` command wiring assigned to Worker 2.
+- `matt agent instructions` command is live via `1787757 feat(cli): wire sync command`; docs marked live in `29db45e docs(agent): mark instructions command live`.
 
 Status:
 
