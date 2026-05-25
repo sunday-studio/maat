@@ -94,6 +94,26 @@ func TestSQLiteIndexKeepsBootstrapJSONIndexSeparate(t *testing.T) {
 	}
 }
 
+func TestSQLiteIndexTypesTargetLayoutObjects(t *testing.T) {
+	root := writeSQLiteTargetLayoutFixture(t)
+
+	info, err := RebuildSQLiteIndexWithOptions(SQLiteIndexOptions{
+		Store:      root,
+		DisableFTS: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Documents != 4 {
+		t.Fatalf("expected four indexed documents, got %d", info.Documents)
+	}
+
+	assertSearchResultType(t, info.Path, "monitor rollup", "ticket", "projects/orion/tickets/T-20260525-190700-b91c.md")
+	assertSearchResultType(t, info.Path, "health clarity", "goal", "projects/orion/goals/G-20260525-190533-a7f3.md")
+	assertSearchResultType(t, info.Path, "claim expiration", "event", "projects/orion/events/2026/05/E-20260525-191100-codex-4c9a.md")
+	assertSearchResultType(t, info.Path, "github.com/sunday-studio/orion", "project", "projects/orion/project.md")
+}
+
 func TestOpenSQLiteIndexDetectsFallbackMetadata(t *testing.T) {
 	root := writeSQLiteIndexFixture(t)
 	path := filepath.Join(root, ".maat", "fallback.sqlite")
@@ -143,6 +163,86 @@ Timeline search should find project history.
 	mustWrite(t, filepath.Join(root, ".maat", "ignored.md"), "# Ignored\n\nAgent health should not be indexed from cache.\n")
 
 	return root
+}
+
+func writeSQLiteTargetLayoutFixture(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "projects", "orion", "project.md"), `# Project: Orion
+
+| Field | Value |
+|---|---|
+| Project Key | orion |
+| Display Name | Orion |
+| Status | active |
+| Created | 2026-05-25 |
+| Updated | 2026-05-25 |
+| Remote | git@github.com:sunday-studio/orion.git |
+
+## Summary
+
+Tracks github.com/sunday-studio/orion agent operations.
+`)
+	mustWrite(t, filepath.Join(root, "projects", "orion", "goals", "G-20260525-190533-a7f3.md"), `# Goal: Improve Health Clarity
+
+| Field | Value |
+|---|---|
+| Goal ID | G-20260525-190533-a7f3 |
+| Project | orion |
+| Status | active |
+| Created | 2026-05-25T19:05:33Z |
+
+## Outcome
+
+Health clarity should explain agent state.
+`)
+	mustWrite(t, filepath.Join(root, "projects", "orion", "tickets", "T-20260525-190700-b91c.md"), `# Ticket: Fix Monitor Rollup
+
+| Field | Value |
+|---|---|
+| Ticket ID | T-20260525-190700-b91c |
+| Project | orion |
+| Goal | G-20260525-190533-a7f3 |
+| Status | active |
+| Created | 2026-05-25T19:07:00Z |
+
+## Description
+
+Monitor rollup should separate agent availability from check health.
+`)
+	mustWrite(t, filepath.Join(root, "projects", "orion", "events", "2026", "05", "E-20260525-191100-codex-4c9a.md"), `# Event: ticket.claimed
+
+| Field | Value |
+|---|---|
+| Event ID | E-20260525-191100-codex-4c9a |
+| Time | 2026-05-25T19:11:00Z |
+| Actor | codex |
+| Project | orion |
+| Type | ticket.claimed |
+| Object | T-20260525-190700-b91c |
+
+## Summary
+
+Recorded claim expiration for the active ticket.
+`)
+	return root
+}
+
+func assertSearchResultType(t *testing.T, indexPath, query, resultType, resultPath string) {
+	t.Helper()
+	results, err := SearchSQLiteIndex(indexPath, query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, result := range results {
+		if result.Path == resultPath {
+			if result.Type != resultType {
+				t.Fatalf("expected %s to be typed %q, got %#v", resultPath, resultType, result)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing result %s for query %q in %#v", resultPath, query, results)
 }
 
 func mustWrite(t *testing.T, path, content string) {

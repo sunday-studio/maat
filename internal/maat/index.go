@@ -72,7 +72,20 @@ func collectDocuments(store string) ([]Document, error) {
 
 func documentType(store, path string) string {
 	rel := relPath(store, path)
+	parts := strings.Split(filepath.ToSlash(rel), "/")
 	switch {
+	case isTargetProjectFile(parts):
+		return "project"
+	case isTargetObjectFile(parts, "goals"):
+		return "goal"
+	case isTargetObjectFile(parts, "tickets"):
+		return "ticket"
+	case isTargetEventFile(parts):
+		return "event"
+	case isTargetObjectFile(parts, "decisions"):
+		return "decision"
+	case isTargetObjectFile(parts, "reports"):
+		return "report"
 	case strings.HasPrefix(rel, "projects/"):
 		return "project"
 	case strings.HasPrefix(rel, "ledger/"):
@@ -88,6 +101,26 @@ func documentType(store, path string) string {
 	default:
 		return "markdown"
 	}
+}
+
+func isTargetProjectFile(parts []string) bool {
+	return len(parts) == 3 &&
+		parts[0] == "projects" &&
+		parts[2] == "project.md"
+}
+
+func isTargetObjectFile(parts []string, dir string) bool {
+	return len(parts) == 4 &&
+		parts[0] == "projects" &&
+		parts[2] == dir &&
+		strings.EqualFold(filepath.Ext(parts[3]), ".md")
+}
+
+func isTargetEventFile(parts []string) bool {
+	return len(parts) >= 6 &&
+		parts[0] == "projects" &&
+		parts[2] == "events" &&
+		strings.EqualFold(filepath.Ext(parts[len(parts)-1]), ".md")
 }
 
 func firstHeading(content string) string {
