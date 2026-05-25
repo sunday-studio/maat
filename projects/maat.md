@@ -148,7 +148,7 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 
 - [x] T-001: Add `matt project link` for source repo/path registration.
 - [x] T-002: Infer project key and display name from Git remote or source directory.
-- [ ] T-003: Infer project automatically for write commands when run from a linked repo.
+- [x] T-003: Infer project automatically for write commands when run from a linked repo.
 - [ ] T-004: Add source path aliases or repo identity records beyond project identity metadata.
 
 ## Blockers
@@ -165,6 +165,7 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 - Keep migration apply non-destructive by writing target-layout files to a destination path instead of rewriting legacy files.
 - Do not run in-place migration until generated IDs and target object ergonomics are reviewed after dogfood.
 - Let `matt project link` be idempotent so agents can safely run it before project work.
+- Let `goal create` and `ticket create` infer the project when the current directory is inside a linked source path.
 
 ## Links
 

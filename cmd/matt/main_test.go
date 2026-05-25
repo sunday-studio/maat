@@ -262,6 +262,33 @@ func TestGoalCreateCommandJSON(t *testing.T) {
 	}
 }
 
+func TestGoalCreateCommandInfersLinkedProject(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := t.TempDir()
+	source := t.TempDir()
+	if _, err := maat.LinkProject(t.Context(), maat.LinkProjectInput{
+		Store:       store,
+		SourcePath:  source,
+		ProjectKey:  "orion",
+		DisplayName: "Orion",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(source)
+
+	output, err := captureRun("goal", "create", "Inferred goal", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result writeCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.ProjectKey != "orion" || result.GoalID == "" {
+		t.Fatalf("unexpected inferred goal result: %#v", result)
+	}
+}
+
 func TestTicketCreateCommand(t *testing.T) {
 	t.Setenv("MAAT_ACTOR", "codex")
 	store := writeObjectCommandFixture(t)
@@ -303,6 +330,33 @@ func TestTicketCreateCommandJSON(t *testing.T) {
 	}
 	if result.Action != "ticket.created" || result.ProjectKey != "orion" || result.GoalID != goalID || result.TicketID == "" || result.EventID == "" {
 		t.Fatalf("unexpected json result: %#v", result)
+	}
+}
+
+func TestTicketCreateCommandInfersLinkedProject(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := t.TempDir()
+	source := t.TempDir()
+	if _, err := maat.LinkProject(t.Context(), maat.LinkProjectInput{
+		Store:       store,
+		SourcePath:  source,
+		ProjectKey:  "orion",
+		DisplayName: "Orion",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(source)
+
+	output, err := captureRun("ticket", "create", "Inferred ticket", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result writeCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.ProjectKey != "orion" || result.TicketID == "" {
+		t.Fatalf("unexpected inferred ticket result: %#v", result)
 	}
 }
 
@@ -388,7 +442,7 @@ func TestTicketCreateCommandRequiresProjectAndTitle(t *testing.T) {
 	store := writeObjectCommandFixture(t)
 
 	_, err := captureRun("ticket", "create", "Only title", "--storage", store)
-	if err == nil || !strings.Contains(err.Error(), "project key and ticket title are required") {
+	if err == nil || !strings.Contains(err.Error(), "project key is required") {
 		t.Fatalf("expected project/title error, got %v", err)
 	}
 }

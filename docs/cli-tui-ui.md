@@ -40,16 +40,20 @@ matt project status orion active
 
 ```sh
 matt goal create orion "Ship first deploy"
+matt goal create "Ship first deploy"
 matt goal list orion
 matt goal show G-20260525-190533-a7f3
 matt goal status G-20260525-190533-a7f3 done --evidence "all tickets complete"
 ```
+
+When run from inside a repo linked with `matt project link`, create commands can infer the project key.
 
 ### Ticket Commands
 
 ```sh
 matt ticket create orion "Fix deploy doc link"
 matt ticket create orion --goal G-20260525-190533-a7f3 "Verify installer"
+matt ticket create "Fix deploy doc link"
 matt ticket show T-20260525-190700-b91c
 matt ticket claim T-20260525-190700-b91c --agent codex --ttl 2h
 matt ticket comment T-20260525-190700-b91c "Found issue in launchd path."

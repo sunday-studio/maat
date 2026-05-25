@@ -103,8 +103,8 @@ Usage:
   matt projects [--storage <path>] [--json]
   matt project show <project-id> [--storage <path>]
   matt project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]
-  matt goal create <project-key> <title> [--storage <path>] [--json]
-  matt ticket create <project-key> <title> [--goal <goal-id>] [--storage <path>] [--json]
+  matt goal create [project-key] <title> [--storage <path>] [--json]
+  matt ticket create [project-key] <title> [--goal <goal-id>] [--storage <path>] [--json]
   matt ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
   matt ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
   matt ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]
@@ -460,13 +460,14 @@ func goalCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	if len(rest) != 2 {
-		return errors.New("project key and goal title are required; usage: matt goal create <project-key> <title> [--storage <path>] [--json]")
+	projectKey, title, err := resolveCreateProjectAndTitle(store, rest, "goal")
+	if err != nil {
+		return err
 	}
 	writer := maat.NewWriteStore(store)
 	goal, event, err := writer.CreateGoal(maat.CreateGoalInput{
-		ProjectKey: rest[0],
-		Title:      rest[1],
+		ProjectKey: projectKey,
+		Title:      title,
 		Actor:      defaultActor(),
 	})
 	if err != nil {
@@ -508,13 +509,14 @@ func ticketCreateCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	if len(rest) != 2 {
-		return errors.New("project key and ticket title are required; usage: matt ticket create <project-key> <title> [--goal <goal-id>] [--storage <path>] [--json]")
+	projectKey, title, err := resolveCreateProjectAndTitle(store, rest, "ticket")
+	if err != nil {
+		return err
 	}
 	writer := maat.NewWriteStore(store)
 	ticket, event, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: rest[0],
-		Title:      rest[1],
+		ProjectKey: projectKey,
+		Title:      title,
 		GoalID:     goalID,
 		Actor:      defaultActor(),
 	})
@@ -836,6 +838,29 @@ func resolveTicketProject(store, projectKey, ticketID string) (string, error) {
 	default:
 		return "", fmt.Errorf("ticket %q exists in multiple projects; pass --project <project-key>", ticketID)
 	}
+}
+
+func resolveCreateProjectAndTitle(store string, args []string, kind string) (string, string, error) {
+	switch len(args) {
+	case 1:
+		project, err := inferProjectFromWorkingDirectory(store)
+		if err != nil {
+			return "", "", fmt.Errorf("project key is required when not inside a linked project; usage: matt %s create <project-key> <title>: %w", kind, err)
+		}
+		return project.Key, args[0], nil
+	case 2:
+		return args[0], args[1], nil
+	default:
+		return "", "", fmt.Errorf("project key and %s title are required; usage: matt %s create [project-key] <title> [--storage <path>] [--json]", kind, kind)
+	}
+}
+
+func inferProjectFromWorkingDirectory(store string) (maat.ObjectProject, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return maat.ObjectProject{}, err
+	}
+	return maat.InferProjectForPath(context.Background(), store, cwd)
 }
 
 func consumeFlagValue(args []string, flag string, required bool) (string, []string, error) {

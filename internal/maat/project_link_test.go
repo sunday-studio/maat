@@ -74,6 +74,55 @@ func TestLinkProjectAllowsExplicitKeyAndName(t *testing.T) {
 	}
 }
 
+func TestInferProjectForPathMatchesPrimaryRepo(t *testing.T) {
+	store := t.TempDir()
+	source := t.TempDir()
+	nested := filepath.Join(source, "subdir")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LinkProject(context.Background(), LinkProjectInput{
+		Store:       store,
+		SourcePath:  source,
+		ProjectKey:  "orion",
+		DisplayName: "Orion",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	project, err := InferProjectForPath(context.Background(), store, nested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if project.Key != "orion" {
+		t.Fatalf("expected orion, got %#v", project)
+	}
+}
+
+func TestInferProjectForPathMatchesRemote(t *testing.T) {
+	store := t.TempDir()
+	linkedSource := t.TempDir()
+	runSource := t.TempDir()
+	for _, source := range []string{linkedSource, runSource} {
+		initLinkGitRepo(t, source)
+		runLinkGit(t, source, "remote", "add", "origin", "git@github.com:sunday-studio/orion.git")
+	}
+	if _, err := LinkProject(context.Background(), LinkProjectInput{
+		Store:      store,
+		SourcePath: linkedSource,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	project, err := InferProjectForPath(context.Background(), store, runSource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if project.Key != "orion" {
+		t.Fatalf("expected orion, got %#v", project)
+	}
+}
+
 func initLinkGitRepo(t *testing.T, dir string) {
 	t.Helper()
 	runLinkGit(t, dir, "init", "-b", "main")
