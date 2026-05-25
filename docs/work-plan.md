@@ -110,6 +110,7 @@ Initial owner:
 Status:
 
 - Done in `84b1db1 feat(cli): wire read path commands`.
+- Next write-command wiring assigned to Worker A for goal and ticket create/claim/comment/complete.
 
 ## Group 6: TUI
 
@@ -129,6 +130,7 @@ Initial owner:
 Status:
 
 - Done in `9965baf feat(tui): add bubble tea dashboard`.
+- Next detail-pane and selection improvements assigned to Worker D.
 
 ## Group 7: Local Web UI
 
@@ -185,6 +187,7 @@ Initial owner:
 Status:
 
 - Done in `ea4ea32 feat(sync): add git primitives`.
+- Next orchestration API assigned to Worker B.
 
 ## Group 10: Migration Core
 
@@ -205,6 +208,22 @@ Initial owner:
 Status:
 
 - Done in `982ae4d feat(migration): add legacy object planner`.
+- Next CLI migration command wiring assigned to Worker C.
+
+## Group 11: Agent Protocol Packaging
+
+Goal: make it easy to teach other repos and agents how to use Maat.
+
+Tasks:
+
+- Document current and next agent-facing commands.
+- Define the copy/paste snippet for external project `AGENTS.md` files.
+- Optionally expose a helper that returns the snippet for a future `matt agent instructions` command.
+- Keep the snippet short enough that agents actually follow it.
+
+Initial owner:
+
+- Worker E: agent protocol docs and optional snippet helper.
 
 ## Integration Rules
 

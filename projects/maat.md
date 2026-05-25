@@ -102,6 +102,23 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 - [x] T-006: Add local install and distribution documentation.
 - [x] T-007: Integrate and verify all worker commits.
 
+### G-006: Wire agent-facing workflows
+
+| Field | Value |
+|---|---|
+| Status | active |
+| Updated | 2026-05-25 |
+| Tags | #agent-run #cli #sync #tui |
+
+#### Tasks
+
+- [ ] T-001: Add CLI write commands for goals and tickets.
+- [ ] T-002: Add sync orchestration internals for validate, index, commit, and optional push.
+- [ ] T-003: Add migration plan/apply CLI commands.
+- [ ] T-004: Improve the TUI with project selection and detail view.
+- [ ] T-005: Package the agent protocol snippet for other repos.
+- [ ] T-006: Integrate and verify the workflow worker commits.
+
 ## Blockers
 
 - None.
