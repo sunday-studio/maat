@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -58,6 +59,8 @@ func run(args []string) error {
 		return goalCommand(args[1:])
 	case "ticket":
 		return ticketCommand(args[1:])
+	case "agent":
+		return agentCommand(args[1:])
 	case "status":
 		filtered, jsonOut := splitJSONFlag(args[1:])
 		store, err := loadStore(filtered)
@@ -79,6 +82,8 @@ func run(args []string) error {
 		return validateCommand(args[1:])
 	case "migrate":
 		return migrateCommand(args[1:])
+	case "sync":
+		return syncCommand(args[1:])
 	case "search":
 		return searchCommand(args[1:])
 	case "tui":
@@ -97,13 +102,15 @@ Usage:
   matt index rebuild [--storage <path>]
   matt projects [--storage <path>] [--json]
   matt project show <project-id> [--storage <path>]
-  matt goal create <project-key> <title> [--storage <path>]
-  matt ticket create <project-key> <title> [--goal <goal-id>] [--storage <path>]
-  matt ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>]
-  matt ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>]
-  matt ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>]
+  matt goal create <project-key> <title> [--storage <path>] [--json]
+  matt ticket create <project-key> <title> [--goal <goal-id>] [--storage <path>] [--json]
+  matt ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
+  matt ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
+  matt ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]
+  matt agent instructions [--json] [--output <path>]
   matt status [--storage <path>] [--json]
   matt validate [--storage <path>] [--json]
+  matt sync [--storage <path>] [--message <msg>] [--push] [--status] [--json]
   matt migrate plan [--storage <path>] [--json]
   matt migrate apply --dest <path> [--storage <path>]
   matt search <query> [--storage <path>] [--json]
@@ -162,6 +169,101 @@ func indexCommand(args []string) error {
 	}
 	fmt.Printf("sqlite: %s (%d documents, fts %s)\n", sqliteInfo.Path, sqliteInfo.Documents, fts)
 	return nil
+}
+
+func syncCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	store, rest, err := loadStoreAndRest(filtered)
+	if err != nil {
+		return err
+	}
+	message, rest, err := consumeFlagValue(rest, "--message", false)
+	if err != nil {
+		return err
+	}
+
+	push := false
+	statusOnly := false
+	for _, arg := range rest {
+		switch arg {
+		case "--push":
+			push = true
+		case "--status":
+			statusOnly = true
+		default:
+			return fmt.Errorf("unexpected sync argument %q", arg)
+		}
+	}
+	if statusOnly && push {
+		return errors.New("--push cannot be used with --status")
+	}
+	if !statusOnly && strings.TrimSpace(message) == "" {
+		message = "status(maat): sync store"
+	}
+
+	result, err := maat.SyncStore(context.Background(), maat.StoreSyncOptions{
+		Store:        store,
+		Message:      message,
+		Push:         push,
+		SkipIndex:    statusOnly,
+		SkipValidate: statusOnly,
+	})
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(result)
+	}
+	printSyncResult(result, statusOnly)
+	return nil
+}
+
+func printSyncResult(result maat.StoreSyncResult, statusOnly bool) {
+	repo := "not a git repository"
+	if result.Repository.IsRepository {
+		repo = "git repository"
+		if result.Repository.Branch != "" {
+			repo += " on " + result.Repository.Branch
+		}
+	}
+	fmt.Printf("Repository: %s\n", repo)
+	if result.Validation.Files > 0 {
+		fmt.Printf("Validation: %d files, ok\n", result.Validation.Files)
+	}
+	if result.JSONIndexPath != "" {
+		fmt.Printf("Index:      %s\n", result.JSONIndexPath)
+	}
+	if result.SQLiteIndex.Path != "" {
+		fts := "disabled"
+		if result.SQLiteIndex.FTS {
+			fts = "enabled"
+		}
+		fmt.Printf("SQLite:     %s (%d documents, fts %s)\n", result.SQLiteIndex.Path, result.SQLiteIndex.Documents, fts)
+	}
+	if statusOnly {
+		printSyncDirty("Dirty", result.DirtyBeforeCommit)
+		return
+	}
+	if result.Committed {
+		fmt.Printf("Committed:  %s\n", result.CommitMessage)
+	} else {
+		fmt.Println("Committed:  no changes")
+	}
+	if result.Pushed {
+		fmt.Println("Pushed:     yes")
+	}
+	printSyncDirty("Remaining", result.DirtyAfterSync)
+}
+
+func printSyncDirty(label string, entries []maat.GitStatusEntry) {
+	if len(entries) == 0 {
+		fmt.Printf("%s:      clean\n", label)
+		return
+	}
+	fmt.Printf("%s:      %d changes\n", label, len(entries))
+	for _, entry := range entries {
+		fmt.Printf("  %c%c %s\n", entry.Index, entry.Work, entry.Path)
+	}
 }
 
 func validateCommand(args []string) error {
@@ -287,14 +389,15 @@ func projectCommand(args []string) error {
 
 func goalCommand(args []string) error {
 	if len(args) == 0 || args[0] != "create" {
-		return errors.New("usage: matt goal create <project-key> <title> [--storage <path>]")
+		return errors.New("usage: matt goal create <project-key> <title> [--storage <path>] [--json]")
 	}
-	store, rest, err := loadStoreAndRest(args[1:])
+	filtered, jsonOut := splitJSONFlag(args[1:])
+	store, rest, err := loadStoreAndRest(filtered)
 	if err != nil {
 		return err
 	}
 	if len(rest) != 2 {
-		return errors.New("usage: matt goal create <project-key> <title> [--storage <path>]")
+		return errors.New("project key and goal title are required; usage: matt goal create <project-key> <title> [--storage <path>] [--json]")
 	}
 	writer := maat.NewWriteStore(store)
 	goal, event, err := writer.CreateGoal(maat.CreateGoalInput{
@@ -305,10 +408,12 @@ func goalCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	refreshIndexes(store)
-	fmt.Printf("created goal %s in %s\n", goal.ID, goal.ProjectKey)
-	fmt.Printf("event %s\n", event.ID)
-	return nil
+	return finishWrite(store, goal.ProjectKey, writeCommandResult{
+		Action:     "goal.created",
+		ProjectKey: goal.ProjectKey,
+		GoalID:     goal.ID,
+		EventID:    event.ID,
+	}, jsonOut)
 }
 
 func ticketCommand(args []string) error {
@@ -330,7 +435,8 @@ func ticketCommand(args []string) error {
 }
 
 func ticketCreateCommand(args []string) error {
-	store, rest, err := loadStoreAndRest(args)
+	filtered, jsonOut := splitJSONFlag(args)
+	store, rest, err := loadStoreAndRest(filtered)
 	if err != nil {
 		return err
 	}
@@ -339,7 +445,7 @@ func ticketCreateCommand(args []string) error {
 		return err
 	}
 	if len(rest) != 2 {
-		return errors.New("usage: matt ticket create <project-key> <title> [--goal <goal-id>] [--storage <path>]")
+		return errors.New("project key and ticket title are required; usage: matt ticket create <project-key> <title> [--goal <goal-id>] [--storage <path>] [--json]")
 	}
 	writer := maat.NewWriteStore(store)
 	ticket, event, err := writer.CreateTicket(maat.CreateTicketInput{
@@ -351,14 +457,18 @@ func ticketCreateCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	refreshIndexes(store)
-	fmt.Printf("created ticket %s in %s\n", ticket.ID, ticket.ProjectKey)
-	fmt.Printf("event %s\n", event.ID)
-	return nil
+	return finishWrite(store, ticket.ProjectKey, writeCommandResult{
+		Action:     "ticket.created",
+		ProjectKey: ticket.ProjectKey,
+		GoalID:     ticket.GoalID,
+		TicketID:   ticket.ID,
+		EventID:    event.ID,
+	}, jsonOut)
 }
 
 func ticketClaimCommand(args []string) error {
-	store, rest, err := loadStoreAndRest(args)
+	filtered, jsonOut := splitJSONFlag(args)
+	store, rest, err := loadStoreAndRest(filtered)
 	if err != nil {
 		return err
 	}
@@ -375,7 +485,7 @@ func ticketClaimCommand(args []string) error {
 		return err
 	}
 	if len(rest) != 1 {
-		return errors.New("usage: matt ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>]")
+		return errors.New("ticket id is required; usage: matt ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]")
 	}
 	if agent == "" {
 		agent = defaultActor()
@@ -404,14 +514,20 @@ func ticketClaimCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	refreshIndexes(store)
-	fmt.Printf("claimed ticket %s in %s until %s\n", ticketID, projectKey, now.Add(ttl).Format(time.RFC3339))
-	fmt.Printf("event %s\n", event.ID)
-	return nil
+	expiresAt := now.Add(ttl).Format(time.RFC3339)
+	return finishWrite(store, projectKey, writeCommandResult{
+		Action:     "ticket.claimed",
+		ProjectKey: projectKey,
+		TicketID:   ticketID,
+		EventID:    event.ID,
+		Agent:      agent,
+		ExpiresAt:  expiresAt,
+	}, jsonOut)
 }
 
 func ticketCommentCommand(args []string) error {
-	store, rest, err := loadStoreAndRest(args)
+	filtered, jsonOut := splitJSONFlag(args)
+	store, rest, err := loadStoreAndRest(filtered)
 	if err != nil {
 		return err
 	}
@@ -420,7 +536,7 @@ func ticketCommentCommand(args []string) error {
 		return err
 	}
 	if len(rest) != 2 {
-		return errors.New("usage: matt ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>]")
+		return errors.New("ticket id and comment are required; usage: matt ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]")
 	}
 	ticketID := rest[0]
 	projectKey, err = resolveTicketProject(store, projectKey, ticketID)
@@ -437,14 +553,17 @@ func ticketCommentCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	refreshIndexes(store)
-	fmt.Printf("commented on ticket %s in %s\n", ticketID, projectKey)
-	fmt.Printf("event %s\n", event.ID)
-	return nil
+	return finishWrite(store, projectKey, writeCommandResult{
+		Action:     "ticket.commented",
+		ProjectKey: projectKey,
+		TicketID:   ticketID,
+		EventID:    event.ID,
+	}, jsonOut)
 }
 
 func ticketCompleteCommand(args []string) error {
-	store, rest, err := loadStoreAndRest(args)
+	filtered, jsonOut := splitJSONFlag(args)
+	store, rest, err := loadStoreAndRest(filtered)
 	if err != nil {
 		return err
 	}
@@ -457,7 +576,7 @@ func ticketCompleteCommand(args []string) error {
 		return err
 	}
 	if len(rest) != 1 {
-		return errors.New("usage: matt ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>]")
+		return errors.New("ticket id is required; usage: matt ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]")
 	}
 	ticketID := rest[0]
 	projectKey, err = resolveTicketProject(store, projectKey, ticketID)
@@ -474,9 +593,45 @@ func ticketCompleteCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	refreshIndexes(store)
-	fmt.Printf("completed ticket %s in %s\n", ticketID, projectKey)
-	fmt.Printf("event %s\n", event.ID)
+	return finishWrite(store, projectKey, writeCommandResult{
+		Action:     "ticket.completed",
+		ProjectKey: projectKey,
+		TicketID:   ticketID,
+		EventID:    event.ID,
+	}, jsonOut)
+}
+
+func agentCommand(args []string) error {
+	if len(args) == 0 || args[0] != "instructions" {
+		return errors.New("usage: matt agent instructions [--json] [--output <path>]")
+	}
+	jsonOut := false
+	outputPath := ""
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "--json":
+			jsonOut = true
+		case "--output":
+			if i+1 >= len(args) {
+				return errors.New("--output requires a path")
+			}
+			outputPath = args[i+1]
+			i++
+		default:
+			return fmt.Errorf("unexpected agent instructions argument %q", args[i])
+		}
+	}
+
+	snippet := maat.AgentInstructionsSnippet()
+	if outputPath != "" {
+		if err := os.WriteFile(outputPath, []byte(snippet+"\n"), 0o644); err != nil {
+			return err
+		}
+	}
+	if jsonOut {
+		return writeJSON(map[string]string{"instructions": snippet})
+	}
+	fmt.Println(snippet)
 	return nil
 }
 
@@ -525,11 +680,71 @@ func searchWithSQLite(store, query string) ([]maat.SearchResult, error) {
 	return maat.Search(store, query)
 }
 
-func refreshIndexes(store string) {
-	if idx, err := maat.BuildIndex(store); err == nil {
-		_, _ = maat.WriteIndex(store, idx)
+type writeCommandResult struct {
+	Action     string `json:"action"`
+	ProjectKey string `json:"project_key"`
+	GoalID     string `json:"goal_id,omitempty"`
+	TicketID   string `json:"ticket_id,omitempty"`
+	EventID    string `json:"event_id"`
+	Agent      string `json:"agent,omitempty"`
+	ExpiresAt  string `json:"expires_at,omitempty"`
+}
+
+func finishWrite(store, projectKey string, result writeCommandResult, jsonOut bool) error {
+	if _, err := maat.LoadObjectProject(store, projectKey); err != nil {
+		return fmt.Errorf("post-write validation failed for project %q: %w", projectKey, err)
 	}
-	_, _ = maat.RebuildSQLiteIndex(store)
+	if err := refreshIndexes(store); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(result)
+	}
+	printWriteResult(result)
+	return nil
+}
+
+func printWriteResult(result writeCommandResult) {
+	switch result.Action {
+	case "goal.created":
+		fmt.Printf("created goal %s\n", result.GoalID)
+		fmt.Printf("project %s\n", result.ProjectKey)
+	case "ticket.created":
+		fmt.Printf("created ticket %s\n", result.TicketID)
+		fmt.Printf("project %s\n", result.ProjectKey)
+		if result.GoalID != "" {
+			fmt.Printf("goal %s\n", result.GoalID)
+		}
+	case "ticket.claimed":
+		fmt.Printf("claimed ticket %s\n", result.TicketID)
+		fmt.Printf("project %s\n", result.ProjectKey)
+		fmt.Printf("agent %s\n", result.Agent)
+		fmt.Printf("expires %s\n", result.ExpiresAt)
+	case "ticket.commented":
+		fmt.Printf("commented on ticket %s\n", result.TicketID)
+		fmt.Printf("project %s\n", result.ProjectKey)
+	case "ticket.completed":
+		fmt.Printf("completed ticket %s\n", result.TicketID)
+		fmt.Printf("project %s\n", result.ProjectKey)
+	default:
+		fmt.Printf("%s\n", result.Action)
+		fmt.Printf("project %s\n", result.ProjectKey)
+	}
+	fmt.Printf("event %s\n", result.EventID)
+}
+
+func refreshIndexes(store string) error {
+	idx, err := maat.BuildIndex(store)
+	if err != nil {
+		return fmt.Errorf("rebuild json index: %w", err)
+	}
+	if _, err := maat.WriteIndex(store, idx); err != nil {
+		return fmt.Errorf("write json index: %w", err)
+	}
+	if _, err := maat.RebuildSQLiteIndex(store); err != nil {
+		return fmt.Errorf("rebuild sqlite index: %w", err)
+	}
+	return nil
 }
 
 func resolveTicketProject(store, projectKey, ticketID string) (string, error) {

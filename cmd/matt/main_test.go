@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -248,6 +249,117 @@ func TestTicketCompleteRequiresEvidence(t *testing.T) {
 	}
 }
 
+func TestAgentInstructionsCommand(t *testing.T) {
+	output, err := captureRun("agent", "instructions")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{
+		"matt sync",
+		"matt status",
+		"matt project show <project>",
+		"matt search <query>",
+		"Create or claim a ticket",
+		"complete the ticket with evidence",
+		"Do not mark work done without evidence",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to include %q, got %q", want, output)
+		}
+	}
+}
+
+func TestAgentInstructionsCommandJSONAndOutput(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "AGENTS.md")
+
+	output, err := captureRun("agent", "instructions", "--json", "--output", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var payload map[string]string
+	if err := json.Unmarshal([]byte(output), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["instructions"] != maat.AgentInstructionsSnippet() {
+		t.Fatalf("unexpected instructions payload: %#v", payload)
+	}
+	written, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(written) != maat.AgentInstructionsSnippet()+"\n" {
+		t.Fatalf("unexpected written snippet: %q", string(written))
+	}
+}
+
+func TestSyncStatusCommandReportsDirtyState(t *testing.T) {
+	store := writeCommandFixture(t)
+	initGitStore(t, store)
+	if err := os.WriteFile(filepath.Join(store, "scratch.md"), []byte("# Scratch\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := captureRun("sync", "--storage", store, "--status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "Repository: git repository") || !strings.Contains(output, "Dirty:") || !strings.Contains(output, "scratch.md") {
+		t.Fatalf("unexpected output: %q", output)
+	}
+	if _, err := os.Stat(filepath.Join(store, ".maat")); !os.IsNotExist(err) {
+		t.Fatalf("status command should not rebuild indexes, got err=%v", err)
+	}
+}
+
+func TestSyncCommandCommitsChanges(t *testing.T) {
+	store := writeCommandFixture(t)
+	initGitStore(t, store)
+	if err := os.WriteFile(filepath.Join(store, "docs", "sync.md"), []byte("# Sync\n\nCommit me.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := captureRun("sync", "--storage", store, "--message", "status(maat): test sync")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "Validation:") || !strings.Contains(output, "Committed:  status(maat): test sync") {
+		t.Fatalf("unexpected output: %q", output)
+	}
+	status := runGit(t, store, "status", "--porcelain=v1")
+	if strings.TrimSpace(status) != "" {
+		t.Fatalf("expected clean git status after sync, got %q", status)
+	}
+	log := runGit(t, store, "log", "-1", "--pretty=%s")
+	if strings.TrimSpace(log) != "status(maat): test sync" {
+		t.Fatalf("unexpected commit subject: %q", log)
+	}
+}
+
+func TestSyncCommandJSON(t *testing.T) {
+	store := writeCommandFixture(t)
+	initGitStore(t, store)
+	if err := os.WriteFile(filepath.Join(store, "docs", "json.md"), []byte("# JSON sync\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := captureRun("sync", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result maat.StoreSyncResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.Committed || result.CommitMessage != "status(maat): sync store" {
+		t.Fatalf("unexpected sync result: %#v", result)
+	}
+	if result.SQLiteIndex.Path == "" || result.JSONIndexPath == "" {
+		t.Fatalf("expected rebuilt indexes: %#v", result)
+	}
+}
+
 func captureRun(args ...string) (string, error) {
 	oldStdout := os.Stdout
 	reader, writer, err := os.Pipe()
@@ -267,6 +379,26 @@ func captureRun(args ...string) (string, error) {
 		return "", readErr
 	}
 	return string(data), runErr
+}
+
+func initGitStore(t *testing.T, store string) {
+	t.Helper()
+	runGit(t, store, "init", "-b", "main")
+	runGit(t, store, "config", "user.email", "maat@example.test")
+	runGit(t, store, "config", "user.name", "Maat Test")
+	runGit(t, store, "add", ".")
+	runGit(t, store, "commit", "-m", "test: seed store")
+}
+
+func runGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	command := exec.Command("git", args...)
+	command.Dir = dir
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, output)
+	}
+	return string(output)
 }
 
 func writeObjectCommandFixture(t *testing.T) string {
