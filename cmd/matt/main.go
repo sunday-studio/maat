@@ -88,8 +88,6 @@ func run(args []string) error {
 		return goalCommand(args[1:])
 	case "ticket":
 		return ticketCommand(args[1:])
-	case "agent":
-		return agentCommand(args[1:])
 	case "status":
 		filtered, jsonOut := splitJSONFlag(args[1:])
 		store, err := loadStore(filtered)
@@ -160,8 +158,6 @@ Setup and maintenance:
   matt validate [--storage <path>] [--json]
   matt migrate plan [--storage <path>] [--json]
   matt migrate apply --dest <path> [--storage <path>]
-  matt agent initialize [--project <project-key>] [--storage <path>] [--json]
-  matt agent instructions [--json] [--output <path>]
   matt tui [--storage <path>]
   matt version [--json]
 
@@ -949,54 +945,6 @@ func ticketCompleteCommand(args []string) error {
 	}, jsonOut)
 }
 
-func agentCommand(args []string) error {
-	if len(args) == 0 {
-		return errors.New("usage: matt agent <initialize|instructions>")
-	}
-	switch args[0] {
-	case "initialize":
-		return agentInitializeCommand(args[1:])
-	case "instructions":
-		return agentInstructionsCommand(args[1:])
-	default:
-		return fmt.Errorf("unknown agent command %q", args[0])
-	}
-}
-
-func agentInstructionsCommand(args []string) error {
-	jsonOut := false
-	outputPath := ""
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--json":
-			jsonOut = true
-		case "--output":
-			if i+1 >= len(args) {
-				return errors.New("--output requires a path")
-			}
-			outputPath = args[i+1]
-			i++
-		default:
-			return fmt.Errorf("unexpected agent instructions argument %q", args[i])
-		}
-	}
-
-	snippet := maat.AgentInstructionsSnippet()
-	if outputPath != "" {
-		if err := os.WriteFile(outputPath, []byte(snippet+"\n"), 0o644); err != nil {
-			return err
-		}
-	}
-	if agentUse {
-		return agentUpdate("agent.instructions.ready", "ok", "agent instructions ready", map[string]string{"instructions": snippet})
-	}
-	if jsonOut {
-		return writeJSON(map[string]string{"instructions": snippet})
-	}
-	fmt.Println(snippet)
-	return nil
-}
-
 func agentInitializeCommand(args []string) error {
 	jsonOut := false
 	projectKey := ""
@@ -1022,7 +970,7 @@ func agentInitializeCommand(args []string) error {
 			store = abs
 			i++
 		default:
-			return fmt.Errorf("unexpected agent initialize argument %q", args[i])
+			return fmt.Errorf("unexpected initialize argument %q", args[i])
 		}
 	}
 	if store == "" {

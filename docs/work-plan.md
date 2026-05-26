@@ -242,7 +242,7 @@ Tasks:
 
 - Document current and next agent-facing commands.
 - Define the copy/paste snippet for external project `AGENTS.md` files.
-- Optionally expose a helper that returns the snippet for a future `matt agent instructions` command.
+- Generate the full setup contract with `matt initialize`.
 - Keep the snippet short enough that agents actually follow it.
 - Add tests that pin the command names and evidence rule.
 
@@ -253,8 +253,7 @@ Initial owner:
 Status:
 
 - Done in `7654ed2 docs(agent): define command protocol`.
-- Next `matt agent instructions` command wiring assigned to Worker 2.
-- `matt agent instructions` command is live via `1787757 feat(cli): wire sync command`; docs marked live in `29db45e docs(agent): mark instructions command live`.
+- Superseded the old snippet helper with `matt initialize`; no separate `matt agent` namespace is kept.
 
 ## Group 12: README And Product Packaging
 
@@ -290,7 +289,7 @@ Initial owner:
 
 Status:
 
-- Done in this slice. Remaining CLI hook: add `matt agent instructions` without changing the snippet text.
+- Done in this slice. Agent onboarding is handled by `matt initialize`.
 
 ## Integration Rules
 

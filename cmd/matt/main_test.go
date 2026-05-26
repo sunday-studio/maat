@@ -808,55 +808,10 @@ func TestTicketCompleteRequiresEvidence(t *testing.T) {
 	}
 }
 
-func TestAgentInstructionsCommand(t *testing.T) {
-	output, err := captureRun("agent", "instructions")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, want := range []string{
-		"matt sync",
-		"matt status",
-		"matt project show <project>",
-		"matt search <query>",
-		"Create or claim a ticket",
-		"complete the ticket with evidence",
-		"Do not mark work done without evidence",
-	} {
-		if !strings.Contains(output, want) {
-			t.Fatalf("expected output to include %q, got %q", want, output)
-		}
-	}
-}
-
-func TestAgentInstructionsCommandJSONAndOutput(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "AGENTS.md")
-
-	output, err := captureRun("agent", "instructions", "--json", "--output", path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var payload map[string]string
-	if err := json.Unmarshal([]byte(output), &payload); err != nil {
-		t.Fatal(err)
-	}
-	if payload["instructions"] != maat.AgentInstructionsSnippet() {
-		t.Fatalf("unexpected instructions payload: %#v", payload)
-	}
-	written, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(written) != maat.AgentInstructionsSnippet()+"\n" {
-		t.Fatalf("unexpected written snippet: %q", string(written))
-	}
-}
-
 func TestAgentInitializeCommand(t *testing.T) {
 	store := t.TempDir()
 
-	output, err := captureRun("agent", "initialize", "--project", "maat", "--storage", store)
+	output, err := captureRun("initialize", "--project", "maat", "--storage", store)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -878,7 +833,7 @@ func TestAgentInitializeCommand(t *testing.T) {
 	}
 }
 
-func TestInitializeAliasCommandJSON(t *testing.T) {
+func TestInitializeCommandJSON(t *testing.T) {
 	store := t.TempDir()
 
 	output, err := captureRun("initialize", "--project", "maat", "--storage", store, "--json")
@@ -895,15 +850,21 @@ func TestInitializeAliasCommandJSON(t *testing.T) {
 	}
 }
 
-func TestAgentInitializeCommandRejectsAgentFlag(t *testing.T) {
-	if _, err := captureRun("agent", "initialize", "--agent", "codex"); err == nil || !strings.Contains(err.Error(), "unexpected agent initialize argument") {
+func TestInitializeCommandRejectsAgentFlag(t *testing.T) {
+	if _, err := captureRun("initialize", "--agent", "codex"); err == nil || !strings.Contains(err.Error(), "unexpected initialize argument") {
 		t.Fatalf("expected --agent to be rejected, got %v", err)
 	}
 }
 
-func TestAgentInitializeCommandRejectsOutputFlag(t *testing.T) {
-	if _, err := captureRun("agent", "initialize", "--output", "AGENTS.md"); err == nil || !strings.Contains(err.Error(), "unexpected agent initialize argument") {
+func TestInitializeCommandRejectsOutputFlag(t *testing.T) {
+	if _, err := captureRun("initialize", "--output", "AGENTS.md"); err == nil || !strings.Contains(err.Error(), "unexpected initialize argument") {
 		t.Fatalf("expected --output to be rejected, got %v", err)
+	}
+}
+
+func TestAgentCommandRemoved(t *testing.T) {
+	if _, err := captureRun("agent", "initialize"); err == nil || !strings.Contains(err.Error(), "unknown command") {
+		t.Fatalf("expected agent command to be removed, got %v", err)
 	}
 }
 

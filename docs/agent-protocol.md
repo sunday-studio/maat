@@ -155,20 +155,11 @@ This is the minimal snippet Maat should install into project repos. It is intent
 Use Maat as the canonical project memory for this repo. Before material work, run `matt sync` if available, then inspect state with `matt status`, `matt project show <project>`, or `matt search <query>`. Create or claim a ticket before working. Record meaningful progress with ticket comments or events. When finished, complete the ticket with evidence, validate Maat, and sync. Do not mark work done without evidence.
 ```
 
-CLI:
-
-```sh
-matt agent instructions
-```
-
-prints exactly this snippet. Use `matt agent instructions --output AGENTS.md` when creating a new project-level agent instruction file.
-
 ## Agent Setup Document
 
 Use this when handing Maat to a new agent, a hosted agent, or a skill/instruction system that needs the full operating protocol:
 
 ```sh
-matt agent initialize --project maat --storage /absolute/path/to/maat-state
 matt initialize --project maat --storage /absolute/path/to/maat-state
 ```
 

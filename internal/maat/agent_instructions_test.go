@@ -6,7 +6,7 @@ import (
 )
 
 func TestAgentInstructionsSnippet(t *testing.T) {
-	snippet := AgentInstructionsSnippet()
+	snippet := agentInstructionsSnippetText()
 	if strings.TrimSpace(snippet) != snippet {
 		t.Fatalf("snippet should not include leading or trailing whitespace: %q", snippet)
 	}

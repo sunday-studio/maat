@@ -126,18 +126,10 @@ Agents should follow this loop:
 5. Complete tickets only with evidence.
 6. Run `matt validate` and `matt sync`.
 
-Install the project instruction snippet into another repo with:
-
-```sh
-matt agent instructions --output AGENTS.md
-```
-
 Generate a full setup handoff for an agent with:
 
 ```sh
 matt initialize --project maat --storage /absolute/path/to/maat-state
-# or
-matt agent initialize --project maat --storage /absolute/path/to/maat-state
 ```
 
 ## TUI
