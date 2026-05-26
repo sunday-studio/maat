@@ -41,6 +41,8 @@ func TestAgentSetupDocument(t *testing.T) {
 		"matt storage link /tmp/maat-state",
 		"Codex: add it to the repo's `AGENTS.md`",
 		"Claude Code: add it to `CLAUDE.md`",
+		"Cursor or Cursor Cloud: add it to the repo's Cursor rules",
+		"Do not rely on the human to manually update Maat state",
 		"matt project show maat --storage /tmp/maat-state",
 		"matt goal create maat",
 		"matt ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",

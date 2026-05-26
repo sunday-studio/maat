@@ -63,13 +63,14 @@ matt status --storage %[2]s
 matt projects --storage %[2]s
 `+"```"+`
 
-## Install Into The Agent
+## Save Into The Agent's Instructions
 
-Put the Maat rule into the agent's normal instruction surface:
+Save this setup document, or the shorter snippet below, into the instruction file or memory surface that the agent reads before it starts work:
 
 - Codex: add it to the repo's `+"`AGENTS.md`"+` or to a Codex skill/instruction file for this workspace.
 - Claude Code: add it to `+"`CLAUDE.md`"+` in the repo, or to the user-level Claude instruction file if this should apply everywhere.
-- Cloud or hosted agents: add it to the system prompt, project instructions, memory, or skill document that the agent reads before work.
+- Cursor or Cursor Cloud: add it to the repo's Cursor rules or project instructions.
+- Cloud or hosted agents: add it to the project prompt, system prompt, memory, or skill document that the agent reads before work.
 - Other agents: use the closest equivalent persistent instruction file.
 
 Use this exact project-level snippet when the target file already has other instructions:
@@ -78,11 +79,7 @@ Use this exact project-level snippet when the target file already has other inst
 %[3]s
 `+"```"+`
 
-You can write the snippet directly with:
-
-`+"```sh"+`
-matt agent instructions --output AGENTS.md
-`+"```"+`
+After saving it, follow the command loop below. Do not rely on the human to manually update Maat state.
 
 ## Operating Loop
 

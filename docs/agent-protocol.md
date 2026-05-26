@@ -169,7 +169,7 @@ Use this when handing Maat to a new agent, a hosted agent, or a skill/instructio
 
 ```sh
 matt agent initialize --project maat --storage /absolute/path/to/maat-state
-matt initialize --output maat-agent-setup.md
+matt initialize --project maat --storage /absolute/path/to/maat-state
 ```
 
-The setup document explains how to link storage, where to place the Maat rule for Codex, Claude Code, cloud agents, or generic agents, and which commands to run before planning, during work, and when finishing with evidence.
+The setup document explains how to link storage, tells the agent to save the Maat rule into `AGENTS.md` or the equivalent instruction surface it reads, and lists the commands to run before planning, during work, and when finishing with evidence.

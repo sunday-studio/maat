@@ -869,6 +869,8 @@ func TestAgentInitializeCommand(t *testing.T) {
 		"matt ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",
 		"Codex: add it to the repo's `AGENTS.md`",
 		"Claude Code: add it to `CLAUDE.md`",
+		"Cursor or Cursor Cloud: add it to the repo's Cursor rules",
+		"Do not rely on the human to manually update Maat state",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected initialize output to include %q, got %q", want, output)
@@ -876,11 +878,10 @@ func TestAgentInitializeCommand(t *testing.T) {
 	}
 }
 
-func TestInitializeAliasCommandJSONAndOutput(t *testing.T) {
+func TestInitializeAliasCommandJSON(t *testing.T) {
 	store := t.TempDir()
-	path := filepath.Join(t.TempDir(), "maat-agent-setup.md")
 
-	output, err := captureRun("initialize", "--project", "maat", "--storage", store, "--json", "--output", path)
+	output, err := captureRun("initialize", "--project", "maat", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -892,18 +893,17 @@ func TestInitializeAliasCommandJSONAndOutput(t *testing.T) {
 	if !strings.Contains(payload["document"], "Audience: any agent") || !strings.Contains(payload["document"], "matt storage link "+store) {
 		t.Fatalf("unexpected initialize payload: %#v", payload)
 	}
-	written, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(written), "Audience: any agent") || !strings.HasSuffix(string(written), "\n") {
-		t.Fatalf("unexpected written setup document: %q", string(written))
-	}
 }
 
 func TestAgentInitializeCommandRejectsAgentFlag(t *testing.T) {
 	if _, err := captureRun("agent", "initialize", "--agent", "codex"); err == nil || !strings.Contains(err.Error(), "unexpected agent initialize argument") {
 		t.Fatalf("expected --agent to be rejected, got %v", err)
+	}
+}
+
+func TestAgentInitializeCommandRejectsOutputFlag(t *testing.T) {
+	if _, err := captureRun("agent", "initialize", "--output", "AGENTS.md"); err == nil || !strings.Contains(err.Error(), "unexpected agent initialize argument") {
+		t.Fatalf("expected --output to be rejected, got %v", err)
 	}
 }
 

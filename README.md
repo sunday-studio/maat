@@ -137,7 +137,7 @@ Generate a full setup handoff for an agent with:
 ```sh
 matt initialize --project maat --storage /absolute/path/to/maat-state
 # or
-matt agent initialize --output maat-agent-setup.md
+matt agent initialize --project maat --storage /absolute/path/to/maat-state
 ```
 
 ## TUI

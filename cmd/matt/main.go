@@ -134,7 +134,7 @@ Usage:
   matt <command> [flags]
 
 Common:
-  matt initialize [--project <project-key>] [--storage <path>] [--output <path>] [--json]
+  matt initialize [--project <project-key>] [--storage <path>] [--json]
   matt status [--storage <path>] [--json]
   matt projects [--storage <path>] [--json]
   matt search <query> [--storage <path>] [--json]
@@ -160,7 +160,7 @@ Setup and maintenance:
   matt validate [--storage <path>] [--json]
   matt migrate plan [--storage <path>] [--json]
   matt migrate apply --dest <path> [--storage <path>]
-  matt agent initialize [--project <project-key>] [--storage <path>] [--output <path>] [--json]
+  matt agent initialize [--project <project-key>] [--storage <path>] [--json]
   matt agent instructions [--json] [--output <path>]
   matt tui [--storage <path>]
   matt version [--json]
@@ -999,19 +999,12 @@ func agentInstructionsCommand(args []string) error {
 
 func agentInitializeCommand(args []string) error {
 	jsonOut := false
-	outputPath := ""
 	projectKey := ""
 	store := ""
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
 			jsonOut = true
-		case "--output":
-			if i+1 >= len(args) {
-				return errors.New("--output requires a path")
-			}
-			outputPath = args[i+1]
-			i++
 		case "--project":
 			if i+1 >= len(args) {
 				return errors.New("--project requires a project key")
@@ -1041,11 +1034,6 @@ func agentInitializeCommand(args []string) error {
 		ProjectKey:  projectKey,
 		StoragePath: store,
 	})
-	if outputPath != "" {
-		if err := os.WriteFile(outputPath, []byte(document+"\n"), 0o644); err != nil {
-			return err
-		}
-	}
 	if agentUse {
 		return agentUpdate("agent.initialize.ready", "ok", "agent setup document ready", map[string]string{"document": document})
 	}
