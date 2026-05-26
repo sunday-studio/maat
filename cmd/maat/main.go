@@ -2208,11 +2208,10 @@ func autoCommitMessage(projectKey, action string) string {
 
 func autoSyncPathspecs(projectKey string) []string {
 	projectKey = strings.Trim(strings.TrimSpace(projectKey), "/")
-	pathspecs := []string{".maat"}
 	if projectKey != "" {
-		pathspecs = append(pathspecs, path.Join("projects", projectKey))
+		return []string{path.Join("projects", projectKey)}
 	}
-	return pathspecs
+	return []string{"projects"}
 }
 
 func warnAutoSync(result autoSyncResult) {

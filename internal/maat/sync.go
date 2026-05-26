@@ -94,6 +94,14 @@ func SyncStore(ctx context.Context, opts StoreSyncOptions) (StoreSyncResult, err
 	message := strings.TrimSpace(opts.Message)
 	if message != "" && len(dirty) > 0 {
 		pathspecs := syncCommitPathspecs(opts.Pathspecs)
+		if !dirtyMatchesPathspecs(dirty, pathspecs) {
+			after, err := git.DirtyStatus(ctx)
+			if err != nil {
+				return result, err
+			}
+			result.DirtyAfterSync = after
+			return result, nil
+		}
 		if err := git.Commit(ctx, message, pathspecs...); err != nil {
 			return result, err
 		}
@@ -145,7 +153,58 @@ func syncCommitPathspecs(pathspecs []string) []string {
 		}
 	}
 	if len(cleaned) == 0 {
-		return []string{"."}
+		return []string{".", ":(exclude).maat"}
 	}
 	return cleaned
+}
+
+func dirtyMatchesPathspecs(dirty []GitStatusEntry, pathspecs []string) bool {
+	for _, entry := range dirty {
+		if pathspecsMatchPath(pathspecs, entry.Path) {
+			return true
+		}
+		if entry.Rename != "" && pathspecsMatchPath(pathspecs, entry.Rename) {
+			return true
+		}
+	}
+	return false
+}
+
+func pathspecsMatchPath(pathspecs []string, candidate string) bool {
+	matched := false
+	for _, pathspec := range pathspecs {
+		if pathspecExcludesPath(pathspec, candidate) {
+			return false
+		}
+		if pathspecMatchesPath(pathspec, candidate) {
+			matched = true
+		}
+	}
+	return matched
+}
+
+func pathspecExcludesPath(pathspec, candidate string) bool {
+	pathspec = strings.TrimSpace(filepath.ToSlash(pathspec))
+	for _, prefix := range []string{":(exclude)", ":!"} {
+		if strings.HasPrefix(pathspec, prefix) {
+			excluded := strings.TrimPrefix(pathspec, prefix)
+			return pathspecMatchesPath(excluded, candidate)
+		}
+	}
+	return false
+}
+
+func pathspecMatchesPath(pathspec, candidate string) bool {
+	pathspec = strings.Trim(strings.TrimSpace(filepath.ToSlash(pathspec)), "/")
+	candidate = strings.Trim(strings.TrimSpace(filepath.ToSlash(candidate)), "/")
+	if pathspec == "" || strings.HasPrefix(pathspec, ":") {
+		return false
+	}
+	if pathspec == "." {
+		return true
+	}
+	if candidate == pathspec || strings.HasPrefix(candidate, pathspec+"/") {
+		return true
+	}
+	return strings.HasPrefix(pathspec, candidate+"/")
 }

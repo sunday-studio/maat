@@ -19,7 +19,7 @@ func TestSyncStoreValidatesIndexesCommitsAndPushes(t *testing.T) {
 		{},
 		{},
 		{},
-		{result: GitCommandResult{}},
+		{result: GitCommandResult{Stdout: "?? .maat/index.json\n?? .maat/index.sqlite\n"}},
 	}}
 
 	result, err := SyncStore(context.Background(), StoreSyncOptions{
@@ -43,20 +43,56 @@ func TestSyncStoreValidatesIndexesCommitsAndPushes(t *testing.T) {
 	if !result.Committed || !result.Pushed {
 		t.Fatalf("expected commit and push, got committed=%v pushed=%v", result.Committed, result.Pushed)
 	}
-	if !reflect.DeepEqual(result.CommitPathspecs, []string{"."}) {
-		t.Fatalf("expected all-change pathspec, got %#v", result.CommitPathspecs)
+	if !reflect.DeepEqual(result.CommitPathspecs, []string{".", ":(exclude).maat"}) {
+		t.Fatalf("expected cache-excluding pathspec, got %#v", result.CommitPathspecs)
 	}
 	if len(result.DirtyBeforeCommit) != 3 {
 		t.Fatalf("expected dirty status before commit, got %#v", result.DirtyBeforeCommit)
+	}
+	if len(result.DirtyAfterSync) != 2 || result.DirtyAfterSync[0].Path != ".maat/index.json" || result.DirtyAfterSync[1].Path != ".maat/index.sqlite" {
+		t.Fatalf("expected rebuildable cache files to remain unstaged, got %#v", result.DirtyAfterSync)
 	}
 	assertGitCalls(t, runner.calls, [][]string{
 		{"rev-parse", "--is-inside-work-tree"},
 		{"branch", "--show-current"},
 		{"remote", "get-url", "origin"},
 		{"status", "--porcelain=v1"},
-		{"add", "--", "."},
+		{"add", "--", ".", ":(exclude).maat"},
 		{"commit", "-m", "status(maat): sync state"},
 		{"push", "origin", "main"},
+		{"status", "--porcelain=v1"},
+	})
+}
+
+func TestSyncStoreSkipsCommitWhenOnlyIndexesAreDirty(t *testing.T) {
+	root := newSyncStore(t)
+	runner := &fakeGitRunner{responses: []fakeGitResponse{
+		{result: GitCommandResult{Stdout: "true\n"}},
+		{result: GitCommandResult{Stdout: "main\n"}},
+		{result: GitCommandResult{}},
+		{result: GitCommandResult{Stdout: "?? .maat/index.json\n?? .maat/index.sqlite\n"}},
+		{result: GitCommandResult{Stdout: "?? .maat/index.json\n?? .maat/index.sqlite\n"}},
+	}}
+
+	result, err := SyncStore(context.Background(), StoreSyncOptions{
+		Store:   root,
+		Runner:  runner,
+		Message: "status(maat): sync state",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Committed {
+		t.Fatal("did not expect commit when only rebuildable indexes are dirty")
+	}
+	if len(result.DirtyAfterSync) != 2 {
+		t.Fatalf("expected dirty cache files to remain, got %#v", result.DirtyAfterSync)
+	}
+	assertGitCalls(t, runner.calls, [][]string{
+		{"rev-parse", "--is-inside-work-tree"},
+		{"branch", "--show-current"},
+		{"remote", "get-url", "origin"},
+		{"status", "--porcelain=v1"},
 		{"status", "--porcelain=v1"},
 	})
 }

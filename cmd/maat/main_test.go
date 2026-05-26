@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -946,9 +947,12 @@ func TestWriteCommandsAutoCommitConfiguredGitStorage(t *testing.T) {
 	if result.AutoSync.CommitMessage != "status(sample): create goal" {
 		t.Fatalf("unexpected auto commit message: %#v", result.AutoSync)
 	}
+	if !reflect.DeepEqual(result.AutoSync.CommitPathspecs, []string{"projects/sample"}) {
+		t.Fatalf("unexpected auto commit pathspecs: %#v", result.AutoSync.CommitPathspecs)
+	}
 	status := runGit(t, store, "status", "--porcelain=v1")
-	if strings.TrimSpace(status) != "" {
-		t.Fatalf("expected clean storage after auto commit, got %q", status)
+	if status != "?? .maat/\n" {
+		t.Fatalf("expected only local cache to remain dirty after auto commit, got %q", status)
 	}
 	log := strings.TrimSpace(runGit(t, store, "log", "-1", "--pretty=%s"))
 	if log != "status(sample): create goal" {
@@ -990,6 +994,9 @@ func TestWriteCommandsAutoPushConfiguredGitStorage(t *testing.T) {
 	if result.AutoSync == nil || !result.AutoSync.Committed || !result.AutoSync.Pushed {
 		t.Fatalf("expected auto commit and push, got %#v", result.AutoSync)
 	}
+	if !reflect.DeepEqual(result.AutoSync.CommitPathspecs, []string{"projects/sample"}) {
+		t.Fatalf("unexpected auto commit pathspecs: %#v", result.AutoSync.CommitPathspecs)
+	}
 	runGit(t, source, "pull", "--rebase")
 	project, err := maat.LoadObjectProject(source, "sample")
 	if err != nil {
@@ -1003,6 +1010,15 @@ func TestWriteCommandsAutoPushConfiguredGitStorage(t *testing.T) {
 	}
 	if !sawGoal {
 		t.Fatalf("expected pushed goal in source checkout, got %#v", project.Goals)
+	}
+}
+
+func TestAutoSyncPathspecsExcludeRebuildableCaches(t *testing.T) {
+	if got := autoSyncPathspecs("sample"); !reflect.DeepEqual(got, []string{"projects/sample"}) {
+		t.Fatalf("unexpected project pathspecs: %#v", got)
+	}
+	if got := autoSyncPathspecs(""); !reflect.DeepEqual(got, []string{"projects"}) {
+		t.Fatalf("unexpected default pathspecs: %#v", got)
 	}
 }
 
@@ -1628,8 +1644,8 @@ func TestSyncCommandCommitsChanges(t *testing.T) {
 		t.Fatalf("unexpected output: %q", output)
 	}
 	status := runGit(t, store, "status", "--porcelain=v1")
-	if strings.TrimSpace(status) != "" {
-		t.Fatalf("expected clean git status after sync, got %q", status)
+	if status != "?? .maat/\n" {
+		t.Fatalf("expected only local cache to remain dirty after sync, got %q", status)
 	}
 	log := runGit(t, store, "log", "-1", "--pretty=%s")
 	if strings.TrimSpace(log) != "status(maat): test sync" {
