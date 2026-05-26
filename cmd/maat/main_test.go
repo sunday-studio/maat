@@ -209,6 +209,9 @@ func TestUpdateCommandDownloadsLatestGitHubRelease(t *testing.T) {
 	updateHTTPClient = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
 		switch request.URL.String() {
 		case baseURL + "/latest":
+			if got := request.Header.Get("Accept"); got != "application/json" {
+				return nil, fmt.Errorf("latest release Accept header = %q, want application/json", got)
+			}
 			payload := map[string]any{
 				"tag_name": "v9.9.9",
 				"assets": []map[string]string{
@@ -228,8 +231,14 @@ func TestUpdateCommandDownloadsLatestGitHubRelease(t *testing.T) {
 			}
 			return testHTTPResponse(http.StatusOK, data), nil
 		case baseURL + "/assets/" + assetName:
+			if got := request.Header.Get("Accept"); got != "application/octet-stream" {
+				return nil, fmt.Errorf("asset Accept header = %q, want application/octet-stream", got)
+			}
 			return testHTTPResponse(http.StatusOK, archive), nil
 		case baseURL + "/assets/checksums-v9.9.9.txt":
+			if got := request.Header.Get("Accept"); got != "application/octet-stream" {
+				return nil, fmt.Errorf("checksum Accept header = %q, want application/octet-stream", got)
+			}
 			return testHTTPResponse(http.StatusOK, []byte(checksum)), nil
 		default:
 			return testHTTPResponse(http.StatusNotFound, []byte("not found")), nil

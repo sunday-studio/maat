@@ -2098,7 +2098,7 @@ func installBinary(sourcePath, targetPath string, sourcePerm os.FileMode) error 
 }
 
 func fetchLatestRelease() (githubRelease, error) {
-	data, err := downloadURL(latestReleaseURL)
+	data, err := downloadURLWithAccept(latestReleaseURL, "application/json")
 	if err != nil {
 		return githubRelease{}, err
 	}
@@ -2113,11 +2113,15 @@ func fetchLatestRelease() (githubRelease, error) {
 }
 
 func downloadURL(url string) ([]byte, error) {
+	return downloadURLWithAccept(url, "application/octet-stream")
+}
+
+func downloadURLWithAccept(url, accept string) ([]byte, error) {
 	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("Accept", "application/octet-stream")
+	request.Header.Set("Accept", accept)
 	request.Header.Set("User-Agent", "maat-updater/"+version.Current().Version)
 	response, err := updateHTTPClient.Do(request)
 	if err != nil {
