@@ -69,13 +69,16 @@ GitHub Actions runs the same test and release build path on `v*` tags and manual
 
 ## Current Implementation Scope
 
-The first executable slice is intentionally small:
+The current executable slice includes:
 
-- parse legacy flat project files from `state/projects/*.md` in a storage repo
-- validate known status values
-- compute status totals
+- setup config with storage path and auto-sync defaults
+- project registration with `maat initialize` or `maat project link`
+- object-layout project, goal, ticket, and event files under `projects/<project-key>/`
+- legacy flat project reads for older storage repos
+- validation for required fields, status values, timestamps, duplicate IDs, object links, malformed tables, and event paths
+- status totals across legacy and object-layout projects
 - search through the rebuildable SQLite index, with direct Markdown search as a fallback
-- write a rebuildable JSON index to `.maat/index.json`
-- write a rebuildable SQLite index to `.maat/index.sqlite`
+- rebuildable JSON and SQLite indexes under `.maat/`
+- write commands for goals, tickets, comments, claims, completion, and explicit sync
 
 The architecture still targets optional vector search. The JSON and SQLite indexes are rebuildable artifacts; Markdown in Git remains canonical.

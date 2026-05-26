@@ -189,7 +189,7 @@ maat initialize --storage /absolute/path/to/maat-state
 
 - [Architecture](docs/architecture.md)
 - [Storage Model](docs/storage-model.md)
-- [CLI, TUI, And UI](docs/cli-tui-ui.md)
+- [CLI, TUI, And Future UI](docs/cli-tui-ui.md)
 - [Agent Protocol](docs/agent-protocol.md)
 - [Install](docs/install.md)
 - [Development](docs/development.md)

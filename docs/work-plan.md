@@ -27,16 +27,16 @@ Status:
 
 ## Group 2: Target Storage Parser
 
-Goal: support the conflict-resistant target layout from `docs/storage-model.md`.
+Goal: support the conflict-resistant object layout from `docs/storage-model.md`.
 
 Tasks:
 
-- Parse `state/projects/<project-key>/project.md`.
+- Parse `projects/<project-key>/project.md`.
 - Parse `goals/*.md`.
 - Parse `tickets/*.md`.
 - Parse `events/YYYY/MM/*.md`.
 - Validate required fields and object links.
-- Keep compatibility with the legacy flat `state/projects/*.md` files until migration exists.
+- Keep compatibility with the legacy flat `projects/*.md` files until migration exists.
 
 Initial owner:
 
@@ -58,7 +58,7 @@ Tasks:
 - Detect invalid status values.
 - Detect missing required fields.
 - Detect malformed object files.
-- Expose a validation API for future `maat validate`.
+- Expose validation through `maat validate`.
 
 Initial owner:
 
@@ -78,7 +78,7 @@ Tasks:
 - Generate event file paths.
 - Render event Markdown from structured input.
 - Add tests for ID shape, event paths, and Markdown output.
-- Later: wire `maat goal create`, `maat ticket create`, `maat ticket comment`, and `maat ticket complete`.
+- Wire CLI write commands on top of these helpers.
 
 Initial owner:
 
@@ -87,6 +87,7 @@ Initial owner:
 Status:
 
 - Done in `ef82244 feat(core): add event write helpers`.
+- CLI write commands are now available.
 
 ## Group 5: CLI Commands
 
@@ -105,9 +106,11 @@ Tasks:
 Initial owner:
 
 - Worker 1: read-path CLI wiring for validation, SQLite-backed search, index rebuild, and JSON output.
-- Later integration: write commands after write-path core lands.
+- Write-command integration follows the write-path core.
 
 Status:
+
+- Core read and write commands are available in the first release.
 
 - Done in `84b1db1 feat(cli): wire read path commands`.
 - Next write-command wiring assigned to Worker A for goal and ticket create/claim/comment/complete.
@@ -148,7 +151,7 @@ Goal: provide a browser dashboard for browsing all project state.
 
 Tasks:
 
-- Add `maat ui`.
+- Add a local web UI command.
 - Serve a local dashboard.
 - Read from SQLite.
 - Use core operations for mutations.
@@ -207,7 +210,7 @@ Goal: move from v0 flat project files to the target object layout safely.
 
 Tasks:
 
-- Plan migration from `state/projects/*.md` to `state/projects/<project-key>/`.
+- Plan migration from `projects/*.md` to `projects/<project-key>/`.
 - Preserve legacy source files.
 - Write target files into a separate destination or temp path first.
 - Generate enough event history to explain migrated objects.
@@ -289,7 +292,7 @@ Initial owner:
 
 Status:
 
-- Done in this slice. Agent onboarding is handled by `maat initialize`.
+- Object indexing is improved enough for the first release. Stale, active, and blocked specialty views remain future work.
 
 ## Integration Rules
 

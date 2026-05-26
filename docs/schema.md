@@ -4,14 +4,14 @@ Maat uses plain Markdown conventions as the durable store.
 
 The schema is designed to be readable by humans, reliable enough for agents, and easy to index into SQLite.
 
-The repository currently contains early flat files. The target schema is directory-per-project and object-per-file. See [Storage Model](./storage-model.md) for the full rationale.
+The current schema is directory-per-project and object-per-file. See [Storage Model](./storage-model.md) for the full rationale. Examples below use paths relative to the configured storage repo content root. New storage repos should use the root layout; older repos may keep the same paths under a top-level `state/` directory.
 
-## Target Project File
+## Project File
 
 Path:
 
 ```text
-state/projects/<project-key>/project.md
+projects/<project-key>/project.md
 ```
 
 Required shape:
@@ -38,7 +38,7 @@ Short current-state summary.
 Path:
 
 ```text
-state/projects/<project-key>/goals/<goal-id>.md
+projects/<project-key>/goals/<goal-id>.md
 ```
 
 Required shape:
@@ -64,7 +64,7 @@ The outcome this goal is trying to achieve.
 Path:
 
 ```text
-state/projects/<project-key>/tickets/<ticket-id>.md
+projects/<project-key>/tickets/<ticket-id>.md
 ```
 
 Required shape:
@@ -118,14 +118,14 @@ Examples:
 - `#backend`
 - `#infra`
 
-Add new tags to `state/tags.md` when they become reusable across projects.
+Add new tags to `tags.md` when they become reusable across projects.
 
 ## Event File
 
 Events live under the project they affect:
 
 ```text
-state/projects/<project-key>/events/YYYY/MM/<event-id>.md
+projects/<project-key>/events/YYYY/MM/<event-id>.md
 ```
 
 Required shape:
@@ -159,11 +159,11 @@ Events are append-only. Correction events should be used instead of rewriting co
 Legacy storage repos may still include:
 
 ```text
-state/projects/<project-id>.md
-state/ledger/YYYY-MM.md
+projects/<project-id>.md
+ledger/YYYY-MM.md
 ```
 
-These are v0 planning artifacts. The implementation should either migrate them to the target layout or read them as legacy input.
+These are v0 planning artifacts. Maat can read them as legacy input, and `maat migrate` can plan or apply a conversion into the object layout.
 
 ## Report File
 
@@ -172,7 +172,7 @@ Reports are agent-written summaries. They do not replace append-only events.
 Path:
 
 ```text
-state/reports/YYYY-MM-DD-<scope>.md
+reports/YYYY-MM-DD-<scope>.md
 ```
 
 Use reports for:
@@ -184,10 +184,10 @@ Use reports for:
 
 ## Decision File
 
-Use `state/decisions/` for durable choices that affect multiple projects or the Maat system itself.
+Use `decisions/` for durable choices that affect multiple projects or the Maat system itself.
 
 Path:
 
 ```text
-state/decisions/D-YYYYMMDD-<slug>.md
+decisions/D-YYYYMMDD-<slug>.md
 ```

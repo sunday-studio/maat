@@ -2,7 +2,7 @@
 
 Maat stores canonical state as Markdown files in a Git repository.
 
-The target storage model is object-oriented and conflict-resistant. Most agent actions create new files instead of editing shared files.
+The current storage model is object-oriented and conflict-resistant. Most agent actions create new files instead of editing shared files.
 
 ## Principles
 
@@ -13,43 +13,40 @@ The target storage model is object-oriented and conflict-resistant. Most agent a
 - Generated summaries are views, not primary state.
 - File names use collision-resistant IDs, not shared counters.
 
-## Target Layout
+## Current Layout
 
 ```text
 maat-state/
-├── maat.toml
-├── state/
-│   ├── agents/
-│   ├── decisions/
-│   │   └── D-20260525-architecture-direction.md
-│   ├── projects/
-│   │   └── maat/
-│   │       ├── project.md
-│   │       ├── repos/
-│   │       │   └── R-20260525-190100-a31f.md
-│   │       ├── goals/
-│   │       │   └── G-20260525-190533-a7f3.md
-│   │       ├── tickets/
-│   │       │   └── T-20260525-190700-b91c.md
-│   │       ├── reports/
-│   │       └── events/
-│   │           └── 2026/
-│   │               └── 05/
-│   │                   └── E-20260525-190812-codex-4c9a.md
-│   ├── reports/
-│   ├── templates/
-│   └── tags.md
+├── projects/
+│   └── maat/
+│       ├── project.md
+│       ├── repos/
+│       │   └── R-20260525-190100-a31f.md
+│       ├── goals/
+│       │   └── G-20260525-190533-a7f3.md
+│       ├── tickets/
+│       │   └── T-20260525-190700-b91c.md
+│       ├── reports/
+│       └── events/
+│           └── 2026/
+│               └── 05/
+│                   └── E-20260525-190812-codex-4c9a.md
+├── decisions/
+│   └── D-20260525-architecture-direction.md
+├── reports/
+├── templates/
+├── tags.md
 ├── docs/
 └── README.md
 ```
 
-The product repository ignores `state/` so local smoke data and real storage repos do not clutter the source tree. The architecture target for a storage repo is the directory-per-project layout above.
+The product repository ignores `state/` so local smoke data and nested storage experiments do not clutter the source tree. A storage repo should normally use the root layout above. For compatibility, Maat can also read a checkout where the content root is a top-level `state/` directory.
 
 ## Local Cache Layout
 
 Maat may create local cache data under `.maat/`, including `index.json` and `index.sqlite`.
 
-That cache is rebuildable from `state/` and should normally stay ignored:
+That cache is rebuildable from Markdown and should normally stay ignored:
 
 - product repos should ignore `.maat/`
 - local storage checkouts should ignore `.maat/` unless the storage repo deliberately chooses otherwise
@@ -77,7 +74,7 @@ If a project has a Git remote, the remote should be the strongest identity signa
 Path:
 
 ```text
-state/projects/<project-key>/project.md
+projects/<project-key>/project.md
 ```
 
 Shape:
@@ -113,7 +110,7 @@ Project files should change rarely. Frequent updates belong in event files.
 Path:
 
 ```text
-state/projects/<project-key>/goals/<goal-id>.md
+projects/<project-key>/goals/<goal-id>.md
 ```
 
 Shape:
@@ -141,7 +138,7 @@ Goal status may be computed from events once event processing exists. Until then
 Path:
 
 ```text
-state/projects/<project-key>/tickets/<ticket-id>.md
+projects/<project-key>/tickets/<ticket-id>.md
 ```
 
 Shape:
@@ -176,7 +173,7 @@ Tickets may be goal-linked or standalone.
 Path:
 
 ```text
-state/projects/<project-key>/events/YYYY/MM/<event-id>.md
+projects/<project-key>/events/YYYY/MM/<event-id>.md
 ```
 
 Shape:

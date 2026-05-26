@@ -2,7 +2,7 @@
 
 Agents should use Maat as their shared project memory.
 
-The preferred path is through the `maat` CLI or future MCP tools. Direct Markdown edits are acceptable during early development, but they should follow the same object and event rules in `docs/storage-model.md`.
+The preferred path is through the `maat` CLI or future MCP tools. Direct Markdown edits are a fallback for agents that cannot run the CLI, and they should follow the same object and event rules in `docs/storage-model.md`.
 
 Git plus Markdown is canonical. SQLite, TUI screens, and generated views are rebuildable.
 

@@ -8,7 +8,7 @@ The product has one durable source of truth and several disposable interfaces ar
 - SQLite is the local query and search index.
 - The `maat` binary provides CLI commands for agents and humans.
 - A Bubble Tea TUI provides an interactive terminal dashboard.
-- A local web UI provides a browsable dashboard.
+- A future local web UI provides a browsable dashboard.
 - Future MCP tools expose the same operations to agent systems.
 
 ## Design Goals
@@ -41,8 +41,8 @@ flowchart TD
     subgraph interfaces [Interfaces]
         CLI[maat CLI]
         TUI[Bubble Tea TUI]
-        WEB[Local Web UI]
-        MCP[MCP Server]
+        WEB[Future Local Web UI]
+        MCP[Future MCP Server]
     end
 
     subgraph local [Local Machine]
@@ -105,11 +105,10 @@ and recover the fast local view.
 Local config records machine-specific settings only:
 
 - storage repository path
-- default Git remote
-- UI port
-- index database path
-- preferred editor
-- agent identity defaults
+- default actor
+- auto-pull before reads
+- auto-commit after writes
+- auto-push after commits
 
 Local config is not authoritative project state.
 
@@ -117,7 +116,7 @@ Local config is not authoritative project state.
 
 SQLite is a rebuildable local cache.
 
-It stores parsed objects, materialized current state, keyword search tables, vector embeddings, and UI query helpers. The index may be deleted at any time and rebuilt from Markdown.
+It stores parsed objects, materialized current state, keyword search tables, and UI query helpers. Optional vector embeddings are a later layer. The index may be deleted at any time and rebuilt from Markdown.
 
 See [Search And Indexing](./search-index.md).
 
@@ -133,10 +132,10 @@ Examples:
 maat status
 maat project link
 maat goal create maat "Ship first deploy"
-maat ticket create maat --goal G-20260525-190533-a7f3 "Verify install"
-maat ticket claim T-20260525-190700-b91c --ttl 2h
-maat ticket comment T-20260525-190700-b91c "Found failing deploy path."
-maat ticket complete T-20260525-190700-b91c --evidence "installer smoke passed"
+maat ticket create maat "Verify install" --goal G-20260525-190533-a7f3
+maat ticket claim T-20260525-190700-b91c --project maat --ttl 2h
+maat ticket comment T-20260525-190700-b91c "Found failing deploy path." --project maat
+maat ticket complete T-20260525-190700-b91c --project maat --evidence "installer smoke passed"
 maat search "agent health"
 maat sync
 ```
@@ -155,15 +154,11 @@ It should feel like a fast operational dashboard:
 - agent activity
 - sync/index status
 
-See [CLI, TUI, And UI](./cli-tui-ui.md).
+See [CLI, TUI, And Future UI](./cli-tui-ui.md).
 
-### Web UI
+### Future Web UI
 
-The web UI is a local dashboard launched by:
-
-```sh
-maat ui
-```
+The web UI is planned as a local dashboard.
 
 It reads from the same core library and SQLite index as the CLI. It should not invent a separate write path.
 

@@ -63,7 +63,7 @@ When you finish a change, always commit it before handing the work back unless t
 
 ## Project Files
 
-Legacy project files are plain Markdown in a Maat storage repo. Target architecture uses `state/projects/<project-key>/project.md` plus separate goal, ticket, and event files inside that storage repo.
+Legacy project files are plain Markdown in a Maat storage repo. Current object-layout storage uses `projects/<project-key>/project.md` plus separate goal, ticket, and event files inside that storage repo.
 
 Legacy project fields:
 
@@ -84,8 +84,8 @@ Use stable IDs:
 
 Events are append-only.
 
-- Target architecture writes new event files under `state/projects/<project-key>/events/YYYY/MM/` in the storage repo.
-- Legacy v0 storage may still use monthly files such as `state/ledger/2026-05.md`.
+- Current object-layout storage writes new event files under `projects/<project-key>/events/YYYY/MM/` in the storage repo.
+- Legacy v0 storage may still use monthly files such as `ledger/2026-05.md`.
 - Do not rewrite old events unless you are correcting your own uncommitted mistake.
 - If a previous event was wrong, append a new correction event.
 - Every event must reference the project and changed object.

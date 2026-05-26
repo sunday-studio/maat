@@ -23,7 +23,7 @@ This avoids turning one SQLite file into a shared write target for hundreds of a
 - Materialize current project, goal, and ticket state.
 - Build a timeline from event files.
 - Provide full-text search.
-- Provide semantic search when embeddings are available.
+- Leave room for semantic search when embeddings are available.
 - Track source file paths and hashes for incremental indexing.
 - Serve fast queries to the CLI, TUI, web UI, and MCP adapter.
 
@@ -75,13 +75,13 @@ Search documents should include:
 - tags
 - linked repo metadata
 
-Example commands:
+Current command:
 
 ```sh
 maat search "agent health"
-maat search --project maat "agent protocol"
-maat search --type decision "sqlite"
 ```
+
+Future search filters may add project and document-type scoping.
 
 ## Semantic Search
 

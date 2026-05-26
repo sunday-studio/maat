@@ -72,7 +72,7 @@ Codex can use Maat directly:
 Recommended instruction:
 
 ```text
-Before and after material work, update Maat according to AGENTS.md. Prefer the `maat` CLI. Use current read commands for discovery and validation. When write commands are unavailable, create target-layout object and event files directly. Create or claim a ticket before work, record useful progress, complete work only with evidence, and sync afterward.
+Before and after material work, update Maat according to AGENTS.md. Prefer the `maat` CLI. Use current read commands for discovery and validation. If the CLI is unavailable, create object-layout files and events directly. Create or claim a ticket before work, record useful progress, complete work only with evidence, and sync afterward.
 ```
 
 ## Claude
@@ -82,14 +82,14 @@ Claude-style agents can use the same contract when they have filesystem and Git 
 Recommended instruction:
 
 ```text
-Use the Maat repository as the canonical project tracker. Prefer the `maat` CLI. Use current read commands for discovery and validation. When write commands are unavailable, create target-layout object and event files directly. Create or claim a ticket before work, record useful progress, complete work only with evidence, and sync afterward.
+Use the Maat repository as the canonical project tracker. Prefer the `maat` CLI. Use current read commands for discovery and validation. If the CLI is unavailable, create object-layout files and events directly. Create or claim a ticket before work, record useful progress, complete work only with evidence, and sync afterward.
 ```
 
 ## Agents Without Git Push Access
 
 If an agent cannot push:
 
-1. Write a complete handoff report in `state/reports/`.
+1. Write a complete handoff report in `reports/`.
 2. Include proposed object changes.
 3. Include proposed event files.
 4. Ask a Git-capable agent to apply and commit the update.

@@ -1,11 +1,11 @@
-# CLI, TUI, And UI
+# CLI, TUI, And Future UI
 
-Maat has three human-facing interfaces and one future agent-facing adapter.
+Maat currently has a CLI and a Bubble Tea TUI. A local web UI and MCP adapter are planned.
 
 - CLI: command surface for agents and power users.
 - TUI: Bubble Tea terminal dashboard.
-- Web UI: local browser dashboard.
-- MCP: typed tool adapter for agents.
+- Future web UI: local browser dashboard.
+- Future MCP: typed tool adapter for agents.
 
 All interfaces should use the same core operations.
 
@@ -13,11 +13,12 @@ All interfaces should use the same core operations.
 
 The CLI binary is `maat`.
 
-It should be easy to install on a new machine, link to a Git-controlled storage directory, rebuild the local index, and start querying.
+It should be easy to install on a new machine, link to a Git-controlled storage directory, register a project repo, rebuild the local index, and start querying.
 
 ### Setup
 
 ```sh
+maat setup
 maat setup --storage /absolute/path/to/maat-state
 maat index rebuild
 ```
@@ -32,13 +33,7 @@ maat project link /absolute/path/to/source-repo
 maat project link /absolute/path/to/source-repo --key maat --name "Maat"
 ```
 
-`maat project link` should detect the current Git repository when run from inside a source repo.
-
-Future project commands:
-
-```sh
-maat project status maat active
-```
+`maat project link` detects the current Git repository when run from inside a source repo.
 
 ### Goal Commands
 
@@ -53,11 +48,9 @@ When run from inside a repo linked with `maat project link`, create commands can
 
 Future goal commands:
 
-```sh
-maat goal list maat
-maat goal show G-20260525-190533-a7f3
-maat goal status G-20260525-190533-a7f3 done --evidence "all tickets complete"
-```
+- list goals
+- show a goal
+- update goal status with evidence
 
 ### Ticket Commands
 
@@ -93,20 +86,17 @@ maat search "agent health"
 
 Future query commands:
 
-```sh
-maat active
-maat blocked
-maat stale
-maat timeline --today
-maat report daily
-```
+- active work views
+- blocked work views
+- stale work views
+- timeline views
+- report generation
 
-Most query commands should support:
+Current query commands support `--json` where a structured final result is useful. Project-scoped commands also support `--project <project>` where needed:
 
 ```sh
 --json
 --project <project>
---since <time>
 ```
 
 ### Output Modes
@@ -135,12 +125,7 @@ maat validate
 maat index rebuild
 ```
 
-Future sync shorthands:
-
-```sh
-maat pull
-maat push
-```
+Future sync shorthands may split pull and push into direct commands.
 
 The normal agent write path should validate and commit. Push can be opt-in or configured by policy.
 
@@ -182,15 +167,9 @@ The TUI should optimize for scanning and quick navigation:
 
 The TUI should not become the only way to perform actions. Any TUI mutation should map to a CLI/core operation.
 
-## Web UI
+## Future Web UI
 
-The web UI launches with:
-
-```sh
-maat ui
-```
-
-The first version can be local-only.
+The first web UI version can be local-only and should launch from the `maat` binary when it lands.
 
 ### Web Views
 
@@ -209,7 +188,7 @@ The web UI should read primarily from SQLite for speed and ask the core layer to
 
 If the SQLite cache is stale, missing, or being rebuilt, the UI should surface that state and offer a rebuild path rather than treating it as lost project data.
 
-## MCP Adapter
+## Future MCP Adapter
 
 MCP should expose the same safe operations agents need:
 

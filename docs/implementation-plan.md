@@ -16,10 +16,10 @@ This plan keeps implementation small while preserving the target architecture.
 - Detect malformed events.
 - Support the existing flat v0 files enough to migrate or inspect them.
 
-Current bootstrap status:
+Current status:
 
-- legacy flat project parsing exists for `state/projects/*.md`
-- target object layout parsing exists for `state/projects/<project-key>/`
+- legacy flat project parsing exists for `projects/*.md`
+- target object layout parsing exists for `projects/<project-key>/`
 - validation checks required fields, known statuses, timestamps, duplicate IDs, object links, malformed tables, and event paths
 - status totals can be computed from legacy and object-layout projects
 
@@ -32,12 +32,12 @@ Current bootstrap status:
 - `maat status`
 - `maat search` with SQLite FTS
 
-Current bootstrap status:
+Current status:
 
 - `maat setup` writes local config
-- `maat index rebuild` writes `.maat/index.json` as a temporary rebuildable index
+- `maat index rebuild` writes rebuildable `.maat/index.json` and `.maat/index.sqlite` indexes
 - `maat projects`, `maat project show`, `maat status`, and direct Markdown `maat search` work
-- SQLite FTS remains future work
+- SQLite FTS is wired with direct Markdown search as a fallback
 
 ## Phase 3: CLI Write Path
 
@@ -62,9 +62,9 @@ Each write creates Markdown objects/events, validates, indexes, and commits.
 
 The TUI should call the same core operations as the CLI.
 
-## Phase 5: Local Web UI
+## Phase 5: Future Local Web UI
 
-- Launch with `maat ui`.
+- Add a local dashboard launched from the `maat` binary.
 - Read from SQLite.
 - Use core operations for mutations.
 - Include projects, tickets, timeline, blocked/stale views, decisions, and search.

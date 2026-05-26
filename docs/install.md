@@ -201,11 +201,11 @@ These paths are local machine state and should not be treated as authoritative p
 Target config paths:
 
 ```text
-macOS: ~/Library/Application Support/maat/config.toml
-Linux: ~/.config/maat/config.toml
+macOS: ~/Library/Application Support/maat/config.json
+Linux: ~/.config/maat/config.json
 ```
 
-The config records settings such as the storage repo path, default UI port, preferred editor, and agent identity defaults.
+The config records settings such as the storage repo path, default actor, auto-pull before reads, auto-commit after writes, and auto-push after commits.
 
 ### Storage
 
@@ -226,7 +226,7 @@ macOS: ~/Library/Caches/maat/index.sqlite
 Linux: ~/.cache/maat/index.sqlite
 ```
 
-The current bootstrap implementation may also write inside the storage repo:
+The CLI currently writes rebuildable indexes inside the storage repo:
 
 ```text
 <storage>/.maat/index.json
@@ -269,11 +269,7 @@ Launch the TUI with:
 maat tui
 ```
 
-When the local web UI lands, the expected command will be:
-
-```sh
-maat ui
-```
+The local web UI is planned for a later release.
 
 ## New Machine Flow
 
@@ -281,7 +277,7 @@ maat ui
 2. Install `maat`.
 3. Save or pass the storage path.
 4. Rebuild the local index.
-5. Query from the CLI, TUI, or UI.
+5. Query from the CLI or TUI.
 
 Current commands:
 
