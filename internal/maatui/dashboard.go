@@ -104,6 +104,15 @@ var (
 	headerStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("63"))
+	openTicketStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("39"))
+	waitingTicketStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("214"))
+	doneTicketStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("42"))
 	mutedStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("245"))
 	errorStyle = lipgloss.NewStyle().
@@ -186,7 +195,7 @@ func (m Model) View() string {
 	if m.err != nil && len(m.dashboard.Projects) == 0 {
 		return errorStyle.Render(fmt.Sprintf("Maat TUI failed: %v", m.err)) + "\n\n" + mutedStyle.Render("Press q to quit.") + "\n"
 	}
-	view := RenderDashboardWithSelectionAndMode(m.dashboard, m.selected, m.mode)
+	view := RenderDashboardWithSelectionModeAndWidth(m.dashboard, m.selected, m.mode, m.width)
 	if m.refreshing {
 		view += mutedStyle.Render("Refreshing...")
 		view += "\n"
@@ -404,6 +413,10 @@ func RenderDashboardWithSelection(dashboard Dashboard, selected int) string {
 }
 
 func RenderDashboardWithSelectionAndMode(dashboard Dashboard, selected int, mode DetailMode) string {
+	return RenderDashboardWithSelectionModeAndWidth(dashboard, selected, mode, 0)
+}
+
+func RenderDashboardWithSelectionModeAndWidth(dashboard Dashboard, selected int, mode DetailMode, width int) string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Maat"))
 	b.WriteString("\n")
@@ -416,7 +429,7 @@ func RenderDashboardWithSelectionAndMode(dashboard Dashboard, selected int, mode
 	project := selectedProject(dashboard.Projects, selected)
 	switch mode {
 	case DetailModeTickets:
-		b.WriteString(RenderProjectTickets(project))
+		b.WriteString(RenderProjectTicketBoard(project, width))
 	case DetailModeTimeline:
 		b.WriteString(RenderTimeline(dashboard.Events))
 	default:
@@ -508,6 +521,10 @@ func RenderProjectDetail(project ProjectRow) string {
 }
 
 func RenderProjectTickets(project ProjectRow) string {
+	return RenderProjectTicketBoard(project, 0)
+}
+
+func RenderProjectTicketBoard(project ProjectRow, width int) string {
 	if project.Key == "" && project.DisplayName == "" {
 		return mutedStyle.Render("Select a project to see tickets.")
 	}
@@ -518,30 +535,144 @@ func RenderProjectTickets(project ProjectRow) string {
 	}
 
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("Tickets"))
+	b.WriteString(headerStyle.Render("Tickets Board"))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("%s  %d open / %d done / %d total\n", titleStyle.Render(name), project.OpenTickets, project.DoneTickets, project.Tickets))
+	b.WriteString(fmt.Sprintf("%s  %s  %d open / %d done / %d total\n", titleStyle.Render(name), emptyFallback(project.Status, "status unknown"), project.OpenTickets, project.DoneTickets, project.Tickets))
 	b.WriteString("\n")
 	if len(project.TicketRows) == 0 {
 		b.WriteString(mutedStyle.Render("No tickets recorded."))
 		return b.String()
 	}
-	for index, ticket := range project.TicketRows {
-		if index >= 10 {
-			b.WriteString(mutedStyle.Render(fmt.Sprintf("+ %d more tickets", len(project.TicketRows)-index)))
+	columns := ticketBoardColumns(project.TicketRows)
+	if width <= 0 {
+		width = 140
+	}
+	if width < 72 {
+		b.WriteString(renderStackedTicketBoard(columns, 56))
+		return strings.TrimRight(b.String(), "\n")
+	}
+	b.WriteString(renderColumnTicketBoard(columns, width))
+	return strings.TrimRight(b.String(), "\n")
+}
+
+type ticketBoardColumn struct {
+	Title   string
+	Style   lipgloss.Style
+	Tickets []TicketRow
+}
+
+func ticketBoardColumns(tickets []TicketRow) []ticketBoardColumn {
+	columns := []ticketBoardColumn{
+		{Title: "Open", Style: openTicketStyle},
+		{Title: "Waiting", Style: waitingTicketStyle},
+		{Title: "Done", Style: doneTicketStyle},
+	}
+	for _, ticket := range tickets {
+		switch ticketBoardStatus(ticket.Status) {
+		case "waiting":
+			columns[1].Tickets = append(columns[1].Tickets, ticket)
+		case "done":
+			columns[2].Tickets = append(columns[2].Tickets, ticket)
+		default:
+			columns[0].Tickets = append(columns[0].Tickets, ticket)
+		}
+	}
+	return columns
+}
+
+func renderColumnTicketBoard(columns []ticketBoardColumn, width int) string {
+	gap := "  "
+	columnWidth := (width - len(gap)*(len(columns)-1)) / len(columns)
+	if columnWidth > 44 {
+		columnWidth = 44
+	}
+	if columnWidth < 20 {
+		columnWidth = 20
+	}
+	renderedColumns := make([][]string, 0, len(columns))
+	maxLines := 0
+	for _, column := range columns {
+		lines := renderTicketColumnLines(column, columnWidth, 6)
+		renderedColumns = append(renderedColumns, lines)
+		if len(lines) > maxLines {
+			maxLines = len(lines)
+		}
+	}
+
+	var b strings.Builder
+	for row := 0; row < maxLines; row++ {
+		for columnIndex, lines := range renderedColumns {
+			cell := ""
+			if row < len(lines) {
+				cell = lines[row]
+			}
+			b.WriteString(fmt.Sprintf("%-*s", columnWidth, truncate(cell, columnWidth)))
+			if columnIndex < len(renderedColumns)-1 {
+				b.WriteString(gap)
+			}
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+func renderStackedTicketBoard(columns []ticketBoardColumn, width int) string {
+	var b strings.Builder
+	for index, column := range columns {
+		if index > 0 {
+			b.WriteString("\n")
+		}
+		lines := renderTicketColumnLines(column, width, 5)
+		for _, line := range lines {
+			b.WriteString(line)
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}
+
+func renderTicketColumnLines(column ticketBoardColumn, width int, limit int) []string {
+	lines := []string{column.Style.Render(fmt.Sprintf("%s (%d)", column.Title, len(column.Tickets)))}
+	if len(column.Tickets) == 0 {
+		lines = append(lines, mutedStyle.Render("No tickets"))
+		return lines
+	}
+	for index, ticket := range column.Tickets {
+		if index >= limit {
+			lines = append(lines, mutedStyle.Render(fmt.Sprintf("+ %d more", len(column.Tickets)-index)))
 			break
 		}
-		label := ticket.ID
-		if label == "" {
-			label = "ticket"
-		}
-		goal := "standalone"
-		if ticket.GoalID != "" {
-			goal = ticket.GoalID
-		}
-		b.WriteString(fmt.Sprintf("- %s [%s] %s (%s)\n", label, ticket.Status, truncate(ticket.Title, 52), goal))
+		lines = append(lines, renderTicketCard(ticket, width))
 	}
-	return strings.TrimRight(b.String(), "\n")
+	return lines
+}
+
+func renderTicketCard(ticket TicketRow, width int) string {
+	label := ticket.ID
+	if label == "" {
+		label = "ticket"
+	}
+	goal := "standalone"
+	if ticket.GoalID != "" {
+		goal = ticket.GoalID
+	}
+	status := emptyFallback(ticket.Status, "open")
+	titleLimit := width - len(label) - len(status) - 7
+	if titleLimit < 12 {
+		titleLimit = 12
+	}
+	return fmt.Sprintf("- %s [%s] %s (%s)", label, status, truncate(ticket.Title, titleLimit), goal)
+}
+
+func ticketBoardStatus(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "done", "completed", "complete", "closed", "merged", "shipped":
+		return "done"
+	case "waiting", "blocked", "paused", "pending", "review", "in-review", "needs-review":
+		return "waiting"
+	default:
+		return "open"
+	}
 }
 
 func RenderTimeline(events []EventRow) string {

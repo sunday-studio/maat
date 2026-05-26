@@ -167,6 +167,7 @@ func TestRenderProjectDetailShowsSummaryGoalsAndTicketCounts(t *testing.T) {
 
 func TestRenderProjectTicketsShowsGoalAndStandaloneTickets(t *testing.T) {
 	got := RenderProjectTickets(ProjectRow{
+		Status:      "active",
 		Key:         "sample",
 		DisplayName: "Sample",
 		Tickets:     2,
@@ -178,10 +179,61 @@ func TestRenderProjectTicketsShowsGoalAndStandaloneTickets(t *testing.T) {
 		},
 	})
 
-	for _, want := range []string{"Tickets", "Sample", "1 open / 1 done / 2 total", "T-001", "Add status table", "G-001", "T-002", "standalone"} {
+	for _, want := range []string{"Tickets Board", "Sample", "active", "1 open / 1 done / 2 total", "Open (1)", "Done (1)", "T-001", "Add status table", "G-001", "T-002", "standalone"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderProjectTickets() missing %q in:\n%s", want, got)
 		}
+	}
+}
+
+func TestRenderProjectTicketBoardGroupsUsefulStatusColumns(t *testing.T) {
+	got := RenderProjectTicketBoard(ProjectRow{
+		Key:         "sample",
+		DisplayName: "Sample",
+		Status:      "active",
+		Tickets:     4,
+		OpenTickets: 2,
+		DoneTickets: 2,
+		TicketRows: []TicketRow{
+			{ID: "T-001", Title: "Build board shell", Status: "active", GoalID: "G-001"},
+			{ID: "T-002", Title: "Await review", Status: "waiting", GoalID: "G-001"},
+			{ID: "T-003", Title: "Ship old work", Status: "done"},
+			{ID: "T-004", Title: "Close release note", Status: "completed"},
+		},
+	}, 96)
+
+	for _, want := range []string{"Open (1)", "Waiting (1)", "Done (2)", "T-001", "T-002", "T-003", "T-004", "completed"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderProjectTicketBoard() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderProjectTicketBoardStacksAtNarrowWidth(t *testing.T) {
+	got := RenderProjectTicketBoard(ProjectRow{
+		Key:         "sample",
+		DisplayName: "Sample",
+		Tickets:     3,
+		OpenTickets: 2,
+		DoneTickets: 1,
+		TicketRows: []TicketRow{
+			{ID: "T-001", Title: "Keep the board readable on compact terminals", Status: "active"},
+			{ID: "T-002", Title: "Wait for external deploy", Status: "blocked"},
+			{ID: "T-003", Title: "Finish detail copy", Status: "done"},
+		},
+	}, 64)
+
+	openIndex := strings.Index(got, "Open (1)")
+	waitingIndex := strings.Index(got, "Waiting (1)")
+	doneIndex := strings.Index(got, "Done (1)")
+	if openIndex < 0 || waitingIndex < 0 || doneIndex < 0 {
+		t.Fatalf("stacked board missing column headers:\n%s", got)
+	}
+	if !(openIndex < waitingIndex && waitingIndex < doneIndex) {
+		t.Fatalf("stacked board headers out of order:\n%s", got)
+	}
+	if !strings.Contains(got, "Keep the board readable") || !strings.Contains(got, "Wait for external deploy") {
+		t.Fatalf("stacked board missing ticket titles:\n%s", got)
 	}
 }
 
@@ -198,7 +250,7 @@ func TestRenderDashboardCanShowTicketMode(t *testing.T) {
 		},
 	}}, 0, DetailModeTickets)
 
-	for _, want := range []string{"Tickets", "T-001", "project/tickets/timeline"} {
+	for _, want := range []string{"Tickets Board", "T-001", "project/tickets/timeline"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderDashboardWithSelectionAndMode() missing %q in:\n%s", want, got)
 		}
