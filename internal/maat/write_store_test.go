@@ -129,10 +129,12 @@ func TestWriteStoreCreatesTicketLifecycleEvents(t *testing.T) {
 	store := WriteStore{Root: root, Entropy: strings.NewReader("\x10\x01\x10\x02\x10\x03\x10\x04\x10\x05\x10\x06\x10\x07\x10\x08")}
 	createProjectFixture(t, store, at)
 	ticket, _, err := store.CreateTicket(CreateTicketInput{
-		ProjectKey: "sample-a31f",
-		Title:      "Separate Agent Availability From Monitor Health",
-		Actor:      "codex",
-		At:         at,
+		ProjectKey:  "sample-a31f",
+		Title:       "Separate Agent Availability From Monitor Health",
+		Description: "Record lifecycle events for a ticket with enough context to pick up.",
+		Acceptance:  []string{"Comment, claim, and completion events are written."},
+		Actor:       "codex",
+		At:          at,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -183,16 +185,64 @@ func TestWriteStoreCreatesTicketLifecycleEvents(t *testing.T) {
 	}
 }
 
+func TestWriteStoreRequiresGoalOutcome(t *testing.T) {
+	root := t.TempDir()
+	at := time.Date(2026, 5, 25, 19, 7, 0, 0, time.UTC)
+	store := WriteStore{Root: root}
+	createProjectFixture(t, store, at)
+
+	_, _, err := store.CreateGoal(CreateGoalInput{
+		ProjectKey: "sample-a31f",
+		Title:      "Missing outcome",
+		Actor:      "codex",
+		At:         at,
+	})
+	if err == nil || !strings.Contains(err.Error(), "goal outcome is required") {
+		t.Fatalf("expected goal outcome error, got %v", err)
+	}
+}
+
+func TestWriteStoreRequiresTicketDetails(t *testing.T) {
+	root := t.TempDir()
+	at := time.Date(2026, 5, 25, 19, 7, 0, 0, time.UTC)
+	store := WriteStore{Root: root}
+	createProjectFixture(t, store, at)
+
+	_, _, err := store.CreateTicket(CreateTicketInput{
+		ProjectKey: "sample-a31f",
+		Title:      "Missing description",
+		Acceptance: []string{"It is accepted."},
+		Actor:      "codex",
+		At:         at,
+	})
+	if err == nil || !strings.Contains(err.Error(), "ticket description is required") {
+		t.Fatalf("expected ticket description error, got %v", err)
+	}
+
+	_, _, err = store.CreateTicket(CreateTicketInput{
+		ProjectKey:  "sample-a31f",
+		Title:       "Missing acceptance",
+		Description: "Do the work.",
+		Actor:       "codex",
+		At:          at,
+	})
+	if err == nil || !strings.Contains(err.Error(), "ticket acceptance is required") {
+		t.Fatalf("expected ticket acceptance error, got %v", err)
+	}
+}
+
 func TestWriteStoreRequiresCompletionEvidence(t *testing.T) {
 	root := t.TempDir()
 	at := time.Date(2026, 5, 25, 19, 7, 0, 0, time.UTC)
 	store := WriteStore{Root: root, Entropy: strings.NewReader("\x10\x01\x10\x02")}
 	createProjectFixture(t, store, at)
 	ticket, _, err := store.CreateTicket(CreateTicketInput{
-		ProjectKey: "sample-a31f",
-		Title:      "Add evidence guard",
-		Actor:      "codex",
-		At:         at,
+		ProjectKey:  "sample-a31f",
+		Title:       "Add evidence guard",
+		Description: "Verify completion rejects tickets without evidence.",
+		Acceptance:  []string{"Completion without evidence returns an error."},
+		Actor:       "codex",
+		At:          at,
 	})
 	if err != nil {
 		t.Fatal(err)

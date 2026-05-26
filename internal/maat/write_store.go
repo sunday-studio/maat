@@ -155,6 +155,9 @@ func (store WriteStore) CreateGoal(input CreateGoalInput) (ObjectGoal, ObjectEve
 	if goal.Title == "" {
 		return ObjectGoal{}, ObjectEvent{}, fmt.Errorf("goal title is required")
 	}
+	if goal.Outcome == "" {
+		return ObjectGoal{}, ObjectEvent{}, fmt.Errorf("goal outcome is required")
+	}
 	if err := requireActor(input.Actor); err != nil {
 		return ObjectGoal{}, ObjectEvent{}, err
 	}
@@ -211,6 +214,12 @@ func (store WriteStore) CreateTicket(input CreateTicketInput) (ObjectTicket, Obj
 	}
 	if ticket.Title == "" {
 		return ObjectTicket{}, ObjectEvent{}, fmt.Errorf("ticket title is required")
+	}
+	if ticket.Description == "" {
+		return ObjectTicket{}, ObjectEvent{}, fmt.Errorf("ticket description is required")
+	}
+	if len(ticket.Acceptance) == 0 {
+		return ObjectTicket{}, ObjectEvent{}, fmt.Errorf("ticket acceptance is required")
 	}
 	if err := requireActor(input.Actor); err != nil {
 		return ObjectTicket{}, ObjectEvent{}, err

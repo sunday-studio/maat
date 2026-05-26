@@ -16,6 +16,8 @@ func TestAgentInstructionsSnippet(t *testing.T) {
 		"`maat status`",
 		"`maat project show <project>`",
 		"Create or claim a ticket",
+		"New goals must include an outcome",
+		"new tickets must include a description and acceptance criteria",
 		"Complete tickets only with evidence",
 	}
 	for _, phrase := range required {
@@ -39,6 +41,9 @@ func TestAgentSetupDocument(t *testing.T) {
 		"This repo is registered as `maat`.",
 		"maat project show maat --storage /tmp/maat-state",
 		"maat goal create maat",
+		"--outcome",
+		"--description",
+		"--acceptance",
 		"maat ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",
 	} {
 		if !strings.Contains(document, want) {

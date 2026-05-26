@@ -34,8 +34,8 @@ maat ticket list --project <project-key>
 Create or claim work:
 
 ```sh
-maat goal create <project-key> "<goal title>"
-maat ticket create <project-key> "<ticket title>" --goal <goal-id>
+maat goal create <project-key> "<goal title>" --outcome "the concrete outcome this goal should achieve"
+maat ticket create <project-key> "<ticket title>" --goal <goal-id> --description "the concrete work another agent should do" --acceptance "clear completion condition"
 maat ticket claim <ticket-id> --project <project-key> --agent "<agent-id>" --ttl 2h
 ```
 
@@ -72,8 +72,8 @@ Write commands:
 
 ```sh
 maat project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]
-maat goal create [project-key] <title> [--storage <path>] [--json]
-maat ticket create [project-key] <title> [--goal <goal-id>] [--storage <path>] [--json]
+maat goal create [project-key] <title> --outcome <text> [--storage <path>] [--json]
+maat ticket create [project-key] <title> [--goal <goal-id>] --description <text> --acceptance <text>... [--storage <path>] [--json]
 maat ticket claim <ticket-id> [--agent <agent-id>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
 maat ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
 maat ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]
@@ -85,6 +85,9 @@ Use `--agent-use` when an agent needs newline-delimited progress updates instead
 ## Rules
 
 - Create or claim a ticket before material work.
+- Never create title-only goals or tickets.
+- Every new goal must include a concrete outcome.
+- Every new ticket must include a concrete description and at least one acceptance criterion.
 - Add comments for meaningful progress, blockers, and handoffs.
 - Complete tickets only with clear evidence.
 - Do not retry a write just because index refresh failed; rebuild the index later.

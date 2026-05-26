@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-const agentInstructionsSnippet = `Use Maat as the canonical project memory for this repo. Before work, run ` + "`maat status`" + ` and ` + "`maat project show <project>`" + `. Create or claim a ticket before material work. Add short progress comments when useful. Complete tickets only with evidence. Validate and sync when done.`
+const agentInstructionsSnippet = `Use Maat as the canonical project memory for this repo. Before work, run ` + "`maat status`" + ` and ` + "`maat project show <project>`" + `. Create or claim a ticket before material work. New goals must include an outcome; new tickets must include a description and acceptance criteria. Add short progress comments when useful. Complete tickets only with evidence. Validate and sync when done.`
 
 func agentInstructionsSnippetText() string {
 	return agentInstructionsSnippet
@@ -60,8 +60,8 @@ maat status --storage %[2]s
 maat project show %[1]s --storage %[2]s
 maat search "<query>" --storage %[2]s
 
-maat goal create %[1]s "<goal title>" --storage %[2]s
-maat ticket create %[1]s "<ticket title>" --goal <goal-id> --storage %[2]s
+maat goal create %[1]s "<goal title>" --outcome "the concrete outcome this goal should achieve" --storage %[2]s
+maat ticket create %[1]s "<ticket title>" --goal <goal-id> --description "the concrete work another agent should do" --acceptance "clear completion condition" --storage %[2]s
 
 maat ticket claim <ticket-id> --project %[1]s --agent "<agent-id>" --ttl 2h --storage %[2]s
 maat ticket comment <ticket-id> "short factual progress note" --project %[1]s --storage %[2]s
@@ -73,6 +73,9 @@ maat sync --storage %[2]s --message "status(%[1]s): update maat" --push
 ## Rules
 
 - Create or claim a ticket before material work.
+- Never create title-only goals or tickets.
+- Every new goal must include a concrete outcome.
+- Every new ticket must include a concrete description and at least one acceptance criterion.
 - Add comments for meaningful progress, blockers, handoffs, and decisions.
 - Complete a ticket only when there is clear evidence.
 - Commit finished product changes in the product repo.

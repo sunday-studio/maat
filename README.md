@@ -108,12 +108,13 @@ maat status --agent-use
 ### 5. Create Goals And Tickets
 
 ```sh
-maat goal create <project-key> "Ship first deploy"
-maat ticket create <project-key> "Verify installer"
-maat ticket create <project-key> "Fix deploy docs" --goal <goal-id>
+maat goal create <project-key> "Ship first deploy" --outcome "Installers and release docs are ready for agents to use."
+maat ticket create <project-key> "Verify installer" --description "Run the installer on a clean machine and record every failure." --acceptance "Installer places maat on PATH."
+maat ticket create <project-key> "Fix deploy docs" --goal <goal-id> --description "Update release docs with the current install flow." --acceptance "Docs include the exact install and initialize commands."
 ```
 
 Tickets can belong to a goal or stand on their own.
+Goals require an outcome. Tickets require a description and at least one acceptance criterion, so another agent can pick them up without guessing.
 
 ### 6. Work A Ticket
 

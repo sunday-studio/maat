@@ -25,6 +25,7 @@ func TestValidateStorePassesObjectLayoutWrittenByCLI(t *testing.T) {
 	goal, _, err := store.CreateGoal(CreateGoalInput{
 		ProjectKey: "maat",
 		Title:      "Ship first deploy",
+		Outcome:    "The object layout validates after Maat writes it.",
 		Actor:      "codex",
 		At:         at.Add(time.Minute),
 	})
@@ -32,11 +33,13 @@ func TestValidateStorePassesObjectLayoutWrittenByCLI(t *testing.T) {
 		t.Fatal(err)
 	}
 	ticket, _, err := store.CreateTicket(CreateTicketInput{
-		ProjectKey: "maat",
-		GoalID:     goal.ID,
-		Title:      "Validate object layout",
-		Actor:      "codex",
-		At:         at.Add(2 * time.Minute),
+		ProjectKey:  "maat",
+		GoalID:      goal.ID,
+		Title:       "Validate object layout",
+		Description: "Run validation against object files created through the write store.",
+		Acceptance:  []string{"The validation report has no issues."},
+		Actor:       "codex",
+		At:          at.Add(2 * time.Minute),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -133,11 +136,14 @@ func TestValidateStoreDetectsObjectLayoutIssues(t *testing.T) {
 		"goal_id_filename_mismatch",
 		"invalid_goal_status",
 		"invalid_goal_timestamp",
+		"missing_goal_outcome",
 		"ticket_project_mismatch",
 		"ticket_id_filename_mismatch",
 		"unknown_ticket_goal",
 		"invalid_ticket_status",
 		"invalid_ticket_timestamp",
+		"missing_ticket_description",
+		"missing_ticket_acceptance",
 		"event_project_mismatch",
 		"event_id_filename_mismatch",
 		"event_time_path_mismatch",

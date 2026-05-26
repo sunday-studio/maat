@@ -23,7 +23,7 @@ Maat creates or updates `projects/<project-key>/project.md`, validates the store
 ## Add A Goal
 
 ```sh
-maat goal create <project-key> "<goal title>"
+maat goal create <project-key> "<goal title>" --outcome "the concrete outcome this goal should achieve"
 ```
 
 Maat creates:
@@ -36,14 +36,16 @@ Maat creates:
 Standalone ticket:
 
 ```sh
-maat ticket create <project-key> "<ticket title>"
+maat ticket create <project-key> "<ticket title>" --description "the concrete work another agent should do" --acceptance "clear completion condition"
 ```
 
 Ticket under a goal:
 
 ```sh
-maat ticket create <project-key> "<ticket title>" --goal <goal-id>
+maat ticket create <project-key> "<ticket title>" --goal <goal-id> --description "the concrete work another agent should do" --acceptance "clear completion condition"
 ```
+
+Goals require `--outcome`. Tickets require `--description` and at least one `--acceptance` value.
 
 Maat creates:
 

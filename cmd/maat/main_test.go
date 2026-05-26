@@ -42,10 +42,12 @@ func TestStatusJSONIncludesObjectProjects(t *testing.T) {
 	goalID := createCommandGoal(t, store)
 	writer := maat.NewWriteStore(store)
 	if _, _, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: "sample",
-		GoalID:     goalID,
-		Title:      "Object status ticket",
-		Actor:      "test",
+		ProjectKey:  "sample",
+		GoalID:      goalID,
+		Title:       "Object status ticket",
+		Description: "Exercise object status ticket counting.",
+		Acceptance:  []string{"Status output includes the object ticket."},
+		Actor:       "test",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -639,7 +641,7 @@ func TestGoalCreateCommand(t *testing.T) {
 	t.Setenv("MAAT_ACTOR", "codex")
 	store := writeObjectCommandFixture(t)
 
-	output, err := captureRun("goal", "create", "sample", "Ship command writes", "--storage", store)
+	output, err := captureRun("goal", "create", "sample", "Ship command writes", "--outcome", "Agents can see the command write outcome.", "--storage", store)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -653,6 +655,9 @@ func TestGoalCreateCommand(t *testing.T) {
 	}
 	if len(project.Goals) != 1 || project.Goals[0].Title != "Ship command writes" {
 		t.Fatalf("unexpected goals: %#v", project.Goals)
+	}
+	if project.Goals[0].Outcome != "Agents can see the command write outcome." {
+		t.Fatalf("unexpected goal outcome: %#v", project.Goals[0])
 	}
 	if len(project.Events) != 1 || project.Events[0].Type != "goal.created" {
 		t.Fatalf("unexpected events: %#v", project.Events)
@@ -669,7 +674,7 @@ func TestGoalCreateCommandJSON(t *testing.T) {
 	t.Setenv("MAAT_ACTOR", "codex")
 	store := writeObjectCommandFixture(t)
 
-	output, err := captureRun("goal", "create", "sample", "Ship json writes", "--storage", store, "--json")
+	output, err := captureRun("goal", "create", "sample", "Ship json writes", "--outcome", "Agents can see the JSON write outcome.", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -698,7 +703,7 @@ func TestWriteCommandsAutoCommitConfiguredGitStorage(t *testing.T) {
 		AutoPushAfterCommit:  false,
 	})
 
-	output, err := captureRun("goal", "create", "sample", "Auto committed goal", "--storage", store, "--json")
+	output, err := captureRun("goal", "create", "sample", "Auto committed goal", "--outcome", "Auto commit is recorded after goal creation.", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -745,7 +750,7 @@ func TestWriteCommandsAutoPushConfiguredGitStorage(t *testing.T) {
 		AutoPushAfterCommit:  true,
 	})
 
-	output, err := captureRun("goal", "create", "sample", "Auto pushed goal", "--storage", store, "--json")
+	output, err := captureRun("goal", "create", "sample", "Auto pushed goal", "--outcome", "Auto push is recorded after goal creation.", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -780,7 +785,7 @@ func TestGoalCreateCommandTreatsIndexFailureAsWarning(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	output, err := captureRun("goal", "create", "sample", "Survive index failure", "--storage", store, "--json")
+	output, err := captureRun("goal", "create", "sample", "Survive index failure", "--outcome", "The goal persists even when index refresh fails.", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -811,7 +816,7 @@ func TestGoalCreateAgentUseEmitsIndexWarning(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	output, err := captureRun("goal", "create", "sample", "Agent warning", "--storage", store, "--agent-use")
+	output, err := captureRun("goal", "create", "sample", "Agent warning", "--outcome", "Agent-use output reports index warnings.", "--storage", store, "--agent-use")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -857,7 +862,7 @@ func TestGoalCreateAgentUseEmitsAutoSyncWarning(t *testing.T) {
 		AutoPushAfterCommit:  true,
 	})
 
-	output, err := captureRun("goal", "create", "sample", "Agent sync warning", "--storage", store, "--agent-use")
+	output, err := captureRun("goal", "create", "sample", "Agent sync warning", "--outcome", "Agent-use output reports sync warnings.", "--storage", store, "--agent-use")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -902,7 +907,7 @@ func TestGoalCreateCommandInfersLinkedProject(t *testing.T) {
 	}
 	t.Chdir(source)
 
-	output, err := captureRun("goal", "create", "Inferred goal", "--storage", store, "--json")
+	output, err := captureRun("goal", "create", "Inferred goal", "--outcome", "The linked project is inferred for the goal.", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -920,7 +925,7 @@ func TestTicketCreateCommand(t *testing.T) {
 	store := writeObjectCommandFixture(t)
 	goalID := createCommandGoal(t, store)
 
-	output, err := captureRun("ticket", "create", "sample", "Wire ticket command", "--goal", goalID, "--storage", store)
+	output, err := captureRun("ticket", "create", "sample", "Wire ticket command", "--goal", goalID, "--description", "Wire the ticket create command through the write store.", "--acceptance", "The ticket stores enough detail for another agent.", "--storage", store)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -938,6 +943,9 @@ func TestTicketCreateCommand(t *testing.T) {
 	if project.Tickets[0].GoalID != goalID {
 		t.Fatalf("expected goal link %q, got %q", goalID, project.Tickets[0].GoalID)
 	}
+	if project.Tickets[0].Description == "" || len(project.Tickets[0].Acceptance) != 1 {
+		t.Fatalf("expected actionable ticket details: %#v", project.Tickets[0])
+	}
 }
 
 func TestTicketCreateCommandJSON(t *testing.T) {
@@ -945,7 +953,7 @@ func TestTicketCreateCommandJSON(t *testing.T) {
 	store := writeObjectCommandFixture(t)
 	goalID := createCommandGoal(t, store)
 
-	output, err := captureRun("ticket", "create", "sample", "Wire json ticket", "--goal", goalID, "--storage", store, "--json")
+	output, err := captureRun("ticket", "create", "sample", "Wire json ticket", "--goal", goalID, "--description", "Return a JSON result after creating a detailed ticket.", "--acceptance", "The ticket create result includes the created IDs.", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -973,7 +981,7 @@ func TestTicketCreateCommandInfersLinkedProject(t *testing.T) {
 	}
 	t.Chdir(source)
 
-	output, err := captureRun("ticket", "create", "Inferred ticket", "--storage", store, "--json")
+	output, err := captureRun("ticket", "create", "Inferred ticket", "--description", "Create a ticket using the linked project from the current directory.", "--acceptance", "The command returns the inferred project key.", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1013,6 +1021,19 @@ func TestTicketListAndShowCommands(t *testing.T) {
 	if ticket.ID != ticketID || ticket.Status != "active" || ticket.Title != "Existing ticket" {
 		t.Fatalf("unexpected ticket: %#v", ticket)
 	}
+	if ticket.Description == "" || len(ticket.Acceptance) != 1 {
+		t.Fatalf("expected ticket details in json: %#v", ticket)
+	}
+
+	output, err = captureRun("ticket", "show", ticketID, "--project", "sample", "--storage", store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Description:", "Existing ticket fixtures can be shown", "Acceptance:", "The ticket show command exposes actionable details."} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected show output to include %q, got %q", want, output)
+		}
+	}
 }
 
 func TestTicketListInfersLinkedProject(t *testing.T) {
@@ -1034,17 +1055,21 @@ func TestTicketListInfersLinkedProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	sampleTicket, _, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: "sample",
-		Title:      "Sample ticket",
-		Actor:      "test",
+		ProjectKey:  "sample",
+		Title:       "Sample ticket",
+		Description: "Exercise ticket filtering for the sample project.",
+		Acceptance:  []string{"Only the sample project ticket is returned."},
+		Actor:       "test",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: "other",
-		Title:      "Other ticket",
-		Actor:      "test",
+		ProjectKey:  "other",
+		Title:       "Other ticket",
+		Description: "Exercise ticket filtering for another project.",
+		Acceptance:  []string{"The other project ticket is excluded."},
+		Actor:       "test",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -1113,9 +1138,11 @@ func TestTicketEventCommandsInferLinkedProjectWhenTicketIDIsDuplicated(t *testin
 	}
 	writer := maat.NewWriteStore(store)
 	ticket, _, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: "sample",
-		Title:      "Shared ticket id",
-		Actor:      "test",
+		ProjectKey:  "sample",
+		Title:       "Shared ticket id",
+		Description: "Exercise duplicate ticket project inference.",
+		Acceptance:  []string{"The first matching linked project is selected."},
+		Actor:       "test",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1190,6 +1217,29 @@ func TestTicketCreateCommandRequiresProjectAndTitle(t *testing.T) {
 	_, err := captureRun("ticket", "create", "Only title", "--storage", store)
 	if err == nil || !strings.Contains(err.Error(), "project key is required") {
 		t.Fatalf("expected project/title error, got %v", err)
+	}
+}
+
+func TestGoalCreateCommandRequiresOutcome(t *testing.T) {
+	store := writeObjectCommandFixture(t)
+
+	_, err := captureRun("goal", "create", "sample", "Missing outcome", "--storage", store)
+	if err == nil || !strings.Contains(err.Error(), "--outcome is required") {
+		t.Fatalf("expected outcome error, got %v", err)
+	}
+}
+
+func TestTicketCreateCommandRequiresDetails(t *testing.T) {
+	store := writeObjectCommandFixture(t)
+
+	_, err := captureRun("ticket", "create", "sample", "Missing description", "--acceptance", "It is accepted.", "--storage", store)
+	if err == nil || !strings.Contains(err.Error(), "--description is required") {
+		t.Fatalf("expected description error, got %v", err)
+	}
+
+	_, err = captureRun("ticket", "create", "sample", "Missing acceptance", "--description", "Do the work.", "--storage", store)
+	if err == nil || !strings.Contains(err.Error(), "--acceptance is required") {
+		t.Fatalf("expected acceptance error, got %v", err)
 	}
 }
 
@@ -1526,6 +1576,7 @@ func createCommandGoal(t *testing.T, store string) string {
 	goal, _, err := writer.CreateGoal(maat.CreateGoalInput{
 		ProjectKey: "sample",
 		Title:      "Existing goal",
+		Outcome:    "Existing goal fixtures can be linked by command tests.",
 		Actor:      "test",
 	})
 	if err != nil {
@@ -1539,9 +1590,11 @@ func createCommandTicket(t *testing.T, store string) string {
 
 	writer := maat.NewWriteStore(store)
 	ticket, _, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: "sample",
-		Title:      "Existing ticket",
-		Actor:      "test",
+		ProjectKey:  "sample",
+		Title:       "Existing ticket",
+		Description: "Existing ticket fixtures can be shown by command tests.",
+		Acceptance:  []string{"The ticket show command exposes actionable details."},
+		Actor:       "test",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1569,24 +1622,29 @@ func writeCommandFixture(t *testing.T) string {
 	goal, _, err := writer.CreateGoal(maat.CreateGoalInput{
 		ProjectKey: "sample",
 		Title:      "Ship",
+		Outcome:    "The fixture project has a goal for tickets.",
 		Actor:      "test",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: "sample",
-		GoalID:     goal.ID,
-		Title:      "Open item",
-		Actor:      "test",
+		ProjectKey:  "sample",
+		GoalID:      goal.ID,
+		Title:       "Open item",
+		Description: "Exercise an open ticket row.",
+		Acceptance:  []string{"The open ticket appears in the fixture."},
+		Actor:       "test",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: "sample",
-		GoalID:     goal.ID,
-		Title:      "Second item",
-		Actor:      "test",
+		ProjectKey:  "sample",
+		GoalID:      goal.ID,
+		Title:       "Second item",
+		Description: "Exercise a second ticket row.",
+		Acceptance:  []string{"The second ticket appears in the fixture."},
+		Actor:       "test",
 	}); err != nil {
 		t.Fatal(err)
 	}

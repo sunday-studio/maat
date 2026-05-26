@@ -155,10 +155,10 @@ Common:
 Projects:
   maat project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]
   maat project show <project-id> [--storage <path>] [--json]
-  maat goal create [project-key] <title> [--storage <path>] [--json]
+  maat goal create [project-key] <title> --outcome <text> [--storage <path>] [--json]
 
 Tickets:
-  maat ticket create [project-key] <title> [--goal <goal-id>] [--storage <path>] [--json]
+  maat ticket create [project-key] <title> [--goal <goal-id>] --description <text> --acceptance <text>... [--storage <path>] [--json]
   maat ticket list [--project <project-key>] [--storage <path>] [--json]
   maat ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]
   maat ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
@@ -1002,10 +1002,14 @@ func projectLinkCommand(args []string) error {
 
 func goalCommand(args []string) error {
 	if len(args) == 0 || args[0] != "create" {
-		return errors.New("usage: maat goal create <project-key> <title> [--storage <path>] [--json]")
+		return errors.New("usage: maat goal create <project-key> <title> --outcome <text> [--storage <path>] [--json]")
 	}
 	filtered, jsonOut := splitJSONFlag(args[1:])
 	store, rest, err := loadStoreAndRest(filtered)
+	if err != nil {
+		return err
+	}
+	outcome, rest, err := consumeFlagValue(rest, "--outcome", false)
 	if err != nil {
 		return err
 	}
@@ -1013,10 +1017,14 @@ func goalCommand(args []string) error {
 	if err != nil {
 		return err
 	}
+	if strings.TrimSpace(outcome) == "" {
+		return errors.New("--outcome is required; describe what this goal should achieve")
+	}
 	writer := maat.NewWriteStore(store)
 	goal, event, err := writer.CreateGoal(maat.CreateGoalInput{
 		ProjectKey: projectKey,
 		Title:      title,
+		Outcome:    outcome,
 		Actor:      defaultActor(),
 	})
 	if err != nil {
@@ -1053,13 +1061,15 @@ func ticketCommand(args []string) error {
 }
 
 type ticketView struct {
-	ID         string `json:"id"`
-	ProjectKey string `json:"project_key"`
-	GoalID     string `json:"goal_id,omitempty"`
-	Title      string `json:"title"`
-	Status     string `json:"status"`
-	Created    string `json:"created,omitempty"`
-	Path       string `json:"path,omitempty"`
+	ID          string   `json:"id"`
+	ProjectKey  string   `json:"project_key"`
+	GoalID      string   `json:"goal_id,omitempty"`
+	Title       string   `json:"title"`
+	Status      string   `json:"status"`
+	Description string   `json:"description,omitempty"`
+	Acceptance  []string `json:"acceptance,omitempty"`
+	Created     string   `json:"created,omitempty"`
+	Path        string   `json:"path,omitempty"`
 }
 
 func ticketListCommand(args []string) error {
@@ -1148,6 +1158,15 @@ func ticketShowCommand(args []string) error {
 		if ticket.Path != "" {
 			fmt.Printf("Path:    %s\n", ticket.Path)
 		}
+		if ticket.Description != "" {
+			fmt.Printf("\nDescription:\n%s\n", ticket.Description)
+		}
+		if len(ticket.Acceptance) > 0 {
+			fmt.Print("\nAcceptance:\n")
+			for _, item := range ticket.Acceptance {
+				fmt.Printf("- %s\n", item)
+			}
+		}
 		return nil
 	}
 	return fmt.Errorf("ticket %q not found in project %q", ticketID, projectKey)
@@ -1163,16 +1182,32 @@ func ticketCreateCommand(args []string) error {
 	if err != nil {
 		return err
 	}
+	description, rest, err := consumeFlagValue(rest, "--description", false)
+	if err != nil {
+		return err
+	}
+	acceptance, rest, err := consumeFlagValues(rest, "--acceptance")
+	if err != nil {
+		return err
+	}
 	projectKey, title, err := resolveCreateProjectAndTitle(store, rest, "ticket")
 	if err != nil {
 		return err
 	}
+	if strings.TrimSpace(description) == "" {
+		return errors.New("--description is required; describe the concrete work to do")
+	}
+	if len(acceptance) == 0 {
+		return errors.New("--acceptance is required at least once; add a completion condition")
+	}
 	writer := maat.NewWriteStore(store)
 	ticket, event, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: projectKey,
-		Title:      title,
-		GoalID:     goalID,
-		Actor:      defaultActor(),
+		ProjectKey:  projectKey,
+		Title:       title,
+		GoalID:      goalID,
+		Description: description,
+		Acceptance:  acceptance,
+		Actor:       defaultActor(),
 	})
 	if err != nil {
 		return err
@@ -1804,13 +1839,15 @@ func objectTicketViews(project maat.ObjectProject) []ticketView {
 	tickets := make([]ticketView, 0, len(project.Tickets))
 	for _, ticket := range project.Tickets {
 		tickets = append(tickets, ticketView{
-			ID:         ticket.ID,
-			ProjectKey: ticket.ProjectKey,
-			GoalID:     ticket.GoalID,
-			Title:      ticket.Title,
-			Status:     ticket.Status,
-			Created:    ticket.Created,
-			Path:       ticket.Path,
+			ID:          ticket.ID,
+			ProjectKey:  ticket.ProjectKey,
+			GoalID:      ticket.GoalID,
+			Title:       ticket.Title,
+			Status:      ticket.Status,
+			Description: ticket.Description,
+			Acceptance:  ticket.Acceptance,
+			Created:     ticket.Created,
+			Path:        ticket.Path,
 		})
 	}
 	return tickets
@@ -1862,6 +1899,23 @@ func consumeFlagValue(args []string, flag string, required bool) (string, []stri
 		return "", nil, fmt.Errorf("%s is required", flag)
 	}
 	return value, filtered, nil
+}
+
+func consumeFlagValues(args []string, flag string) ([]string, []string, error) {
+	filtered := make([]string, 0, len(args))
+	values := make([]string, 0)
+	for i := 0; i < len(args); i++ {
+		if args[i] != flag {
+			filtered = append(filtered, args[i])
+			continue
+		}
+		if i+1 >= len(args) {
+			return nil, nil, fmt.Errorf("%s requires a value", flag)
+		}
+		values = append(values, args[i+1])
+		i++
+	}
+	return values, filtered, nil
 }
 
 func defaultActor() string {

@@ -164,6 +164,9 @@ func validateObjectGoalFile(store, path string, state *objectProjectValidation, 
 	}
 	validateObjectStatus(report, doc, "Status", "invalid_goal_status", "goal")
 	validateRFC3339Field(report, doc, "Created", "invalid_goal_timestamp")
+	if strings.TrimSpace(doc.sections["outcome"]) == "" {
+		addValidationIssue(report, store, path, doc.sectionLines["outcome"], "missing_goal_outcome", "goal must include a non-empty Outcome section")
+	}
 	return nil
 }
 
@@ -216,6 +219,12 @@ func validateObjectTicketFile(store, path string, state *objectProjectValidation
 	}
 	validateObjectStatus(report, doc, "Status", "invalid_ticket_status", "ticket")
 	validateRFC3339Field(report, doc, "Created", "invalid_ticket_timestamp")
+	if strings.TrimSpace(doc.sections["description"]) == "" {
+		addValidationIssue(report, store, path, doc.sectionLines["description"], "missing_ticket_description", "ticket must include a non-empty Description section")
+	}
+	if len(parseBulletList(doc.sections["acceptance"])) == 0 {
+		addValidationIssue(report, store, path, doc.sectionLines["acceptance"], "missing_ticket_acceptance", "ticket must include at least one Acceptance bullet")
+	}
 	return nil
 }
 
