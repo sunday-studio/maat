@@ -76,7 +76,7 @@ func run(args []string) error {
 		progress("projects.load", "loading projects", map[string]string{"storage": store})
 		projects, err := loadProjectListItems(store)
 		if err != nil {
-			return err
+			return reportStorageAccessError("projects.load", store, "read projects", err)
 		}
 		if agentUse {
 			return agentUpdate("projects.loaded", "ok", "projects loaded", map[string]any{
@@ -111,7 +111,7 @@ func run(args []string) error {
 		}
 		summary, err := maat.Status(store)
 		if err != nil {
-			return err
+			return reportStorageAccessError("status.load", store, "read status", err)
 		}
 		if agentUse {
 			return agentUpdate("status.ready", "ok", "status ready", summary)
@@ -616,7 +616,7 @@ func setupCommand(args []string) error {
 	}
 	abs, err := validateSetupStoragePath(storagePath)
 	if err != nil {
-		return err
+		return reportStorageAccessError("setup.storage", storagePath, "inspect setup storage", err)
 	}
 	cfg.StoragePath = abs
 	preserveInstalledBinaryConfig(&cfg)
@@ -671,6 +671,7 @@ func setupDoctorCommand(args []string, jsonOut bool) error {
 	if err != nil {
 		return err
 	}
+	blockingErr := setupDoctorBlockingError(result)
 	if agentUse {
 		status := "ok"
 		message := "setup healthy"
@@ -678,13 +679,19 @@ func setupDoctorCommand(args []string, jsonOut bool) error {
 			status = "warning"
 			message = "setup needs attention"
 		}
-		return agentUpdate("setup.doctor", status, message, result)
+		if err := agentUpdate("setup.doctor", status, message, result); err != nil {
+			return err
+		}
+		return blockingErr
 	}
 	if jsonOut {
-		return writeJSON(result)
+		if err := writeJSON(result); err != nil {
+			return err
+		}
+		return blockingErr
 	}
 	printSetupDoctorResult(result)
-	return nil
+	return blockingErr
 }
 
 func runSetupDoctor(storageArg string, fix bool) (setupDoctorResult, error) {
@@ -872,8 +879,7 @@ func inspectSetupDoctorGit(result *setupDoctorResult, storagePath string) bool {
 		})
 		return true
 	}
-	upstream, err := gitBranchUpstream(storagePath)
-	if err != nil {
+	if repo.Upstream == "" {
 		result.Checks = append(result.Checks, setupDoctorCheck{
 			ID:               "git_upstream",
 			Status:           "warning",
@@ -887,7 +893,28 @@ func inspectSetupDoctorGit(result *setupDoctorResult, storagePath string) bool {
 	result.Checks = append(result.Checks, setupDoctorCheck{
 		ID:      "git_upstream",
 		Status:  "ok",
-		Message: "current branch tracks " + upstream,
+		Message: fmt.Sprintf("current branch tracks %s (ahead %d, behind %d)", repo.Upstream, repo.Ahead, repo.Behind),
+		Path:    storagePath,
+	})
+	if repo.PullStrategyWarning != "" {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:               "git_pull_strategy",
+			Status:           "warning",
+			Message:          repo.PullStrategyWarning,
+			Path:             storagePath,
+			RequiresApproval: true,
+			Suggestion:       "run git -C " + storagePath + " config pull.rebase true after confirming the storage repo policy",
+		})
+		return true
+	}
+	pullRebase := repo.PullRebase
+	if pullRebase == "" {
+		pullRebase = "unset"
+	}
+	result.Checks = append(result.Checks, setupDoctorCheck{
+		ID:      "git_pull_strategy",
+		Status:  "ok",
+		Message: "pull.rebase is " + pullRebase,
 		Path:    storagePath,
 	})
 	return true
@@ -1023,15 +1050,6 @@ func checkWritableDirectory(dir string) error {
 	return removeErr
 }
 
-func gitBranchUpstream(storagePath string) (string, error) {
-	command := exec.Command("git", "-C", storagePath, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
-	output, err := command.Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
 func markSetupDoctorCheckFixed(result *setupDoctorResult, id, message string) {
 	for i := range result.Checks {
 		if result.Checks[i].ID == id {
@@ -1055,6 +1073,15 @@ func finalizeSetupDoctorResult(result *setupDoctorResult) {
 			result.OK = false
 		}
 	}
+}
+
+func setupDoctorBlockingError(result setupDoctorResult) error {
+	for _, check := range result.Checks {
+		if check.Status == "error" {
+			return fmt.Errorf("setup doctor found blocking issue in %s: %s", check.ID, check.Message)
+		}
+	}
+	return nil
 }
 
 func printSetupDoctorResult(result setupDoctorResult) {
@@ -1297,6 +1324,21 @@ func printSyncResult(result maat.StoreSyncResult, statusOnly bool) {
 		}
 	}
 	fmt.Printf("Repository: %s\n", repo)
+	if result.Repository.IsRepository {
+		if result.Repository.Upstream != "" {
+			fmt.Printf("Upstream:   %s (ahead %d, behind %d)\n", result.Repository.Upstream, result.Repository.Ahead, result.Repository.Behind)
+		} else {
+			fmt.Println("Upstream:   none")
+		}
+		pullRebase := result.Repository.PullRebase
+		if pullRebase == "" {
+			pullRebase = "unset"
+		}
+		fmt.Printf("Pull rebase: %s\n", pullRebase)
+		if result.Repository.PullStrategyWarning != "" {
+			fmt.Printf("Warning:    %s\n", result.Repository.PullStrategyWarning)
+		}
+	}
 	if result.Validation.Files > 0 {
 		fmt.Printf("Validation: %d files, ok\n", result.Validation.Files)
 	}
@@ -1321,6 +1363,8 @@ func printSyncResult(result maat.StoreSyncResult, statusOnly bool) {
 	}
 	if result.Pushed {
 		fmt.Println("Pushed:     yes")
+	} else {
+		fmt.Println("Pushed:     no")
 	}
 	printSyncDirty("Remaining", result.DirtyAfterSync)
 }
@@ -1908,7 +1952,7 @@ func agentInitializeCommand(args []string) error {
 		ProjectKey: projectKey,
 	})
 	if err != nil {
-		return err
+		return reportStorageAccessError("initialize.project", store, "write project registration", err)
 	}
 	progress("initialize.index", "refreshing indexes", nil)
 	refreshResult := refreshIndexesBestEffort(store)
@@ -2261,6 +2305,44 @@ func warnIndexRefresh(result indexRefreshResult) {
 		"index_refreshed": result.Refreshed,
 		"warning":         result.Warning,
 	})
+}
+
+type storageAccessDetail struct {
+	StoragePath string `json:"storage_path"`
+	Operation   string `json:"operation"`
+	Error       string `json:"error"`
+	Remediation string `json:"remediation"`
+	Retry       string `json:"retry"`
+}
+
+type storageAccessFailureResult struct {
+	Action string              `json:"action"`
+	OK     bool                `json:"ok"`
+	Error  storageAccessDetail `json:"error"`
+}
+
+func reportStorageAccessError(step, store, operation string, err error) error {
+	detail := storageAccessDetailFor(store, operation, err)
+	if agentUse {
+		_ = agentUpdate(step, "warning", "storage access failed", detail)
+	} else if jsonUse {
+		_ = writeJSON(storageAccessFailureResult{
+			Action: step,
+			OK:     false,
+			Error:  detail,
+		})
+	}
+	return fmt.Errorf("%s failed for storage %s: %w. %s", operation, store, err, detail.Remediation)
+}
+
+func storageAccessDetailFor(store, operation string, err error) storageAccessDetail {
+	return storageAccessDetail{
+		StoragePath: store,
+		Operation:   operation,
+		Error:       err.Error(),
+		Remediation: "Choose a readable and writable Maat storage repo, grant the agent access to this path, or pass --storage <path>.",
+		Retry:       "retry after storage permissions or path selection are fixed",
+	}
 }
 
 func resolveTicketProject(store, projectKey, ticketID string) (string, error) {
@@ -2918,10 +3000,10 @@ func autoPullBeforeRead(store string) {
 	git := maat.GitSync{Store: store}
 	isRepository, err := git.IsRepository(context.Background())
 	if err != nil {
-		warn("read.pull", fmt.Sprintf("auto-pull skipped before read: %v", err), map[string]any{
-			"storage": store,
-			"warning": err.Error(),
-		})
+		detail := storageAccessDetailFor(store, "auto-pull before read", err)
+		detail.Remediation = "The read will continue using local Markdown state. Grant Git/network access, fix storage repo permissions, or disable auto-pull with maat setup --no-auto-pull."
+		detail.Retry = "retry after Git/network permission is available, or keep using local state if it is current"
+		warn("read.pull", fmt.Sprintf("auto-pull skipped before read; continuing with local Markdown state at %s: %v", store, err), detail)
 		return
 	}
 	if !isRepository {
@@ -2929,10 +3011,10 @@ func autoPullBeforeRead(store string) {
 	}
 	progress("read.pull", "pulling storage repo", map[string]string{"storage": store})
 	if err := git.PullRebase(context.Background()); err != nil {
-		warn("read.pull", fmt.Sprintf("auto-pull failed before read: %v", err), map[string]any{
-			"storage": store,
-			"warning": err.Error(),
-		})
+		detail := storageAccessDetailFor(store, "auto-pull before read", err)
+		detail.Remediation = "The read will continue using local Markdown state. Grant Git/network access, resolve the storage repo Git issue, or disable auto-pull with maat setup --no-auto-pull."
+		detail.Retry = "retry after Git/network access is fixed, or switch storage paths if this repo is unavailable"
+		warn("read.pull", fmt.Sprintf("auto-pull failed before read; continuing with local Markdown state at %s: %v", store, err), detail)
 	}
 }
 
@@ -2986,7 +3068,7 @@ func defaultConfig() config {
 		DefaultActor:         defaultSetupActor(),
 		AutoPullBeforeRead:   true,
 		AutoCommitAfterWrite: true,
-		AutoPushAfterCommit:  true,
+		AutoPushAfterCommit:  false,
 	}
 }
 

@@ -42,6 +42,9 @@ func TestGitSyncInfoReadsRepositoryBranchAndRemote(t *testing.T) {
 		{result: GitCommandResult{Stdout: "true\n"}},
 		{result: GitCommandResult{Stdout: "main\n"}},
 		{result: GitCommandResult{Stdout: "git@github.com:sunday-studio/maat-state.git\n"}},
+		{result: GitCommandResult{Stdout: "origin/main\n"}},
+		{result: GitCommandResult{Stdout: "2\t1\n"}},
+		{result: GitCommandResult{Stdout: "true\n"}},
 	}}
 
 	info, err := GitSync{Store: "/tmp/maat-state", Runner: runner}.Info(context.Background())
@@ -51,10 +54,16 @@ func TestGitSyncInfoReadsRepositoryBranchAndRemote(t *testing.T) {
 	if !info.IsRepository || info.Branch != "main" || info.RemoteURL != "git@github.com:sunday-studio/maat-state.git" {
 		t.Fatalf("unexpected repo info: %#v", info)
 	}
+	if info.Upstream != "origin/main" || info.Ahead != 2 || info.Behind != 1 || info.PullRebase != "true" {
+		t.Fatalf("unexpected repo sync metadata: %#v", info)
+	}
 	assertGitCalls(t, runner.calls, [][]string{
 		{"rev-parse", "--is-inside-work-tree"},
 		{"branch", "--show-current"},
 		{"remote", "get-url", "origin"},
+		{"rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"},
+		{"rev-list", "--left-right", "--count", "HEAD...@{u}"},
+		{"config", "--get", "pull.rebase"},
 	})
 }
 

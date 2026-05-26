@@ -15,6 +15,9 @@ func TestSyncStoreValidatesIndexesCommitsAndPushes(t *testing.T) {
 		{result: GitCommandResult{Stdout: "true\n"}},
 		{result: GitCommandResult{Stdout: "main\n"}},
 		{result: GitCommandResult{Stdout: "git@github.com:sunday-studio/maat-state.git\n"}},
+		{result: GitCommandResult{Stdout: "origin/main\n"}},
+		{result: GitCommandResult{Stdout: "1\t0\n"}},
+		{result: GitCommandResult{Stdout: "true\n"}},
 		{result: GitCommandResult{Stdout: " M projects/maat.md\n?? .maat/index.json\n?? .maat/index.sqlite\n"}},
 		{},
 		{},
@@ -43,6 +46,9 @@ func TestSyncStoreValidatesIndexesCommitsAndPushes(t *testing.T) {
 	if !result.Committed || !result.Pushed {
 		t.Fatalf("expected commit and push, got committed=%v pushed=%v", result.Committed, result.Pushed)
 	}
+	if result.Repository.Upstream != "origin/main" || result.Repository.Ahead != 1 || result.Repository.Behind != 0 {
+		t.Fatalf("expected upstream diagnostics, got %#v", result.Repository)
+	}
 	if !reflect.DeepEqual(result.CommitPathspecs, []string{".", ":(exclude).maat"}) {
 		t.Fatalf("expected cache-excluding pathspec, got %#v", result.CommitPathspecs)
 	}
@@ -56,6 +62,9 @@ func TestSyncStoreValidatesIndexesCommitsAndPushes(t *testing.T) {
 		{"rev-parse", "--is-inside-work-tree"},
 		{"branch", "--show-current"},
 		{"remote", "get-url", "origin"},
+		{"rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"},
+		{"rev-list", "--left-right", "--count", "HEAD...@{u}"},
+		{"config", "--get", "pull.rebase"},
 		{"status", "--porcelain=v1"},
 		{"add", "--", ".", ":(exclude).maat"},
 		{"commit", "-m", "status(maat): sync state"},

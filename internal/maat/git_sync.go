@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -43,9 +44,14 @@ type GitSync struct {
 }
 
 type GitRepoInfo struct {
-	IsRepository bool   `json:"is_repository"`
-	Branch       string `json:"branch,omitempty"`
-	RemoteURL    string `json:"remote_url,omitempty"`
+	IsRepository        bool   `json:"is_repository"`
+	Branch              string `json:"branch,omitempty"`
+	RemoteURL           string `json:"remote_url,omitempty"`
+	Upstream            string `json:"upstream,omitempty"`
+	Ahead               int    `json:"ahead"`
+	Behind              int    `json:"behind"`
+	PullRebase          string `json:"pull_rebase,omitempty"`
+	PullStrategyWarning string `json:"pull_strategy_warning,omitempty"`
 }
 
 type GitStatusEntry struct {
@@ -88,10 +94,38 @@ func (sync GitSync) Info(ctx context.Context) (GitRepoInfo, error) {
 	if err != nil {
 		return GitRepoInfo{}, err
 	}
+	upstream := ""
+	ahead, behind := 0, 0
+	pullRebase := ""
+	if remoteURL != "" {
+		upstream, err = sync.BranchUpstream(ctx)
+		if err != nil {
+			if !isMissingUpstream(err) {
+				return GitRepoInfo{}, err
+			}
+			upstream = ""
+		}
+		if upstream != "" {
+			ahead, behind, err = sync.AheadBehind(ctx)
+			if err != nil {
+				return GitRepoInfo{}, err
+			}
+		}
+		pullRebase, err = sync.PullRebaseConfig(ctx)
+		if err != nil {
+			return GitRepoInfo{}, err
+		}
+	}
+	warning := pullStrategyWarning(remoteURL, upstream, pullRebase, ahead, behind)
 	return GitRepoInfo{
-		IsRepository: true,
-		Branch:       branch,
-		RemoteURL:    remoteURL,
+		IsRepository:        true,
+		Branch:              branch,
+		RemoteURL:           remoteURL,
+		Upstream:            upstream,
+		Ahead:               ahead,
+		Behind:              behind,
+		PullRebase:          pullRebase,
+		PullStrategyWarning: warning,
 	}, nil
 }
 
@@ -110,6 +144,45 @@ func (sync GitSync) RemoteURL(ctx context.Context) (string, error) {
 			return "", nil
 		}
 		return "", gitCommandError("git remote read failed", result, err)
+	}
+	return strings.TrimSpace(result.Stdout), nil
+}
+
+func (sync GitSync) BranchUpstream(ctx context.Context) (string, error) {
+	result, err := sync.run(ctx, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+	if err != nil {
+		return "", gitCommandError("git upstream read failed", result, err)
+	}
+	return strings.TrimSpace(result.Stdout), nil
+}
+
+func (sync GitSync) AheadBehind(ctx context.Context) (int, int, error) {
+	result, err := sync.run(ctx, "rev-list", "--left-right", "--count", "HEAD...@{u}")
+	if err != nil {
+		return 0, 0, gitCommandError("git ahead/behind read failed", result, err)
+	}
+	fields := strings.Fields(result.Stdout)
+	if len(fields) != 2 {
+		return 0, 0, fmt.Errorf("git ahead/behind read failed: unexpected output %q", strings.TrimSpace(result.Stdout))
+	}
+	ahead, err := strconv.Atoi(fields[0])
+	if err != nil {
+		return 0, 0, fmt.Errorf("git ahead count parse failed: %w", err)
+	}
+	behind, err := strconv.Atoi(fields[1])
+	if err != nil {
+		return 0, 0, fmt.Errorf("git behind count parse failed: %w", err)
+	}
+	return ahead, behind, nil
+}
+
+func (sync GitSync) PullRebaseConfig(ctx context.Context) (string, error) {
+	result, err := sync.run(ctx, "config", "--get", "pull.rebase")
+	if err != nil {
+		if isMissingGitConfig(result) {
+			return "", nil
+		}
+		return "", gitCommandError("git pull.rebase read failed", result, err)
 	}
 	return strings.TrimSpace(result.Stdout), nil
 }
@@ -224,6 +297,41 @@ func isGitNotRepository(result GitCommandResult, err error) bool {
 func isMissingRemote(result GitCommandResult) bool {
 	text := strings.ToLower(result.Stdout + result.Stderr)
 	return strings.Contains(text, "no such remote") || strings.Contains(text, "no configured push destination")
+}
+
+func isMissingUpstream(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(err.Error())
+	return strings.Contains(text, "no upstream") ||
+		strings.Contains(text, "no such upstream") ||
+		strings.Contains(text, "upstream branch") ||
+		strings.Contains(text, "@{u}")
+}
+
+func isMissingGitConfig(result GitCommandResult) bool {
+	return strings.TrimSpace(result.Stdout+result.Stderr) == ""
+}
+
+func pullStrategyWarning(remoteURL, upstream, pullRebase string, ahead, behind int) string {
+	if strings.TrimSpace(remoteURL) == "" {
+		return ""
+	}
+	if strings.TrimSpace(upstream) == "" {
+		return "current branch has no upstream tracking branch; ask before pushing and use git push -u only after confirming the remote"
+	}
+	normalized := strings.ToLower(strings.TrimSpace(pullRebase))
+	if normalized == "" {
+		return "pull.rebase is not configured; ask before pushing if the branch has diverged"
+	}
+	if normalized == "false" || normalized == "no" {
+		return "pull.rebase is disabled; ask before pushing if the branch has diverged"
+	}
+	if ahead > 0 && behind > 0 {
+		return "branch has both local and remote-only commits; pull with rebase and ask before pushing"
+	}
+	return ""
 }
 
 func gitCommandError(prefix string, result GitCommandResult, err error) error {

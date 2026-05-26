@@ -453,7 +453,7 @@ func TestSetupCommandWritesConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	output, err := captureRunWithInput("", "setup", "--storage", store, "--no-auto-push", "--json")
+	output, err := captureRunWithInput("", "setup", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -529,6 +529,18 @@ func TestSetupCommandRejectsInvalidStorage(t *testing.T) {
 	if _, err := captureRun("setup", "--storage", store); err == nil || !strings.Contains(err.Error(), "must be a Git repository") {
 		t.Fatalf("expected non-git storage error, got %v", err)
 	}
+
+	output, err := captureRun("setup", "--storage", store, "--json")
+	if err == nil {
+		t.Fatal("expected non-git storage error")
+	}
+	var result storageAccessFailureResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("expected JSON setup storage hint, got %q: %v", output, err)
+	}
+	if result.Action != "setup.storage" || result.OK || result.Error.StoragePath != store || result.Error.Remediation == "" {
+		t.Fatalf("unexpected setup storage hint: %#v", result)
+	}
 }
 
 func TestSetupDoctorFixesMissingConfigWithExplicitStorage(t *testing.T) {
@@ -592,6 +604,74 @@ func TestSetupDoctorReportsMissingUpstreamApproval(t *testing.T) {
 	}
 	if remotes := strings.TrimSpace(runGit(t, store, "remote")); remotes != "" {
 		t.Fatalf("doctor should not add remotes automatically, got %q", remotes)
+	}
+}
+
+func TestSetupDoctorReturnsErrorForBlockingSetupFailures(t *testing.T) {
+	t.Setenv("MAAT_CONFIG", filepath.Join(t.TempDir(), "missing-config.json"))
+
+	output, err := captureRun("setup", "doctor", "--json")
+	if err == nil {
+		t.Fatal("expected blocking setup doctor error")
+	}
+	if !strings.Contains(err.Error(), "storage_configured") {
+		t.Fatalf("expected blocking storage configuration error, got %v", err)
+	}
+
+	var result setupDoctorResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("expected JSON doctor result, got %q: %v", output, err)
+	}
+	if result.OK {
+		t.Fatalf("expected unhealthy doctor result, got %#v", result)
+	}
+	storageCheck := findSetupDoctorCheck(t, result, "storage_configured")
+	if storageCheck.Status != "error" {
+		t.Fatalf("expected blocking storage check, got %#v", storageCheck)
+	}
+}
+
+func TestSetupDoctorReportsUpstreamPositionAndPullStrategy(t *testing.T) {
+	store := writeObjectCommandFixture(t)
+	initGitStore(t, store)
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	runGit(t, filepath.Dir(remote), "init", "--bare", "-b", "main", remote)
+	runGit(t, store, "remote", "add", "origin", remote)
+	runGit(t, store, "push", "-u", "origin", "main")
+	runGit(t, store, "config", "pull.rebase", "false")
+	writer := maat.NewWriteStore(store)
+	if _, err := writer.CreateProject(maat.CreateProjectInput{
+		Key:         "local-only",
+		DisplayName: "Local Only",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, store, "add", ".")
+	runGit(t, store, "commit", "-m", "status(local-only): add project")
+	writeCommandConfig(t, config{
+		StoragePath:          store,
+		DefaultActor:         "test",
+		AutoPullBeforeRead:   true,
+		AutoCommitAfterWrite: true,
+		AutoPushAfterCommit:  false,
+	})
+
+	output, err := captureRun("setup", "doctor", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result setupDoctorResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	upstreamCheck := findSetupDoctorCheck(t, result, "git_upstream")
+	if upstreamCheck.Status != "ok" || !strings.Contains(upstreamCheck.Message, "ahead 1, behind 0") {
+		t.Fatalf("expected upstream ahead/behind diagnostics, got %#v", upstreamCheck)
+	}
+	pullCheck := findSetupDoctorCheck(t, result, "git_pull_strategy")
+	if pullCheck.Status != "warning" || !pullCheck.RequiresApproval || !strings.Contains(pullCheck.Message, "pull.rebase is disabled") {
+		t.Fatalf("expected pull strategy warning, got %#v", pullCheck)
 	}
 }
 
@@ -719,6 +799,16 @@ func TestReadAutoPullWarningEmitsAgentUpdate(t *testing.T) {
 		}
 		if update["step"] == "read.pull" && update["status"] == "warning" {
 			sawWarning = true
+			data, ok := update["data"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected structured warning data, got %#v", update["data"])
+			}
+			if data["storage_path"] != store || data["error"] == "" {
+				t.Fatalf("expected storage path and Git error in warning, got %#v", data)
+			}
+			if remediation, _ := data["remediation"].(string); !strings.Contains(remediation, "read will continue") {
+				t.Fatalf("expected local-read remediation, got %#v", data)
+			}
 		}
 		if update["step"] == "status.ready" && update["status"] == "ok" {
 			sawFinal = true
@@ -726,6 +816,58 @@ func TestReadAutoPullWarningEmitsAgentUpdate(t *testing.T) {
 	}
 	if !sawWarning || !sawFinal {
 		t.Fatalf("expected pull warning and final update, got %q", output)
+	}
+}
+
+func TestReadAutoPullWarningHumanExplainsLocalReadContinues(t *testing.T) {
+	store := writeCommandFixture(t)
+	initGitStore(t, store)
+	writeCommandConfig(t, config{
+		StoragePath:          store,
+		DefaultActor:         "test",
+		AutoPullBeforeRead:   true,
+		AutoCommitAfterWrite: false,
+		AutoPushAfterCommit:  false,
+	})
+
+	output, err := captureRun("status")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{
+		"auto-pull failed before read; continuing with local Markdown state at " + store,
+		"Maat status",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to include %q, got %q", want, output)
+		}
+	}
+}
+
+func TestReadStorageAccessFailureReportsStructuredHint(t *testing.T) {
+	storeFile := filepath.Join(t.TempDir(), "state-file")
+	if err := os.WriteFile(storeFile, []byte("not a storage directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := captureRun("status", "--storage", storeFile, "--json")
+	if err == nil {
+		t.Fatal("expected storage access error")
+	}
+	if !strings.Contains(err.Error(), storeFile) || !strings.Contains(err.Error(), "Choose a readable and writable Maat storage repo") {
+		t.Fatalf("expected path and remediation in error, got %v", err)
+	}
+
+	var result storageAccessFailureResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("expected JSON storage warning, got %q: %v", output, err)
+	}
+	if result.OK || result.Action != "status.load" || result.Error.StoragePath != storeFile || result.Error.Operation != "read status" {
+		t.Fatalf("unexpected structured storage warning: %#v", result)
+	}
+	if result.Error.Error == "" || !strings.Contains(result.Error.Remediation, "pass --storage <path>") || result.Error.Retry == "" {
+		t.Fatalf("expected retryable remediation detail, got %#v", result.Error)
 	}
 }
 
@@ -1629,6 +1771,22 @@ func TestSyncStatusCommandReportsDirtyState(t *testing.T) {
 	}
 }
 
+func TestSyncStatusCommandReportsMissingUpstream(t *testing.T) {
+	store := writeCommandFixture(t)
+	initGitStore(t, store)
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	runGit(t, filepath.Dir(remote), "init", "--bare", "-b", "main", remote)
+	runGit(t, store, "remote", "add", "origin", remote)
+
+	output, err := captureRun("sync", "--storage", store, "--status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "Upstream:   none") || !strings.Contains(output, "ask before pushing") {
+		t.Fatalf("expected missing upstream warning, got %q", output)
+	}
+}
+
 func TestSyncCommandCommitsChanges(t *testing.T) {
 	store := writeCommandFixture(t)
 	initGitStore(t, store)
@@ -1640,7 +1798,7 @@ func TestSyncCommandCommitsChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output, "Validation:") || !strings.Contains(output, "Committed:  status(maat): test sync") {
+	if !strings.Contains(output, "Validation:") || !strings.Contains(output, "Committed:  status(maat): test sync") || !strings.Contains(output, "Pushed:     no") {
 		t.Fatalf("unexpected output: %q", output)
 	}
 	status := runGit(t, store, "status", "--porcelain=v1")
@@ -1750,6 +1908,7 @@ func addGitUpstream(t *testing.T, store string) {
 	runGit(t, filepath.Dir(remote), "init", "--bare", "-b", "main", remote)
 	runGit(t, store, "remote", "add", "origin", remote)
 	runGit(t, store, "push", "-u", "origin", "main")
+	runGit(t, store, "config", "pull.rebase", "true")
 }
 
 func runGit(t *testing.T, dir string, args ...string) string {

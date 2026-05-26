@@ -38,6 +38,7 @@ func AgentSetupDocument(opts AgentSetupOptions) string {
 Maat is the project memory. Markdown plus Git is the source of truth. SQLite is only a local search cache.
 
 This repo is registered as `+"`%[1]s`"+`.
+Maat storage lives in `+"`%[2]s`"+`; keep those Markdown state files in that storage repo, not in this product repo.
 Maat binary: %[4]s.
 
 ## First Run
@@ -94,7 +95,8 @@ maat sync --storage %[2]s --message "status(%[1]s): update maat" --push
 - Add comments for meaningful progress, blockers, handoffs, and decisions.
 - Complete a ticket only when there is clear evidence.
 - Commit finished product changes in the product repo.
-- Commit and push Maat storage changes.
+- Commit Maat storage changes in the storage repo, and push only when the remote is confirmed.
+- Do not commit Maat storage files into the product repo.
 - Do not store primary project state outside Markdown.
 `,
 		project, storage, agentInstructionsSnippetText(), binaryVersion)

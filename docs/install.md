@@ -95,6 +95,8 @@ The prompt records:
 - auto-commit after writes
 - auto-push after commits
 
+Auto-push is off by default. Enable it only when the storage remote is confirmed and the agent is allowed to publish state automatically.
+
 Agents and scripts should use the non-interactive form:
 
 ```sh
@@ -116,7 +118,7 @@ maat setup doctor
 maat setup doctor --storage "$HOME/maat-state" --fix
 ```
 
-The doctor reports missing config, path permissions, Git repository status, upstream tracking, validation issues, and rebuildable index health. `--fix` only performs conservative local repairs, such as creating config from an explicit storage path or rebuilding `.maat` indexes. It does not initialize Git, add remotes, delete project history, or rewrite events.
+The doctor reports missing config, path permissions, Git repository status, upstream tracking, ahead/behind state, pull-rebase configuration, validation issues, and rebuildable index health. `--fix` only performs conservative local repairs, such as creating config from an explicit storage path or rebuilding `.maat` indexes. It does not initialize Git, add remotes, push commits, delete project history, or rewrite events.
 
 ## Start Using Maat
 
