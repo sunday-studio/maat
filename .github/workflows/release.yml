@@ -46,7 +46,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          artifactErrorsFail: true
+          artifactErrorsFailBuild: true
           artifacts: "dist/*.tar.gz,dist/checksums-*.txt"
           generateReleaseNotes: true
           replacesArtifacts: true
