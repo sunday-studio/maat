@@ -29,6 +29,44 @@ func TestStatusJSON(t *testing.T) {
 	}
 }
 
+func TestStatusAgentUseOutputsJSONUpdates(t *testing.T) {
+	store := writeCommandFixture(t)
+
+	output, err := captureRun("status", "--storage", store, "--agent-use")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(output, "Projects:") {
+		t.Fatalf("agent output should not include human prose: %q", output)
+	}
+	var update map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(output)), &update); err != nil {
+		t.Fatal(err)
+	}
+	if update["type"] != "maat.update" || update["step"] != "status.ready" || update["status"] != "ok" {
+		t.Fatalf("unexpected update: %#v", update)
+	}
+}
+
+func TestAgentUseRejectsJSONFlag(t *testing.T) {
+	if _, err := captureRun("status", "--agent-use", "--json"); err == nil {
+		t.Fatal("expected --agent-use with --json to fail")
+	}
+}
+
+func TestHumanOutputCanUseColor(t *testing.T) {
+	t.Setenv("MATT_COLOR", "always")
+	store := writeCommandFixture(t)
+
+	output, err := captureRun("status", "--storage", store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "\x1b[") || !strings.Contains(output, "status ready") {
+		t.Fatalf("expected colored human output, got %q", output)
+	}
+}
+
 func TestProjectsJSON(t *testing.T) {
 	store := writeCommandFixture(t)
 

@@ -94,6 +94,16 @@ matt sync --push
 matt sync --status --json
 ```
 
+Human output is colored when the terminal supports it. Set `MATT_COLOR=always` or `MATT_COLOR=never` to force color behavior.
+
+Agents that need parseable progress should use `--agent-use` instead of scraping human output:
+
+```sh
+matt sync --agent-use --storage /absolute/path/to/maat-state
+```
+
+`--agent-use` emits newline-delimited JSON updates and cannot be combined with `--json`.
+
 Migrate legacy flat project files into the object layout:
 
 ```sh

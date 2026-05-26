@@ -14,6 +14,9 @@ import (
 	"github.com/sunday-studio/maat/internal/version"
 )
 
+var agentUse bool
+var jsonUse bool
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintf(os.Stderr, "matt: %v\n", err)
@@ -22,6 +25,13 @@ func main() {
 }
 
 func run(args []string) error {
+	agentUse = false
+	jsonUse = false
+	var err error
+	args, err = splitGlobalFlags(args)
+	if err != nil {
+		return err
+	}
 	if len(args) == 0 {
 		printHelp()
 		return nil
@@ -45,15 +55,23 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
+		progress("projects.load", "loading projects", map[string]string{"storage": store})
 		projects, err := maat.LoadProjects(store)
 		if err != nil {
 			return err
 		}
+		if agentUse {
+			return agentUpdate("projects.loaded", "ok", "projects loaded", map[string]any{
+				"projects": projects,
+				"count":    len(projects),
+			})
+		}
 		if jsonOut {
 			return writeJSON(projects)
 		}
+		ok("projects.loaded", fmt.Sprintf("loaded %d projects", len(projects)), nil)
 		for _, project := range projects {
-			fmt.Printf("%-12s %-9s %s\n", project.ID, project.Status, project.Title)
+			fmt.Printf("%-12s %-9s %s\n", project.ID, colorStatus(project.Status), project.Title)
 		}
 		return nil
 	case "project":
@@ -74,12 +92,16 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
+		if agentUse {
+			return agentUpdate("status.ready", "ok", "status ready", summary)
+		}
 		if jsonOut {
 			return writeJSON(summary)
 		}
-		fmt.Printf("Projects: %d\n", summary.Projects)
-		fmt.Printf("Goals:    %d active, %d done, %d total\n", summary.ActiveGoals, summary.DoneGoals, summary.Goals)
-		fmt.Printf("Tickets:  %d open, %d done, %d total\n", summary.OpenTickets, summary.DoneTickets, summary.Tickets)
+		ok("status.ready", "status ready", nil)
+		fmt.Printf("Projects: %s\n", colorNumber(summary.Projects))
+		fmt.Printf("Goals:    %s active, %s done, %s total\n", colorNumber(summary.ActiveGoals), colorNumber(summary.DoneGoals), colorNumber(summary.Goals))
+		fmt.Printf("Tickets:  %s open, %s done, %s total\n", colorNumber(summary.OpenTickets), colorNumber(summary.DoneTickets), colorNumber(summary.Tickets))
 		return nil
 	case "validate":
 		return validateCommand(args[1:])
@@ -123,6 +145,9 @@ Usage:
   matt search <query> [--storage <path>] [--json]
   matt tui [--storage <path>]
 
+Global flags:
+  --agent-use   emit newline-delimited JSON progress updates instead of human prose
+
 Git plus Markdown remains the source of truth. The local index is rebuildable.
 `)
 }
@@ -133,6 +158,9 @@ func versionCommand(args []string) error {
 		return errors.New("usage: matt version [--json]")
 	}
 	info := version.Current()
+	if agentUse {
+		return agentUpdate("version.ready", "ok", "version ready", info)
+	}
 	if jsonOut {
 		return writeJSON(info)
 	}
@@ -169,18 +197,30 @@ func indexCommand(args []string) error {
 	if err != nil {
 		return err
 	}
+	progress("index.read", "reading markdown store", map[string]string{"storage": store})
 	idx, err := maat.BuildIndex(store)
 	if err != nil {
 		return err
 	}
+	progress("index.json", "writing json index", nil)
 	path, err := maat.WriteIndex(store, idx)
 	if err != nil {
 		return err
 	}
+	progress("index.sqlite", "building sqlite index", nil)
 	sqliteInfo, err := maat.RebuildSQLiteIndex(store)
 	if err != nil {
 		return err
 	}
+	if agentUse {
+		return agentUpdate("index.ready", "ok", "index rebuilt", map[string]any{
+			"projects":     len(idx.Projects),
+			"documents":    len(idx.Documents),
+			"json_path":    path,
+			"sqlite_index": sqliteInfo,
+		})
+	}
+	ok("index.ready", fmt.Sprintf("indexed %d projects and %d documents", len(idx.Projects), len(idx.Documents)), nil)
 	fmt.Printf("indexed %d projects and %d documents\n", len(idx.Projects), len(idx.Documents))
 	fmt.Printf("json:   %s\n", path)
 	fts := "disabled"
@@ -221,6 +261,11 @@ func syncCommand(args []string) error {
 		message = "status(maat): sync store"
 	}
 
+	progress("sync.start", "checking git storage", map[string]any{
+		"storage":     store,
+		"status_only": statusOnly,
+		"push":        push,
+	})
 	result, err := maat.SyncStore(context.Background(), maat.StoreSyncOptions{
 		Store:        store,
 		Message:      message,
@@ -233,6 +278,9 @@ func syncCommand(args []string) error {
 	}
 	if jsonOut {
 		return writeJSON(result)
+	}
+	if agentUse {
+		return agentUpdate("sync.ready", "ok", "sync complete", result)
 	}
 	printSyncResult(result, statusOnly)
 	return nil
@@ -292,18 +340,34 @@ func validateCommand(args []string) error {
 	if err != nil {
 		return err
 	}
+	progress("validate.start", "validating markdown store", map[string]string{"storage": store})
 	report, err := maat.ValidateStore(store)
 	if err != nil {
 		return err
+	}
+	if agentUse {
+		status := "ok"
+		message := "validation passed"
+		if !report.OK() {
+			status = "error"
+			message = "validation failed"
+		}
+		if err := agentUpdate("validate.ready", status, message, report); err != nil {
+			return err
+		}
+		if !report.OK() {
+			return fmt.Errorf("validation failed with %d issues", len(report.Issues))
+		}
+		return nil
 	}
 	if jsonOut {
 		if err := writeJSON(report); err != nil {
 			return err
 		}
 	} else if report.OK() {
-		fmt.Printf("validated %d files: ok\n", report.Files)
+		ok("validate.ready", fmt.Sprintf("validated %d files: ok", report.Files), nil)
 	} else {
-		fmt.Printf("validated %d files: %d issues\n", report.Files, len(report.Issues))
+		warn("validate.ready", fmt.Sprintf("validated %d files: %d issues", report.Files, len(report.Issues)), nil)
 		for _, issue := range report.Issues {
 			location := issue.Path
 			if issue.Line > 0 {
@@ -329,13 +393,18 @@ func migrateCommand(args []string) error {
 		if err != nil {
 			return err
 		}
+		progress("migrate.plan", "planning legacy migration", map[string]string{"storage": store})
 		plan, err := maat.PlanLegacyMigration(store, maat.MigrationOptions{})
 		if err != nil {
 			return err
 		}
+		if agentUse {
+			return agentUpdate("migrate.plan.ready", "ok", "migration plan ready", plan)
+		}
 		if jsonOut {
 			return writeJSON(plan)
 		}
+		ok("migrate.plan.ready", fmt.Sprintf("planned %d projects and %d files", len(plan.Projects), len(plan.Files)), nil)
 		fmt.Printf("planned %d projects and %d files\n", len(plan.Projects), len(plan.Files))
 		for _, project := range plan.Projects {
 			fmt.Printf("%s -> %s (%d goals, %d tickets, %d events)\n",
@@ -360,10 +429,15 @@ func migrateCommand(args []string) error {
 		if err != nil {
 			return err
 		}
+		progress("migrate.apply", "applying legacy migration", map[string]string{"destination": absDest})
 		plan, err := maat.ApplyLegacyMigration(store, absDest, maat.MigrationOptions{})
 		if err != nil {
 			return err
 		}
+		if agentUse {
+			return agentUpdate("migrate.apply.ready", "ok", "migration applied", plan)
+		}
+		ok("migrate.apply.ready", fmt.Sprintf("migrated %d projects", len(plan.Projects)), nil)
 		fmt.Printf("migrated %d projects into %s\n", len(plan.Projects), absDest)
 		fmt.Printf("wrote %d files\n", len(plan.Files))
 		return nil
@@ -398,6 +472,9 @@ func projectShowCommand(args []string) error {
 	}
 	project, err := maat.LoadProject(store, projectID)
 	if err == nil {
+		if agentUse {
+			return agentUpdate("project.ready", "ok", "project loaded", project)
+		}
 		if jsonOut {
 			return writeJSON(project)
 		}
@@ -407,6 +484,9 @@ func projectShowCommand(args []string) error {
 	objectProject, objectErr := maat.LoadObjectProject(store, projectID)
 	if objectErr != nil {
 		return err
+	}
+	if agentUse {
+		return agentUpdate("project.ready", "ok", "project loaded", objectProject)
 	}
 	if jsonOut {
 		return writeJSON(objectProject)
@@ -494,6 +574,7 @@ func projectLinkCommand(args []string) error {
 	if len(rest) == 1 {
 		sourcePath = rest[0]
 	}
+	progress("project.link", "linking source repo", map[string]string{"source": sourcePath})
 	linked, err := maat.LinkProject(context.Background(), maat.LinkProjectInput{
 		Store:       store,
 		SourcePath:  sourcePath,
@@ -505,6 +586,9 @@ func projectLinkCommand(args []string) error {
 	}
 	if err := refreshIndexes(store); err != nil {
 		return err
+	}
+	if agentUse {
+		return agentUpdate("project.linked", "ok", "project linked", linked)
 	}
 	if jsonOut {
 		return writeJSON(linked)
@@ -610,6 +694,12 @@ func ticketListCommand(args []string) error {
 	if jsonOut {
 		return writeJSON(tickets)
 	}
+	if agentUse {
+		return agentUpdate("tickets.ready", "ok", "tickets loaded", map[string]any{
+			"tickets": tickets,
+			"count":   len(tickets),
+		})
+	}
 	for _, ticket := range tickets {
 		goal := "standalone"
 		if ticket.GoalID != "" {
@@ -645,6 +735,9 @@ func ticketShowCommand(args []string) error {
 	for _, ticket := range tickets {
 		if ticket.ID != ticketID {
 			continue
+		}
+		if agentUse {
+			return agentUpdate("ticket.ready", "ok", "ticket loaded", ticket)
 		}
 		if jsonOut {
 			return writeJSON(ticket)
@@ -862,6 +955,9 @@ func agentCommand(args []string) error {
 			return err
 		}
 	}
+	if agentUse {
+		return agentUpdate("agent.instructions.ready", "ok", "agent instructions ready", map[string]string{"instructions": snippet})
+	}
 	if jsonOut {
 		return writeJSON(map[string]string{"instructions": snippet})
 	}
@@ -875,6 +971,7 @@ func searchCommand(args []string) error {
 	for _, arg := range args {
 		if arg == "--json" {
 			jsonOut = true
+			jsonUse = true
 			continue
 		}
 		filtered = append(filtered, arg)
@@ -887,13 +984,25 @@ func searchCommand(args []string) error {
 		return errors.New("usage: matt search <query> [--storage <path>] [--json]")
 	}
 	query := strings.Join(rest, " ")
+	progress("search.index", "refreshing search index", map[string]string{"query": query})
 	results, err := searchWithSQLite(store, query)
 	if err != nil {
 		return err
 	}
+	if results == nil {
+		results = []maat.SearchResult{}
+	}
+	if agentUse {
+		return agentUpdate("search.ready", "ok", "search complete", map[string]any{
+			"query":   query,
+			"count":   len(results),
+			"results": results,
+		})
+	}
 	if jsonOut {
 		return writeJSON(results)
 	}
+	ok("search.ready", fmt.Sprintf("found %d results", len(results)), nil)
 	for _, result := range results {
 		fmt.Printf("%s:%d [%s] %s\n", result.Path, result.Line, result.Type, result.Title)
 		if result.Excerpt != "" {
@@ -925,11 +1034,16 @@ type writeCommandResult struct {
 }
 
 func finishWrite(store, projectKey string, result writeCommandResult, jsonOut bool) error {
+	progress("write.validate", "validating written project", map[string]string{"project": projectKey})
 	if _, err := maat.LoadObjectProject(store, projectKey); err != nil {
 		return fmt.Errorf("post-write validation failed for project %q: %w", projectKey, err)
 	}
+	progress("write.index", "refreshing indexes", nil)
 	if err := refreshIndexes(store); err != nil {
 		return err
+	}
+	if agentUse {
+		return agentUpdate(result.Action, "ok", result.Action, result)
 	}
 	if jsonOut {
 		return writeJSON(result)
@@ -939,6 +1053,7 @@ func finishWrite(store, projectKey string, result writeCommandResult, jsonOut bo
 }
 
 func printWriteResult(result writeCommandResult) {
+	ok(result.Action, result.Action, nil)
 	switch result.Action {
 	case "goal.created":
 		fmt.Printf("created goal %s\n", result.GoalID)
@@ -1188,6 +1303,7 @@ func splitJSONFlag(args []string) ([]string, bool) {
 	for _, arg := range args {
 		if arg == "--json" {
 			jsonOut = true
+			jsonUse = true
 			continue
 		}
 		filtered = append(filtered, arg)
@@ -1219,6 +1335,112 @@ func writeJSON(value any) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(value)
+}
+
+func splitGlobalFlags(args []string) ([]string, error) {
+	filtered := make([]string, 0, len(args))
+	for _, arg := range args {
+		if arg == "--agent-use" {
+			agentUse = true
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+	if agentUse {
+		for _, arg := range filtered {
+			if arg == "--json" {
+				return nil, errors.New("--agent-use cannot be combined with --json")
+			}
+		}
+	}
+	return filtered, nil
+}
+
+func progress(step, message string, data any) {
+	if agentUse {
+		_ = agentUpdate(step, "running", message, data)
+		return
+	}
+	if jsonUse {
+		return
+	}
+	fmt.Printf("%s %s\n", color("[run]", "36"), message)
+}
+
+func ok(step, message string, data any) {
+	if agentUse {
+		_ = agentUpdate(step, "ok", message, data)
+		return
+	}
+	if jsonUse {
+		return
+	}
+	fmt.Printf("%s %s\n", color("[ok]", "32"), message)
+}
+
+func warn(step, message string, data any) {
+	if agentUse {
+		_ = agentUpdate(step, "warning", message, data)
+		return
+	}
+	if jsonUse {
+		return
+	}
+	fmt.Printf("%s %s\n", color("[warn]", "33"), message)
+}
+
+func agentUpdate(step, status, message string, data any) error {
+	event := map[string]any{
+		"type":    "maat.update",
+		"step":    step,
+		"status":  status,
+		"message": message,
+	}
+	if data != nil {
+		event["data"] = data
+	}
+	return json.NewEncoder(os.Stdout).Encode(event)
+}
+
+func colorNumber(value int) string {
+	return color(fmt.Sprintf("%d", value), "36")
+}
+
+func colorStatus(status string) string {
+	switch strings.ToLower(status) {
+	case "done":
+		return color(status, "32")
+	case "active":
+		return color(status, "36")
+	case "waiting", "paused":
+		return color(status, "33")
+	default:
+		return status
+	}
+}
+
+func color(text, code string) string {
+	if !colorEnabled() {
+		return text
+	}
+	return "\033[" + code + "m" + text + "\033[0m"
+}
+
+func colorEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("MATT_COLOR"))) {
+	case "always", "1", "true", "yes":
+		return true
+	case "never", "0", "false", "no":
+		return false
+	}
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	stat, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return stat.Mode()&os.ModeCharDevice != 0
 }
 
 func loadStore(args []string) (string, error) {
@@ -1293,6 +1515,12 @@ func writeConfig(storagePath string) error {
 	}
 	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
 		return err
+	}
+	if agentUse {
+		return agentUpdate("storage.linked", "ok", "storage linked", map[string]string{
+			"storage_path": abs,
+			"config_path":  path,
+		})
 	}
 	fmt.Printf("linked storage: %s\n", abs)
 	return nil

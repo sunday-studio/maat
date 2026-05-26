@@ -83,6 +83,21 @@ Most query commands should support:
 --since <time>
 ```
 
+### Output Modes
+
+The default CLI output is for humans. It should use concise progress states such as `[run]`, `[ok]`, and `[warn]`, plus ANSI color when supported by the terminal. Color can be forced with `MATT_COLOR=always` or disabled with `MATT_COLOR=never` or `NO_COLOR=1`.
+
+`--json` returns the command's final structured result and should not include progress text.
+
+`--agent-use` is for agents that need progress without human prose. It emits newline-delimited JSON updates:
+
+```json
+{"type":"maat.update","step":"sync.start","status":"running","message":"checking git storage"}
+{"type":"maat.update","step":"sync.ready","status":"ok","message":"sync complete","data":{}}
+```
+
+`--agent-use` cannot be combined with `--json`.
+
 ### Sync Commands
 
 ```sh
