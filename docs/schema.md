@@ -118,8 +118,6 @@ Examples:
 - `#backend`
 - `#infra`
 
-Add new tags to `tags.md` when they become reusable across projects.
-
 ## Event File
 
 Events live under the project they affect:
@@ -153,30 +151,3 @@ Marked T-20260525-190700-b91c complete after verification.
 ```
 
 Events are append-only. Correction events should be used instead of rewriting committed history.
-
-## Report File
-
-Reports are agent-written summaries. They do not replace append-only events.
-
-Path:
-
-```text
-reports/YYYY-MM-DD-<scope>.md
-```
-
-Use reports for:
-
-- Daily or weekly cross-project status.
-- Handoffs between agents.
-- Risk summaries.
-- Human-readable digest views.
-
-## Decision File
-
-Use `decisions/` for durable choices that affect multiple projects or the Maat system itself.
-
-Path:
-
-```text
-decisions/D-YYYYMMDD-<slug>.md
-```

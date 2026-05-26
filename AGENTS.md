@@ -7,7 +7,7 @@ These conventions define how agents should work inside Maat.
 ## Repository Map
 
 - `cmd/`: the `maat` CLI entrypoint.
-- `docs/`: architecture, workflows, storage model, CLI/TUI/UI design, and integration notes.
+- `docs/`: install, architecture, workflows, storage model, schema, search, and agent protocol.
 - `internal/`: Go packages for storage, indexing, sync, validation, and TUI logic.
 - `scripts/`: local install and release helper scripts.
 
@@ -38,7 +38,7 @@ conventional-commit-type(scope): one liner
 ```
 
 - The first line must use a conventional commit type and a meaningful scope.
-- Use scopes such as `docs`, `repo`, `agent`, `architecture`, `storage`, `cli`, `tui`, `ui`, `search`, or a project ID.
+- Use scopes such as `docs`, `repo`, `agent`, `architecture`, `storage`, `cli`, `tui`, `search`, or a project ID.
 - Prefer a one-line commit message when the subject fully explains a small change.
 - Add bullet points only when they add meaningful context beyond the one-liner.
 - When bullets are needed, add one blank line after the subject.
@@ -63,22 +63,12 @@ When you finish a change, always commit it before handing the work back unless t
 
 ## Project Files
 
-Legacy project files are plain Markdown in a Maat storage repo. Current object-layout storage uses `projects/<project-key>/project.md` plus separate goal, ticket, and event files inside that storage repo.
-
-Legacy project fields:
-
-- `ID`
-- `Status`
-- `Owner`
-- `Updated`
-- `Tags`
+Maat storage uses `projects/<project-key>/project.md` plus separate goal, ticket, and event files inside the configured storage repo.
 
 Use stable IDs:
 
 - Projects: lowercase slugs, for example `maat`.
-- Early docs may use readable IDs like `G-001` and `T-001`.
-- Target storage should use collision-resistant IDs such as `G-20260525-190533-a7f3` and `T-20260525-190700-b91c`.
-- Decisions use stable IDs such as `D-20260525-short-slug`.
+- Goals and tickets use collision-resistant IDs such as `G-20260525-190533-a7f3` and `T-20260525-190700-b91c`.
 
 ## Event Rules
 
@@ -101,9 +91,9 @@ If two agents edit the same project:
 
 Prefer storage patterns that avoid conflicts in the first place:
 
-- Add new files for comments, events, reports, and tickets when possible.
+- Add new files for comments, events, and tickets when possible.
 - Avoid shared append targets for high-frequency agent writes.
-- Treat generated summaries and rendered reports as rebuildable views unless explicitly committed.
+- Treat generated summaries and rendered views as rebuildable unless explicitly committed.
 - Pull before writing, validate before committing, and sync after committing.
 
 ## Integration Pattern

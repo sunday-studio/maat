@@ -20,24 +20,17 @@ maat-state/
 ├── projects/
 │   └── maat/
 │       ├── project.md
-│       ├── repos/
-│       │   └── R-20260525-190100-a31f.md
 │       ├── goals/
 │       │   └── G-20260525-190533-a7f3.md
 │       ├── tickets/
 │       │   └── T-20260525-190700-b91c.md
-│       ├── reports/
 │       └── events/
 │           └── 2026/
 │               └── 05/
 │                   └── E-20260525-190812-codex-4c9a.md
-├── decisions/
-│   └── D-20260525-architecture-direction.md
-├── reports/
-├── templates/
-├── tags.md
-├── docs/
-└── README.md
+└── .maat/
+    ├── index.json
+    └── index.sqlite
 ```
 
 The product repository ignores `state/` so local smoke data and nested storage experiments do not clutter the source tree. Storage repos use the root layout above.
@@ -63,11 +56,10 @@ Use:
 
 - `project_key`: stable directory-safe key inside Maat.
 - `display_name`: human-readable name.
-- `repo_fingerprint`: hash of the normalized remote URL when available.
-- `created_at`: timestamp used when no remote exists.
-- `path_aliases`: known local paths where the project has lived.
+- `Primary Repo`: local source repo path when linked.
+- `Remote`: Git remote URL when available.
 
-If a project has a Git remote, the remote should be the strongest identity signal. If it has no remote, Maat should generate a stable project key and later attach the remote when one appears.
+If a project has a Git remote, the remote is the strongest identity signal. If it has no remote, Maat uses the requested or inferred project key.
 
 ## Project File
 
@@ -99,7 +91,7 @@ Git-native project memory for agent-managed work.
 
 | Field | Value |
 |---|---|
-| Primary Repo | R-20260525-190100-a31f |
+| Primary Repo | /Users/casprine/Desktop/vendor/sunday-studio/maat |
 | Remote | git@github.com:sunday-studio/maat.git |
 ```
 
@@ -130,8 +122,6 @@ Shape:
 
 Agent workflow docs should make the state model and handoff expectations clear.
 ```
-
-Goal status may be computed from events once event processing exists. Until then the file can carry a status field.
 
 ## Ticket File
 
@@ -224,19 +214,6 @@ Expires: 2026-05-25T21:07:00+02:00
 ```
 
 Claims expire automatically. An expired claim should not block another agent.
-
-## Generated Views
-
-These should be generated from object and event files:
-
-- project summary
-- open ticket list
-- blocked ticket list
-- agent activity feed
-- daily report
-- stale project report
-
-Generated views may be committed only when there is a specific reason to preserve the rendered snapshot.
 
 ## Merge Conflict Reduction
 

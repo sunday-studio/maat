@@ -80,4 +80,4 @@ The current executable slice includes:
 - rebuildable JSON and SQLite indexes under `.maat/`
 - write commands for goals, tickets, comments, claims, completion, and explicit sync
 
-The architecture still targets optional vector search. The JSON and SQLite indexes are rebuildable artifacts; Markdown in Git remains canonical.
+The JSON and SQLite indexes are rebuildable artifacts; Markdown in Git remains canonical.

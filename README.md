@@ -168,7 +168,7 @@ Launch the terminal dashboard:
 maat tui
 ```
 
-The TUI currently shows projects, status totals, project detail, and ticket lists. Search and timeline views are planned next.
+The TUI shows projects, status totals, project detail, and ticket lists.
 
 ## Agent Loop
 
@@ -191,7 +191,9 @@ maat initialize --storage /absolute/path/to/maat-state
 
 - [Architecture](docs/architecture.md)
 - [Storage Model](docs/storage-model.md)
-- [CLI, TUI, And Future UI](docs/cli-tui-ui.md)
+- [Schema](docs/schema.md)
+- [Workflows](docs/workflows.md)
+- [Search And Indexing](docs/search-index.md)
 - [Agent Protocol](docs/agent-protocol.md)
 - [Install](docs/install.md)
 - [Development](docs/development.md)
