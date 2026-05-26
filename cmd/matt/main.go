@@ -584,9 +584,7 @@ func projectLinkCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := refreshIndexes(store); err != nil {
-		return err
-	}
+	warnIndexRefresh(refreshIndexesBestEffort(store))
 	if agentUse {
 		return agentUpdate("project.linked", "ok", "project linked", linked)
 	}
@@ -1024,13 +1022,15 @@ func searchWithSQLite(store, query string) ([]maat.SearchResult, error) {
 }
 
 type writeCommandResult struct {
-	Action     string `json:"action"`
-	ProjectKey string `json:"project_key"`
-	GoalID     string `json:"goal_id,omitempty"`
-	TicketID   string `json:"ticket_id,omitempty"`
-	EventID    string `json:"event_id"`
-	Agent      string `json:"agent,omitempty"`
-	ExpiresAt  string `json:"expires_at,omitempty"`
+	Action         string `json:"action"`
+	ProjectKey     string `json:"project_key"`
+	GoalID         string `json:"goal_id,omitempty"`
+	TicketID       string `json:"ticket_id,omitempty"`
+	EventID        string `json:"event_id"`
+	Agent          string `json:"agent,omitempty"`
+	ExpiresAt      string `json:"expires_at,omitempty"`
+	IndexRefreshed bool   `json:"index_refreshed"`
+	IndexWarning   string `json:"index_warning,omitempty"`
 }
 
 func finishWrite(store, projectKey string, result writeCommandResult, jsonOut bool) error {
@@ -1039,9 +1039,10 @@ func finishWrite(store, projectKey string, result writeCommandResult, jsonOut bo
 		return fmt.Errorf("post-write validation failed for project %q: %w", projectKey, err)
 	}
 	progress("write.index", "refreshing indexes", nil)
-	if err := refreshIndexes(store); err != nil {
-		return err
-	}
+	refreshResult := refreshIndexesBestEffort(store)
+	result.IndexRefreshed = refreshResult.Refreshed
+	result.IndexWarning = refreshResult.Warning
+	warnIndexRefresh(refreshResult)
 	if agentUse {
 		return agentUpdate(result.Action, "ok", result.Action, result)
 	}
@@ -1080,6 +1081,9 @@ func printWriteResult(result writeCommandResult) {
 		fmt.Printf("project %s\n", result.ProjectKey)
 	}
 	fmt.Printf("event %s\n", result.EventID)
+	if result.IndexWarning != "" {
+		fmt.Printf("index warning %s\n", result.IndexWarning)
+	}
 }
 
 func refreshIndexes(store string) error {
@@ -1094,6 +1098,31 @@ func refreshIndexes(store string) error {
 		return fmt.Errorf("rebuild sqlite index: %w", err)
 	}
 	return nil
+}
+
+type indexRefreshResult struct {
+	Refreshed bool
+	Warning   string
+}
+
+func refreshIndexesBestEffort(store string) indexRefreshResult {
+	if err := refreshIndexes(store); err != nil {
+		return indexRefreshResult{
+			Refreshed: false,
+			Warning:   fmt.Sprintf("index refresh failed after state write persisted: %v", err),
+		}
+	}
+	return indexRefreshResult{Refreshed: true}
+}
+
+func warnIndexRefresh(result indexRefreshResult) {
+	if result.Warning == "" {
+		return
+	}
+	warn("index.refresh", result.Warning, map[string]any{
+		"index_refreshed": result.Refreshed,
+		"warning":         result.Warning,
+	})
 }
 
 func resolveTicketProject(store, projectKey, ticketID string) (string, error) {

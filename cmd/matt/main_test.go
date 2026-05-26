@@ -372,6 +372,81 @@ func TestGoalCreateCommandJSON(t *testing.T) {
 	if result.Action != "goal.created" || result.ProjectKey != "sample" || result.GoalID == "" || result.EventID == "" {
 		t.Fatalf("unexpected json result: %#v", result)
 	}
+	if !result.IndexRefreshed || result.IndexWarning != "" {
+		t.Fatalf("expected successful index refresh, got %#v", result)
+	}
+}
+
+func TestGoalCreateCommandTreatsIndexFailureAsWarning(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := writeObjectCommandFixture(t)
+	if err := os.WriteFile(filepath.Join(store, ".maat"), []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := captureRun("goal", "create", "sample", "Survive index failure", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result writeCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Action != "goal.created" || result.GoalID == "" || result.EventID == "" {
+		t.Fatalf("unexpected json result: %#v", result)
+	}
+	if result.IndexRefreshed || !strings.Contains(result.IndexWarning, "index refresh failed after state write persisted") {
+		t.Fatalf("expected index warning, got %#v", result)
+	}
+	project, err := maat.LoadObjectProject(store, "sample")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(project.Goals) != 1 || project.Goals[0].Title != "Survive index failure" {
+		t.Fatalf("expected persisted goal despite index failure, got %#v", project.Goals)
+	}
+}
+
+func TestGoalCreateAgentUseEmitsIndexWarning(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := writeObjectCommandFixture(t)
+	if err := os.WriteFile(filepath.Join(store, ".maat"), []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := captureRun("goal", "create", "sample", "Agent warning", "--storage", store, "--agent-use")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) < 2 {
+		t.Fatalf("expected multiple agent updates, got %q", output)
+	}
+	var sawWarning, sawFinal bool
+	for _, line := range lines {
+		var update map[string]any
+		if err := json.Unmarshal([]byte(line), &update); err != nil {
+			t.Fatalf("invalid agent update %q: %v", line, err)
+		}
+		if update["step"] == "index.refresh" && update["status"] == "warning" {
+			sawWarning = true
+		}
+		if update["step"] == "goal.created" && update["status"] == "ok" {
+			sawFinal = true
+			data, ok := update["data"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected final data object, got %#v", update["data"])
+			}
+			if data["index_refreshed"] != false {
+				t.Fatalf("expected final update to report stale index, got %#v", data)
+			}
+		}
+	}
+	if !sawWarning || !sawFinal {
+		t.Fatalf("expected warning and final updates, got %q", output)
+	}
 }
 
 func TestGoalCreateCommandInfersLinkedProject(t *testing.T) {
