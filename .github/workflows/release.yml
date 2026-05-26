@@ -10,7 +10,8 @@ permissions:
   contents: write
 
 jobs:
-  check:
+  build-and-publish:
+    name: Build and publish release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
