@@ -1,6 +1,7 @@
 package maatui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -321,5 +322,89 @@ func TestModelQuitKeyReturnsCommand(t *testing.T) {
 	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	if cmd == nil {
 		t.Fatal("quit command is nil")
+	}
+}
+
+func TestLiveModelStartsRefreshLoop(t *testing.T) {
+	model := NewLiveModel("/tmp/maat-state", Dashboard{}, nil)
+	if cmd := model.Init(); cmd == nil {
+		t.Fatal("expected live model init to schedule refresh")
+	}
+}
+
+func TestModelRefreshReloadsDashboardAndPreservesSelection(t *testing.T) {
+	model := NewLiveModel("/tmp/maat-state", Dashboard{Projects: []ProjectRow{
+		{Key: "first"},
+		{Key: "second"},
+	}}, nil)
+	model.selected = 1
+
+	updated, _ := model.Update(dashboardLoadedMsg{dashboard: Dashboard{Projects: []ProjectRow{
+		{Key: "new"},
+		{Key: "second", DisplayName: "Second Reloaded"},
+		{Key: "third"},
+	}}})
+	got := updated.(Model)
+	if got.selected != 1 || got.dashboard.Projects[got.selected].DisplayName != "Second Reloaded" {
+		t.Fatalf("refresh did not preserve selected project: selected=%d projects=%+v", got.selected, got.dashboard.Projects)
+	}
+	if got.err != nil || got.refreshErr != nil {
+		t.Fatalf("expected successful refresh to clear errors, got err=%v refreshErr=%v", got.err, got.refreshErr)
+	}
+}
+
+func TestModelRefreshErrorKeepsExistingDashboardVisible(t *testing.T) {
+	model := NewLiveModel("/tmp/maat-state", Dashboard{Projects: []ProjectRow{
+		{Key: "sample", DisplayName: "Sample"},
+	}}, nil)
+
+	updated, _ := model.Update(dashboardLoadedMsg{err: errors.New("storage unavailable")})
+	got := updated.(Model)
+	if len(got.dashboard.Projects) != 1 || got.dashboard.Projects[0].Key != "sample" {
+		t.Fatalf("refresh error should keep existing dashboard, got %+v", got.dashboard)
+	}
+	view := got.View()
+	for _, want := range []string{"Sample", "Auto-refresh warning", "storage unavailable"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("view missing %q after refresh error:\n%s", want, view)
+		}
+	}
+}
+
+func TestModelLoadCommandUsesConfiguredLoader(t *testing.T) {
+	model := NewLiveModel("/tmp/maat-state", Dashboard{}, nil)
+	model.load = func(storage string) dashboardLoadedMsg {
+		if storage != "/tmp/maat-state" {
+			return dashboardLoadedMsg{err: errors.New("unexpected storage")}
+		}
+		return dashboardLoadedMsg{dashboard: Dashboard{Projects: []ProjectRow{{Key: "loaded"}}}}
+	}
+
+	msg := model.loadDashboardCmd()()
+	loaded, ok := msg.(dashboardLoadedMsg)
+	if !ok {
+		t.Fatalf("unexpected load message: %#v", msg)
+	}
+	if loaded.err != nil || len(loaded.dashboard.Projects) != 1 || loaded.dashboard.Projects[0].Key != "loaded" {
+		t.Fatalf("unexpected loaded dashboard: %#v", loaded)
+	}
+}
+
+func TestModelRefreshWarningKeepsNewDashboardVisible(t *testing.T) {
+	model := NewLiveModel("/tmp/maat-state", Dashboard{Projects: []ProjectRow{{Key: "old"}}}, nil)
+
+	updated, _ := model.Update(dashboardLoadedMsg{
+		dashboard: Dashboard{Projects: []ProjectRow{{Key: "new", DisplayName: "New"}}},
+		warning:   errors.New("git pull failed"),
+	})
+	got := updated.(Model)
+	if got.refreshErr == nil || got.dashboard.Projects[0].Key != "new" {
+		t.Fatalf("expected warning with refreshed dashboard, got refreshErr=%v dashboard=%+v", got.refreshErr, got.dashboard)
+	}
+	view := got.View()
+	for _, want := range []string{"New", "Auto-refresh warning", "git pull failed"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("view missing %q after warning refresh:\n%s", want, view)
+		}
 	}
 }

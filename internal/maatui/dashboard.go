@@ -1,9 +1,11 @@
 package maatui
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -65,12 +67,31 @@ const (
 )
 
 type Model struct {
+	dashboard  Dashboard
+	err        error
+	refreshErr error
+	width      int
+	selected   int
+	mode       DetailMode
+	storage    string
+	load       dashboardLoader
+}
+
+type dashboardLoader func(string) dashboardLoadedMsg
+
+type TUIOptions struct {
+	AutoPullBeforeRefresh bool
+}
+
+type dashboardRefreshTickMsg struct{}
+
+type dashboardLoadedMsg struct {
 	dashboard Dashboard
 	err       error
-	width     int
-	selected  int
-	mode      DetailMode
+	warning   error
 }
+
+const dashboardRefreshInterval = 5 * time.Second
 
 var (
 	titleStyle = lipgloss.NewStyle().
@@ -86,8 +107,12 @@ var (
 )
 
 func RunTUI(storage string) error {
+	return RunTUIWithOptions(storage, TUIOptions{})
+}
+
+func RunTUIWithOptions(storage string, options TUIOptions) error {
 	dashboard, err := LoadDashboard(storage)
-	model := NewModel(dashboard, err)
+	model := NewLiveModelWithOptions(storage, dashboard, err, options)
 	_, runErr := tea.NewProgram(model, tea.WithAltScreen()).Run()
 	if runErr != nil {
 		return runErr
@@ -96,11 +121,27 @@ func RunTUI(storage string) error {
 }
 
 func NewModel(dashboard Dashboard, err error) Model {
-	return Model{dashboard: dashboard, err: err}
+	return Model{dashboard: dashboard, err: err, load: loadDashboardWithoutPull}
+}
+
+func NewLiveModel(storage string, dashboard Dashboard, err error) Model {
+	return NewLiveModelWithOptions(storage, dashboard, err, TUIOptions{})
+}
+
+func NewLiveModelWithOptions(storage string, dashboard Dashboard, err error, options TUIOptions) Model {
+	model := NewModel(dashboard, err)
+	model.storage = storage
+	if options.AutoPullBeforeRefresh {
+		model.load = loadDashboardWithPull
+	}
+	return model
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	if m.storage == "" {
+		return nil
+	}
+	return refreshTickCmd()
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -120,15 +161,80 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
+	case dashboardRefreshTickMsg:
+		if m.storage == "" {
+			return m, nil
+		}
+		return m, tea.Batch(m.loadDashboardCmd(), refreshTickCmd())
+	case dashboardLoadedMsg:
+		m = m.withLoadedDashboard(msg)
 	}
 	return m, nil
 }
 
 func (m Model) View() string {
-	if m.err != nil {
+	if m.err != nil && len(m.dashboard.Projects) == 0 {
 		return errorStyle.Render(fmt.Sprintf("Maat TUI failed: %v", m.err)) + "\n\n" + mutedStyle.Render("Press q to quit.") + "\n"
 	}
-	return RenderDashboardWithSelectionAndMode(m.dashboard, m.selected, m.mode)
+	view := RenderDashboardWithSelectionAndMode(m.dashboard, m.selected, m.mode)
+	if m.refreshErr != nil {
+		view += mutedStyle.Render(fmt.Sprintf("Auto-refresh warning: %v", m.refreshErr))
+		view += "\n"
+	}
+	return view
+}
+
+func refreshTickCmd() tea.Cmd {
+	return tea.Tick(dashboardRefreshInterval, func(time.Time) tea.Msg {
+		return dashboardRefreshTickMsg{}
+	})
+}
+
+func (m Model) loadDashboardCmd() tea.Cmd {
+	load := m.load
+	if load == nil {
+		load = loadDashboardWithoutPull
+	}
+	storage := m.storage
+	return func() tea.Msg {
+		return load(storage)
+	}
+}
+
+func (m Model) withLoadedDashboard(msg dashboardLoadedMsg) Model {
+	if msg.err != nil {
+		m.refreshErr = msg.err
+		return m
+	}
+	selectedKey := ""
+	if len(m.dashboard.Projects) > 0 {
+		selectedKey = selectedProject(m.dashboard.Projects, m.selected).Key
+	}
+	m.dashboard = msg.dashboard
+	m.err = nil
+	m.refreshErr = msg.warning
+	m.selected = selectedIndexByKey(m.dashboard.Projects, selectedKey, m.selected)
+	return m
+}
+
+func loadDashboardWithoutPull(storage string) dashboardLoadedMsg {
+	dashboard, err := LoadDashboard(storage)
+	return dashboardLoadedMsg{dashboard: dashboard, err: err}
+}
+
+func loadDashboardWithPull(storage string) dashboardLoadedMsg {
+	var warning error
+	git := maat.GitSync{Store: storage}
+	isRepository, err := git.IsRepository(context.Background())
+	if err != nil {
+		warning = err
+	} else if isRepository {
+		if err := git.PullRebase(context.Background()); err != nil {
+			warning = err
+		}
+	}
+	dashboard, err := LoadDashboard(storage)
+	return dashboardLoadedMsg{dashboard: dashboard, err: err, warning: warning}
 }
 
 func LoadDashboard(storage string) (Dashboard, error) {
@@ -428,6 +534,17 @@ func selectedProject(projects []ProjectRow, selected int) ProjectRow {
 		return ProjectRow{}
 	}
 	return projects[clampSelection(selected, len(projects))]
+}
+
+func selectedIndexByKey(projects []ProjectRow, key string, fallback int) int {
+	if key != "" {
+		for index, project := range projects {
+			if project.Key == key {
+				return index
+			}
+		}
+	}
+	return clampSelection(fallback, len(projects))
 }
 
 func nextDetailMode(mode DetailMode) DetailMode {

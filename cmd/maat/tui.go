@@ -7,5 +7,10 @@ func tuiCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	return maatui.RunTUI(store)
+	cfg, err := readConfig()
+	options := maatui.TUIOptions{}
+	if err == nil {
+		options.AutoPullBeforeRefresh = cfg.AutoPullBeforeRead
+	}
+	return maatui.RunTUIWithOptions(store, options)
 }
