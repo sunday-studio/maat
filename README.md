@@ -8,29 +8,45 @@ It gives agents one shared place to create goals, create and claim tickets, reco
 
 ### 1. Install Maat
 
-From a checkout:
+Download the current release for your OS and CPU. Check the [releases page](https://github.com/sunday-studio/maat/releases) for the latest version.
 
 ```sh
-scripts/install.sh
+VERSION=v0.1.0  # replace with the latest release
+OS=darwin    # darwin or linux
+ARCH=arm64   # arm64 or amd64
+
+curl -L "https://github.com/sunday-studio/maat/releases/download/$VERSION/maat-$VERSION-$OS-$ARCH.tar.gz" -o maat.tar.gz
+tar -xzf maat.tar.gz
+mkdir -p "$HOME/.local/bin"
+install -m 0755 "maat-$VERSION-$OS-$ARCH" "$HOME/.local/bin/maat"
 ```
 
-Or build directly:
-
-```sh
-go build -o maat ./cmd/maat
-```
-
-Check the binary:
+Make sure the install directory is on `PATH`, then check the binary:
 
 ```sh
 maat version
 ```
 
+You do not need to clone this repository to use Maat. Clone it only if you want to contribute or build from source.
+
 ### 2. Prepare A Storage Repo
 
-Maat state lives in a normal Git repository full of Markdown files. That storage repo is the source of truth.
+Maat state lives in a normal Git repository full of Markdown files. That storage repo is the source of truth and is separate from the Maat product repo.
 
-Create or clone one somewhere stable, then run:
+Create one locally:
+
+```sh
+mkdir -p "$HOME/maat-state"
+git init "$HOME/maat-state"
+```
+
+Or clone an existing shared storage repo:
+
+```sh
+git clone <your-maat-storage-remote> "$HOME/maat-state"
+```
+
+Then run:
 
 ```sh
 maat setup
@@ -47,13 +63,13 @@ The setup prompt asks for:
 For agents and scripts, use the non-interactive form:
 
 ```sh
-maat setup --storage /absolute/path/to/maat-state
+maat setup --storage "$HOME/maat-state"
 ```
 
 You can also pass storage explicitly on any command:
 
 ```sh
-maat status --storage /absolute/path/to/maat-state
+maat status --storage "$HOME/maat-state"
 ```
 
 ### 3. Register A Project Repo
@@ -193,3 +209,13 @@ maat initialize --storage /absolute/path/to/maat-state
 - [Agent Protocol](docs/agent-protocol.md)
 - [Install](docs/install.md)
 - [Development](docs/development.md)
+
+## Build From Source
+
+Source builds are for contributors:
+
+```sh
+git clone https://github.com/sunday-studio/maat.git
+cd maat
+go build -o maat ./cmd/maat
+```
