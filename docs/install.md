@@ -55,6 +55,15 @@ Install a specific binary with:
 MATT_SOURCE_BIN="./dist/matt" scripts/install.sh
 ```
 
+Control ANSI progress color with:
+
+```sh
+MATT_COLOR=always scripts/install.sh
+MATT_COLOR=never scripts/install.sh
+```
+
+During install, the script prints step-by-step progress for selecting the target directory, finding or building the binary, preparing the target, installing the executable, and checking whether the target directory is on `PATH`.
+
 ## Build From Source
 
 Build the local binary into `dist/matt`:
@@ -158,6 +167,17 @@ Check the binary:
 
 ```sh
 matt --help
+```
+
+The installer ends with a `maat ready to use` banner and a short start-here command list:
+
+```sh
+matt version
+matt --help
+matt init /absolute/path/to/maat-state
+matt index rebuild --storage /absolute/path/to/maat-state
+matt status --storage /absolute/path/to/maat-state
+matt tui --storage /absolute/path/to/maat-state
 ```
 
 Query a storage repo:

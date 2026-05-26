@@ -18,6 +18,8 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 
 The latest cleanup grouped reusable Markdown templates into a single `templates/` directory so agents do not need to hunt through state directories for starter files.
 
+The local installer now gives visible step-by-step progress, supports ANSI color control, and ends with a `maat ready to use` banner plus starter commands.
+
 ## Goals
 
 ### G-001: Define the agent-operable project system
@@ -213,6 +215,21 @@ The latest cleanup grouped reusable Markdown templates into a single `templates/
 - [x] T-001: Move agent, project, and ledger event templates into `templates/`.
 - [x] T-002: Add a template directory index.
 - [x] T-003: Update agent, project, and ledger docs to point at the new template paths.
+
+### G-013: Improve installer first-run feedback
+
+| Field | Value |
+|---|---|
+| Status | done |
+| Updated | 2026-05-26 |
+| Tags | #release #cli #install |
+
+#### Tasks
+
+- [x] T-001: Add visible installer progress steps.
+- [x] T-002: Add an ANSI completion banner that says `maat ready to use`.
+- [x] T-003: Print practical starter commands after install.
+- [x] T-004: Document installer color and post-install output.
 
 ## Blockers
 
