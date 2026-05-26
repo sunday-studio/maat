@@ -25,8 +25,7 @@ Current bootstrap status:
 
 ## Phase 2: CLI Read Path
 
-- `maat init`
-- `maat storage link`
+- `maat setup --storage <absolute-git-repo-path>`
 - `maat index rebuild`
 - `maat projects`
 - `maat project show`
@@ -35,7 +34,7 @@ Current bootstrap status:
 
 Current bootstrap status:
 
-- `maat init` and `maat storage link` write local config
+- `maat setup` writes local config
 - `maat index rebuild` writes `.maat/index.json` as a temporary rebuildable index
 - `maat projects`, `maat project show`, `maat status`, and direct Markdown `maat search` work
 - SQLite FTS remains future work
@@ -88,7 +87,7 @@ The TUI should call the same core operations as the CLI.
 The smallest useful build is:
 
 - installable `maat` binary
-- storage link
+- setup storage
 - index rebuild
 - project list/show
 - ticket create/comment/complete

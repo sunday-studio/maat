@@ -167,7 +167,7 @@ Tasks:
 - Add release build commands.
 - Add install script design.
 - Add config path documentation for macOS and Linux.
-- Add storage linking flow.
+- Add setup flow for linking storage.
 - Add upgrade notes.
 
 Initial owner:
@@ -295,6 +295,6 @@ Status:
 
 - Keep storage files and generated indexes out of source commits unless explicitly needed.
 - Prefer additive files for parallel work.
-- Avoid editing `cmd/matt/main.go` from multiple agents at once.
+- Avoid editing `cmd/maat/main.go` from multiple agents at once.
 - Run `GOCACHE=/private/tmp/maat-go-cache GOPATH=/private/tmp/maat-go-path go test ./...`.
 - Commit each coherent change using the format in `AGENTS.md`.

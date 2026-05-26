@@ -89,8 +89,7 @@ The store can live anywhere:
 The user links the binary to that store during setup:
 
 ```sh
-maat init
-maat storage link /absolute/path/to/maat-state
+maat setup --storage /absolute/path/to/maat-state
 ```
 
 If the storage repo is cloned on a new machine, the user can run:

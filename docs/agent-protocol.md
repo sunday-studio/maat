@@ -35,8 +35,7 @@ After work:
 These commands are available now and are safe for agents to rely on:
 
 ```sh
-maat init [storage-path]
-maat storage link <storage-path>
+maat setup --storage <absolute-git-repo-path>
 maat index rebuild [--storage <path>]
 maat status [--storage <path>] [--json]
 maat projects [--storage <path>] [--json]
@@ -50,7 +49,7 @@ Use JSON output when another tool or agent needs to parse results.
 
 ## Next Write Commands
 
-These commands define the intended agent write protocol. Until they are wired into `cmd/matt`, agents should use the same object files and event rules directly in the Maat storage repo.
+These commands define the intended agent write protocol.
 
 Typical start:
 
@@ -160,7 +159,7 @@ Use Maat as the canonical project memory for this repo. Before material work, ru
 Use this when handing Maat to a new agent, a hosted agent, or a skill/instruction system that needs the full operating protocol:
 
 ```sh
-maat initialize --project maat --storage /absolute/path/to/maat-state
+maat initialize --storage /absolute/path/to/maat-state
 ```
 
 The setup document explains how to link storage, tells the agent to save the Maat rule into `AGENTS.md` or the equivalent instruction surface it reads, and lists the commands to run before planning, during work, and when finishing with evidence.

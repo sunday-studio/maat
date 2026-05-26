@@ -24,7 +24,7 @@ Use Maat as the canonical project memory for this repo. Before material work, ru
 For a full agent onboarding document, run:
 
 ```sh
-maat initialize --project <project-key> --storage /absolute/path/to/maat-state
+maat initialize --storage /absolute/path/to/maat-state
 ```
 
 Use it when an agent needs instructions for linking storage, saving the Maat rule into Codex, Claude Code, Cursor, cloud agent instructions, or a generic skill file, and following the Maat command loop.
@@ -34,8 +34,7 @@ Use it when an agent needs instructions for linking storage, saving the Maat rul
 Current commands suitable for integrations:
 
 ```sh
-maat init [storage-path]
-maat storage link <storage-path>
+maat setup --storage <absolute-git-repo-path>
 maat index rebuild [--storage <path>]
 maat status [--storage <path>] [--json]
 maat projects [--storage <path>] [--json]

@@ -30,7 +30,7 @@ for target in $targets; do
   artifact="${binary_name}-${version}-${goos}-${goarch}"
   archive="${artifact}.tar.gz"
   printf 'building %s/%s...\n' "$goos" "$goarch"
-  GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build -trimpath -ldflags "$ldflags" -o "$dist_dir/$artifact" ./cmd/matt
+  GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build -trimpath -ldflags "$ldflags" -o "$dist_dir/$artifact" ./cmd/maat
   tar -C "$dist_dir" -czf "$dist_dir/$archive" "$artifact"
 done
 

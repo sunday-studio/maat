@@ -47,9 +47,7 @@ maat version
 3. Link this machine or sandbox to that storage directory:
 
 `+"```sh"+`
-maat init %[2]s
-# or
-maat storage link %[2]s
+maat setup --storage %[2]s
 `+"```"+`
 
 4. Check the current state:

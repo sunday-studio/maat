@@ -39,19 +39,19 @@ maat uninstall --install-dir "$HOME/.local/bin"
 Build directly:
 
 ```sh
-go build -o maat ./cmd/matt
+go build -o maat ./cmd/maat
 ```
 
 Run from source:
 
 ```sh
-go run ./cmd/matt version
+go run ./cmd/maat version
 ```
 
 Link your storage repo once:
 
 ```sh
-maat init /absolute/path/to/maat-state
+maat setup --storage /absolute/path/to/maat-state
 ```
 
 Or pass it explicitly:
@@ -65,7 +65,7 @@ maat status --storage /absolute/path/to/maat-state
 Set up and inspect:
 
 ```sh
-maat init /absolute/path/to/maat-state
+maat setup --storage /absolute/path/to/maat-state
 maat index rebuild
 maat validate
 maat status
@@ -136,7 +136,7 @@ Agents should follow this loop:
 Generate a full setup handoff for an agent with:
 
 ```sh
-maat initialize --project maat --storage /absolute/path/to/maat-state
+maat initialize --storage /absolute/path/to/maat-state
 ```
 
 ## TUI

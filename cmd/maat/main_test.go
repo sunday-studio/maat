@@ -1042,7 +1042,7 @@ func TestAgentInitializeCommand(t *testing.T) {
 	for _, want := range []string{
 		"# Maat Agent Setup",
 		"Audience: any agent that can read files, run shell commands, and update Git",
-		"maat init " + store,
+		"maat setup --storage " + store,
 		"maat project show maat --storage " + store,
 		"maat ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",
 		"Codex: add it to the repo's `AGENTS.md`",
@@ -1071,7 +1071,7 @@ func TestInitializeCommandJSON(t *testing.T) {
 	if payload.ProjectKey != "maat" || payload.StoragePath != store || payload.LinkedProject.ProjectKey != "maat" {
 		t.Fatalf("unexpected initialize payload: %#v", payload)
 	}
-	if !strings.Contains(payload.Document, "Audience: any agent") || !strings.Contains(payload.Document, "maat storage link "+store) {
+	if !strings.Contains(payload.Document, "Audience: any agent") || !strings.Contains(payload.Document, "maat setup --storage "+store) {
 		t.Fatalf("unexpected initialize payload: %#v", payload)
 	}
 }

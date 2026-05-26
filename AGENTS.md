@@ -6,7 +6,7 @@ These conventions define how agents should work inside Maat.
 
 ## Repository Map
 
-- `cmd/`: the `matt` CLI entrypoint.
+- `cmd/`: the `maat` CLI entrypoint.
 - `docs/`: architecture, workflows, storage model, CLI/TUI/UI design, and integration notes.
 - `internal/`: Go packages for storage, indexing, sync, validation, and TUI logic.
 - `scripts/`: local install and release helper scripts.

@@ -63,10 +63,6 @@ func run(args []string) error {
 		return setupCommand(args[1:])
 	case "initialize":
 		return agentInitializeCommand(args[1:])
-	case "init":
-		return initConfig(args[1:])
-	case "storage":
-		return storageCommand(args[1:])
 	case "index":
 		return indexCommand(args[1:])
 	case "projects":
@@ -171,8 +167,6 @@ Tickets:
 
 Setup and maintenance:
   maat setup --storage <absolute-git-repo-path> [--actor <name>] [--auto-pull|--no-auto-pull] [--auto-commit|--no-auto-commit] [--auto-push|--no-auto-push] [--json]
-  maat init [storage-path]
-  maat storage link <storage-path>
   maat update [--source <path>] [--install-dir <path>] [--binary-name <name>] [--json]
   maat uninstall [--install-dir <path>] [--binary-name <name>] [--purge-config] [--json]
   maat index rebuild [--storage <path>]
@@ -485,20 +479,6 @@ func uninstallCommand(args []string) error {
 	return nil
 }
 
-func initConfig(args []string) error {
-	storagePath := ""
-	if len(args) > 0 {
-		storagePath = args[0]
-	} else {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		storagePath = cwd
-	}
-	return writeConfig(storagePath)
-}
-
 type setupCommandResult struct {
 	Action               string `json:"action"`
 	StoragePath          string `json:"storage_path"`
@@ -592,13 +572,6 @@ func setupCommand(args []string) error {
 	printField("Auto-commit after writes", formatBool(result.AutoCommitAfterWrite))
 	printField("Auto-push after commits", formatBool(result.AutoPushAfterCommit))
 	return nil
-}
-
-func storageCommand(args []string) error {
-	if len(args) != 2 || args[0] != "link" {
-		return errors.New("usage: maat storage link <storage-path>")
-	}
-	return writeConfig(args[1])
 }
 
 func indexCommand(args []string) error {
@@ -2358,32 +2331,6 @@ func defaultSetupActor() string {
 		return value
 	}
 	return defaultSystemActor()
-}
-
-func writeConfig(storagePath string) error {
-	abs, err := filepath.Abs(storagePath)
-	if err != nil {
-		return err
-	}
-	if stat, err := os.Stat(abs); err != nil {
-		return err
-	} else if !stat.IsDir() {
-		return fmt.Errorf("%s is not a directory", abs)
-	}
-	cfg := defaultConfig()
-	cfg.StoragePath = abs
-	path, err := persistConfig(cfg)
-	if err != nil {
-		return err
-	}
-	if agentUse {
-		return agentUpdate("storage.linked", "ok", "storage linked", map[string]string{
-			"storage_path": abs,
-			"config_path":  path,
-		})
-	}
-	fmt.Printf("linked storage: %s\n", abs)
-	return nil
 }
 
 func persistConfig(cfg config) (string, error) {

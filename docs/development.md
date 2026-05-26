@@ -7,16 +7,16 @@ Maat is currently a Go CLI named `maat`.
 Use a writable Go build cache when running inside restricted environments:
 
 ```sh
-GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt status --storage .
+GOCACHE=/private/tmp/maat-go-cache go run ./cmd/maat status --storage .
 ```
 
 Useful commands against a local or external Maat storage repo:
 
 ```sh
-GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt projects --storage /path/to/maat-state
-GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt project show maat --storage /path/to/maat-state
-GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt search "agent health" --storage /path/to/maat-state
-GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt index rebuild --storage /path/to/maat-state
+GOCACHE=/private/tmp/maat-go-cache go run ./cmd/maat projects --storage /path/to/maat-state
+GOCACHE=/private/tmp/maat-go-cache go run ./cmd/maat project show maat --storage /path/to/maat-state
+GOCACHE=/private/tmp/maat-go-cache go run ./cmd/maat search "agent health" --storage /path/to/maat-state
+GOCACHE=/private/tmp/maat-go-cache go run ./cmd/maat index rebuild --storage /path/to/maat-state
 ```
 
 ## Install Locally
@@ -27,7 +27,7 @@ Use the local installer when you need a `maat` binary on `PATH`:
 scripts/install.sh
 ```
 
-The installer copies an existing checkout binary when available, or builds `./cmd/matt` with Go in offline mode. See [Install](./install.md) for install targets, storage paths, and index paths.
+The installer copies an existing checkout binary when available, or builds `./cmd/maat` with Go in offline mode. See [Install](./install.md) for install targets, storage paths, and index paths.
 
 ## Test
 

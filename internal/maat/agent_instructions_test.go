@@ -37,8 +37,7 @@ func TestAgentSetupDocument(t *testing.T) {
 	for _, want := range []string{
 		"# Maat Agent Setup",
 		"Audience: any agent that can read files, run shell commands, and update Git",
-		"maat init /tmp/maat-state",
-		"maat storage link /tmp/maat-state",
+		"maat setup --storage /tmp/maat-state",
 		"Codex: add it to the repo's `AGENTS.md`",
 		"Claude Code: add it to `CLAUDE.md`",
 		"Cursor or Cursor Cloud: add it to the repo's Cursor rules",

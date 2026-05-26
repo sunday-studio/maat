@@ -149,7 +149,7 @@ if [ -z "$source_path" ]; then
   info_line "no prebuilt binary found; building $binary_name from this checkout"
   (
     cd "$repo_dir"
-    GOPROXY=off go build -o "$source_path" ./cmd/matt
+    GOPROXY=off go build -o "$source_path" ./cmd/maat
   )
   done_line "built $binary_name"
 else

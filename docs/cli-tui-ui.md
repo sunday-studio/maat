@@ -18,8 +18,7 @@ It should be easy to install on a new machine, link to a Git-controlled storage 
 ### Setup
 
 ```sh
-maat init
-maat storage link /absolute/path/to/maat-state
+maat setup --storage /absolute/path/to/maat-state
 maat index rebuild
 ```
 

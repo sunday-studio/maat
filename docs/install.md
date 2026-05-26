@@ -34,7 +34,7 @@ dist/maat
 If no executable is found and Go is available, it builds:
 
 ```sh
-go build -o <temp>/maat ./cmd/matt
+go build -o <temp>/maat ./cmd/maat
 ```
 
 The default install target is `/usr/local/bin` when writable. Otherwise it installs to:
@@ -102,7 +102,7 @@ Use `--binary-name <name>` for test installs or renamed binaries.
 Use a temporary install directory so the test does not touch your real system path:
 
 ```sh
-GOCACHE=/private/tmp/maat-go-cache go build -o /tmp/maat ./cmd/matt
+GOCACHE=/private/tmp/maat-go-cache go build -o /tmp/maat ./cmd/maat
 
 INSTALL_DIR=$(mktemp -d)
 MAAT_INSTALL_DIR="$INSTALL_DIR" MAAT_SOURCE_BIN=/tmp/maat scripts/install.sh
@@ -176,7 +176,7 @@ maat projects --storage /absolute/path/to/maat-state
 maat search "blocked" --storage /absolute/path/to/maat-state
 ```
 
-The target setup flow will persist this path with `maat init` or `maat storage link`.
+The setup flow persists this path with `maat setup --storage <absolute-git-repo-path>`.
 
 ## Local Paths
 
@@ -234,7 +234,7 @@ The installer ends with a `maat ready to use` banner and a short start-here comm
 ```sh
 maat version
 maat --help
-maat init /absolute/path/to/maat-state
+maat setup --storage /absolute/path/to/maat-state
 maat index rebuild --storage /absolute/path/to/maat-state
 maat status --storage /absolute/path/to/maat-state
 maat tui --storage /absolute/path/to/maat-state

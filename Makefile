@@ -13,7 +13,7 @@ test:
 
 build:
 	mkdir -p $(DIST_DIR)
-	go build -trimpath -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$(BINARY) ./cmd/matt
+	go build -trimpath -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$(BINARY) ./cmd/maat
 
 release:
 	MAAT_BINARY_NAME=$(BINARY) DIST_DIR=$(DIST_DIR) VERSION=$(VERSION) COMMIT=$(COMMIT) DATE=$(DATE) scripts/build-release.sh
