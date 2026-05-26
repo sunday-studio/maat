@@ -30,7 +30,7 @@ Use the local installer when you need a `maat` binary on `PATH`:
 scripts/install.sh
 ```
 
-The installer copies an existing checkout binary when available, or builds `./cmd/maat` with Go in offline mode. See [Install](./install.md) for install targets, storage paths, and index paths.
+From a checkout, the installer copies an existing local binary when available or builds `./cmd/maat` with Go in offline mode. Outside a checkout, the same script downloads the latest release binary. See [Install](./install.md) for install targets, storage paths, and index paths.
 
 ## Test
 

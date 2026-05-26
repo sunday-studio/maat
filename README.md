@@ -8,20 +8,15 @@ It gives agents one shared place to create goals, create and claim tickets, reco
 
 ### 1. Install Maat
 
-Download the current release for your OS and CPU. Check the [releases page](https://github.com/sunday-studio/maat/releases) for the latest version.
+Run the installer:
 
 ```sh
-VERSION=v0.1.0  # replace with the latest release
-OS=darwin    # darwin or linux
-ARCH=arm64   # arm64 or amd64
-
-curl -L "https://github.com/sunday-studio/maat/releases/download/$VERSION/maat-$VERSION-$OS-$ARCH.tar.gz" -o maat.tar.gz
-tar -xzf maat.tar.gz
-mkdir -p "$HOME/.local/bin"
-install -m 0755 "maat-$VERSION-$OS-$ARCH" "$HOME/.local/bin/maat"
+curl -fsSL https://raw.githubusercontent.com/sunday-studio/maat/main/scripts/install.sh | sh
 ```
 
-Make sure the install directory is on `PATH`, then check the binary:
+The installer detects macOS/Linux and arm64/amd64, downloads the right release, chooses a writable install directory, installs the binary as `maat`, and adds the install directory to your shell profile if needed.
+
+Check the binary:
 
 ```sh
 maat version

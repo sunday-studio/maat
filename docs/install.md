@@ -12,26 +12,23 @@ You do not need to clone the Maat source repository to use it. Install a release
 
 Go is only required when building Maat from source.
 
-## Install From A Release
+## Install
 
-Choose the release, operating system, and CPU architecture:
-
-```sh
-VERSION=v0.1.0  # replace with the latest release
-OS=darwin    # darwin or linux
-ARCH=arm64   # arm64 or amd64
-```
-
-Check the [releases page](https://github.com/sunday-studio/maat/releases) for the latest version.
-
-Download and install:
+Run the installer:
 
 ```sh
-curl -L "https://github.com/sunday-studio/maat/releases/download/$VERSION/maat-$VERSION-$OS-$ARCH.tar.gz" -o maat.tar.gz
-tar -xzf maat.tar.gz
-mkdir -p "$HOME/.local/bin"
-install -m 0755 "maat-$VERSION-$OS-$ARCH" "$HOME/.local/bin/maat"
+curl -fsSL https://raw.githubusercontent.com/sunday-studio/maat/main/scripts/install.sh | sh
 ```
+
+The installer:
+
+- detects macOS or Linux
+- detects `arm64` or `amd64`
+- downloads the matching GitHub Release archive
+- verifies the checksum when a checksum tool is available
+- chooses a writable install directory, preferring one already on `PATH`
+- installs the binary as `maat`
+- adds the install directory to your shell profile if it is not already on `PATH`
 
 Check that your shell can find it:
 
@@ -45,21 +42,27 @@ If `maat` is not found, add the install directory to `PATH` in your shell profil
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-## Verify Checksums
+## Install Options
 
-Download the checksum file from the same release:
-
-```sh
-curl -L "https://github.com/sunday-studio/maat/releases/download/$VERSION/checksums-$VERSION.txt" -o checksums.txt
-```
-
-Then verify the archive before extracting it:
+Install a specific release:
 
 ```sh
-grep "maat-$VERSION-$OS-$ARCH.tar.gz" checksums.txt | shasum -a 256 -c -
+curl -fsSL https://raw.githubusercontent.com/sunday-studio/maat/main/scripts/install.sh | MAAT_VERSION=v0.1.0 sh
 ```
 
-On Linux, `sha256sum -c -` can be used in place of `shasum -a 256 -c -`.
+Use a custom install directory:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/sunday-studio/maat/main/scripts/install.sh | MAAT_INSTALL_DIR="$HOME/bin" sh
+```
+
+Skip shell profile changes:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/sunday-studio/maat/main/scripts/install.sh | MAAT_UPDATE_PATH=never sh
+```
+
+Manual release downloads are available on the [releases page](https://github.com/sunday-studio/maat/releases).
 
 ## Prepare Storage
 
