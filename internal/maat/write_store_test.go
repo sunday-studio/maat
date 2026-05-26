@@ -40,7 +40,7 @@ func TestWriteStoreCreatesProject(t *testing.T) {
 	}
 }
 
-func TestWriteStoreUsesStateDirectoryWhenPresent(t *testing.T) {
+func TestWriteStoreUsesRootLayoutWhenStateDirectoryExists(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "state"), 0o755); err != nil {
 		t.Fatal(err)
@@ -55,14 +55,14 @@ func TestWriteStoreUsesStateDirectoryWhenPresent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if project.Path != "state/projects/maat/project.md" {
+	if project.Path != "projects/maat/project.md" {
 		t.Fatalf("unexpected path: %q", project.Path)
 	}
-	if _, err := os.Stat(filepath.Join(root, "state", "projects", "maat", "project.md")); err != nil {
-		t.Fatalf("expected state project file: %v", err)
+	if _, err := os.Stat(filepath.Join(root, "projects", "maat", "project.md")); err != nil {
+		t.Fatalf("expected root project file: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "projects", "maat", "project.md")); !os.IsNotExist(err) {
-		t.Fatalf("expected no root project file, got %v", err)
+	if _, err := os.Stat(filepath.Join(root, "state", "projects", "maat", "project.md")); !os.IsNotExist(err) {
+		t.Fatalf("expected no state project file, got %v", err)
 	}
 }
 

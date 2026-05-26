@@ -14,14 +14,12 @@ This plan keeps implementation small while preserving the target architecture.
 - Validate required fields, statuses, timestamps, and object links.
 - Detect duplicate IDs.
 - Detect malformed events.
-- Support the existing flat v0 files enough to migrate or inspect them.
 
 Current status:
 
-- legacy flat project parsing exists for `projects/*.md`
 - target object layout parsing exists for `projects/<project-key>/`
 - validation checks required fields, known statuses, timestamps, duplicate IDs, object links, malformed tables, and event paths
-- status totals can be computed from legacy and object-layout projects
+- status totals can be computed from object-layout projects
 
 ## Phase 2: CLI Read Path
 

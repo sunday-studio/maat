@@ -127,8 +127,6 @@ func run(args []string) error {
 		return nil
 	case "validate":
 		return validateCommand(args[1:])
-	case "migrate":
-		return migrateCommand(args[1:])
 	case "sync":
 		return syncCommand(args[1:])
 	case "search":
@@ -173,8 +171,6 @@ Setup and maintenance:
   maat uninstall [--install-dir <path>] [--binary-name <name>] [--purge-config] [--json]
   maat index rebuild [--storage <path>]
   maat validate [--storage <path>] [--json]
-  maat migrate plan [--storage <path>] [--json]
-  maat migrate apply --dest <path> [--storage <path>]
   maat tui [--storage <path>]
   maat version [--json]
 
@@ -873,70 +869,6 @@ func validateCommand(args []string) error {
 	return nil
 }
 
-func migrateCommand(args []string) error {
-	if len(args) == 0 {
-		return errors.New("usage: maat migrate plan [--storage <path>] [--json] or maat migrate apply --dest <path> [--storage <path>]")
-	}
-	switch args[0] {
-	case "plan":
-		filtered, jsonOut := splitJSONFlag(args[1:])
-		store, err := loadStoreForRead(filtered)
-		if err != nil {
-			return err
-		}
-		progress("migrate.plan", "planning legacy migration", map[string]string{"storage": store})
-		plan, err := maat.PlanLegacyMigration(store, maat.MigrationOptions{})
-		if err != nil {
-			return err
-		}
-		if agentUse {
-			return agentUpdate("migrate.plan.ready", "ok", "migration plan ready", plan)
-		}
-		if jsonOut {
-			return writeJSON(plan)
-		}
-		ok("migrate.plan.ready", fmt.Sprintf("planned %d projects and %d files", len(plan.Projects), len(plan.Files)), nil)
-		fmt.Printf("planned %d projects and %d files\n", len(plan.Projects), len(plan.Files))
-		for _, project := range plan.Projects {
-			fmt.Printf("%s -> %s (%d goals, %d tickets, %d events)\n",
-				project.LegacyPath,
-				project.ProjectPath,
-				len(project.GoalPaths),
-				len(project.TicketPaths),
-				len(project.EventPaths),
-			)
-		}
-		return nil
-	case "apply":
-		filtered, dest, err := splitDestinationFlag(args[1:])
-		if err != nil {
-			return err
-		}
-		store, err := loadStore(filtered)
-		if err != nil {
-			return err
-		}
-		absDest, err := filepath.Abs(dest)
-		if err != nil {
-			return err
-		}
-		progress("migrate.apply", "applying legacy migration", map[string]string{"destination": absDest})
-		plan, err := maat.ApplyLegacyMigration(store, absDest, maat.MigrationOptions{})
-		if err != nil {
-			return err
-		}
-		if agentUse {
-			return agentUpdate("migrate.apply.ready", "ok", "migration applied", plan)
-		}
-		ok("migrate.apply.ready", fmt.Sprintf("migrated %d projects", len(plan.Projects)), nil)
-		fmt.Printf("migrated %d projects into %s\n", len(plan.Projects), absDest)
-		fmt.Printf("wrote %d files\n", len(plan.Files))
-		return nil
-	default:
-		return fmt.Errorf("unknown migrate command %q", args[0])
-	}
-}
-
 func projectCommand(args []string) error {
 	if len(args) == 0 {
 		return errors.New("usage: maat project <show|link>")
@@ -961,51 +893,18 @@ func projectShowCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	project, err := maat.LoadProject(store, projectID)
-	if err == nil {
-		if agentUse {
-			return agentUpdate("project.ready", "ok", "project loaded", project)
-		}
-		if jsonOut {
-			return writeJSON(project)
-		}
-		printLegacyProject(project)
-		return nil
-	}
-	objectProject, objectErr := maat.LoadObjectProject(store, projectID)
-	if objectErr != nil {
+	project, err := maat.LoadObjectProject(store, projectID)
+	if err != nil {
 		return err
 	}
 	if agentUse {
-		return agentUpdate("project.ready", "ok", "project loaded", objectProject)
+		return agentUpdate("project.ready", "ok", "project loaded", project)
 	}
 	if jsonOut {
-		return writeJSON(objectProject)
+		return writeJSON(project)
 	}
-	printObjectProject(objectProject)
+	printObjectProject(project)
 	return nil
-}
-
-func printLegacyProject(project maat.Project) {
-	fmt.Printf("# %s\n\n", project.Title)
-	fmt.Printf("ID:      %s\n", project.ID)
-	fmt.Printf("Status:  %s\n", project.Status)
-	fmt.Printf("Updated: %s\n", project.Updated)
-	fmt.Printf("Tags:    %s\n\n", strings.Join(project.Tags, " "))
-	if project.Current != "" {
-		fmt.Println(project.Current)
-		fmt.Println()
-	}
-	for _, goal := range project.Goals {
-		fmt.Printf("- %s [%s] %s\n", goal.ID, goal.Status, goal.Title)
-		for _, ticket := range goal.Tickets {
-			box := " "
-			if ticket.Done {
-				box = "x"
-			}
-			fmt.Printf("  - [%s] %s %s\n", box, ticket.ID, ticket.Title)
-		}
-	}
 }
 
 func printObjectProject(project maat.ObjectProject) {
@@ -1161,7 +1060,6 @@ type ticketView struct {
 	Status     string `json:"status"`
 	Created    string `json:"created,omitempty"`
 	Path       string `json:"path,omitempty"`
-	Legacy     bool   `json:"legacy,omitempty"`
 }
 
 func ticketListCommand(args []string) error {
@@ -1564,26 +1462,11 @@ type projectListItem struct {
 }
 
 func loadProjectListItems(store string) ([]projectListItem, error) {
-	legacyProjects, err := maat.LoadProjects(store)
-	if err != nil {
-		return nil, err
-	}
 	objectProjects, err := maat.LoadObjectProjects(store)
 	if err != nil {
 		return nil, err
 	}
-	projects := make([]projectListItem, 0, len(legacyProjects)+len(objectProjects))
-	for _, project := range legacyProjects {
-		projects = append(projects, projectListItem{
-			ID:      project.ID,
-			Key:     project.ID,
-			Title:   project.Title,
-			Status:  project.Status,
-			Updated: project.Updated,
-			Path:    project.Path,
-			Layout:  "legacy",
-		})
-	}
+	projects := make([]projectListItem, 0, len(objectProjects))
 	for _, project := range objectProjects {
 		projects = append(projects, projectListItem{
 			ID:      project.Key,
@@ -1596,9 +1479,6 @@ func loadProjectListItems(store string) ([]projectListItem, error) {
 		})
 	}
 	sort.Slice(projects, func(i, j int) bool {
-		if projects[i].ID == projects[j].ID {
-			return projects[i].Layout < projects[j].Layout
-		}
 		return projects[i].ID < projects[j].ID
 	})
 	return projects, nil
@@ -1854,7 +1734,7 @@ func resolveTicketProject(store, projectKey, ticketID string) (string, error) {
 	}
 	switch len(matches) {
 	case 0:
-		return "", fmt.Errorf("ticket %q not found; pass --project <project-key> if it is in a legacy project", ticketID)
+		return "", fmt.Errorf("ticket %q not found", ticketID)
 	case 1:
 		return matches[0], nil
 	default:
@@ -1869,11 +1749,6 @@ func resolveReadableTicketProject(store, projectKey, ticketID string) (string, e
 	if project, err := inferProjectFromWorkingDirectory(store); err == nil {
 		if objectProjectHasTicket(project, ticketID) {
 			return project.Key, nil
-		}
-		for _, ticket := range legacyTicketViewsForProject(project.Key, nil) {
-			if ticket.ID == ticketID {
-				return project.Key, nil
-			}
 		}
 	}
 	tickets, err := loadTicketViews(store, "")
@@ -1913,11 +1788,6 @@ func loadTicketViews(store, projectKey string) ([]ticketView, error) {
 		} else if !os.IsNotExist(err) {
 			return nil, err
 		}
-		if project, err := maat.LoadProject(store, projectKey); err == nil {
-			tickets = append(tickets, legacyTicketViewsForProject(project.ID, project.Goals)...)
-		} else if !os.IsNotExist(err) && !strings.Contains(err.Error(), "not found") {
-			return nil, err
-		}
 		return tickets, nil
 	}
 	objectStore, err := maat.LoadObjectStore(store)
@@ -1926,13 +1796,6 @@ func loadTicketViews(store, projectKey string) ([]ticketView, error) {
 	}
 	for _, project := range objectStore.Projects {
 		tickets = append(tickets, objectTicketViews(project)...)
-	}
-	legacyProjects, err := maat.LoadProjects(store)
-	if err != nil {
-		return nil, err
-	}
-	for _, project := range legacyProjects {
-		tickets = append(tickets, legacyTicketViewsForProject(project.ID, project.Goals)...)
 	}
 	return tickets, nil
 }
@@ -1949,27 +1812,6 @@ func objectTicketViews(project maat.ObjectProject) []ticketView {
 			Created:    ticket.Created,
 			Path:       ticket.Path,
 		})
-	}
-	return tickets
-}
-
-func legacyTicketViewsForProject(projectKey string, goals []maat.Goal) []ticketView {
-	var tickets []ticketView
-	for _, goal := range goals {
-		for _, ticket := range goal.Tickets {
-			status := "active"
-			if ticket.Done {
-				status = "done"
-			}
-			tickets = append(tickets, ticketView{
-				ID:         ticket.ID,
-				ProjectKey: projectKey,
-				GoalID:     goal.ID,
-				Title:      ticket.Title,
-				Status:     status,
-				Legacy:     true,
-			})
-		}
 	}
 	return tickets
 }
@@ -2053,26 +1895,6 @@ func splitJSONFlag(args []string) ([]string, bool) {
 		filtered = append(filtered, arg)
 	}
 	return filtered, jsonOut
-}
-
-func splitDestinationFlag(args []string) ([]string, string, error) {
-	filtered := make([]string, 0, len(args))
-	dest := ""
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--dest" {
-			if i+1 >= len(args) {
-				return nil, "", errors.New("--dest requires a path")
-			}
-			dest = args[i+1]
-			i++
-			continue
-		}
-		filtered = append(filtered, args[i])
-	}
-	if strings.TrimSpace(dest) == "" {
-		return nil, "", errors.New("usage: maat migrate apply --dest <path> [--storage <path>]")
-	}
-	return filtered, dest, nil
 }
 
 func writeJSON(value any) error {

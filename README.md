@@ -170,15 +170,6 @@ maat tui
 
 The TUI currently shows projects, status totals, project detail, and ticket lists. Search and timeline views are planned next.
 
-## Migration
-
-Migrate legacy flat project files into the object layout:
-
-```sh
-maat migrate plan --json
-maat migrate apply --dest /tmp/maat-migrated
-```
-
 ## Agent Loop
 
 Agents should follow this loop:

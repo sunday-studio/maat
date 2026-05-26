@@ -136,15 +136,7 @@ func LoadDashboard(storage string) (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
-	if len(objectProjects) > 0 {
-		return DashboardFromObjectProjects(objectProjects), nil
-	}
-
-	legacyProjects, err := maat.LoadProjects(storage)
-	if err != nil {
-		return Dashboard{}, err
-	}
-	return DashboardFromLegacyProjects(legacyProjects), nil
+	return DashboardFromObjectProjects(objectProjects), nil
 }
 
 func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
@@ -224,65 +216,6 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 		return events[i].Time > events[j].Time
 	})
 	return Dashboard{Projects: rows, Summary: summary, Events: events}
-}
-
-func DashboardFromLegacyProjects(projects []maat.Project) Dashboard {
-	rows := make([]ProjectRow, 0, len(projects))
-	var summary maat.StatusSummary
-	summary.Projects = len(projects)
-	for _, project := range projects {
-		ticketCount := 0
-		openTickets := 0
-		doneTickets := 0
-		goalRows := make([]GoalRow, 0, len(project.Goals))
-		ticketRows := make([]TicketRow, 0)
-		for _, goal := range project.Goals {
-			ticketCount += len(goal.Tickets)
-			summary.Goals++
-			if goal.Status == "active" {
-				summary.ActiveGoals++
-			}
-			if goal.Status == "done" {
-				summary.DoneGoals++
-			}
-			for _, ticket := range goal.Tickets {
-				summary.Tickets++
-				if ticket.Done {
-					summary.DoneTickets++
-					doneTickets++
-				} else {
-					summary.OpenTickets++
-					openTickets++
-				}
-				ticketRows = append(ticketRows, TicketRow{
-					ID:     ticket.ID,
-					Title:  ticket.Title,
-					Status: legacyTicketStatus(ticket.Done),
-					GoalID: goal.ID,
-				})
-			}
-			goalRows = append(goalRows, GoalRow{
-				ID:      goal.ID,
-				Title:   goal.Title,
-				Status:  goal.Status,
-				Tickets: len(goal.Tickets),
-			})
-		}
-		rows = append(rows, ProjectRow{
-			Key:         project.ID,
-			DisplayName: project.Title,
-			Status:      project.Status,
-			Summary:     project.Current,
-			Goals:       len(project.Goals),
-			Tickets:     ticketCount,
-			OpenTickets: openTickets,
-			DoneTickets: doneTickets,
-			Updated:     project.Updated,
-			GoalRows:    goalRows,
-			TicketRows:  ticketRows,
-		})
-	}
-	return Dashboard{Projects: rows, Summary: summary}
 }
 
 func RenderDashboard(dashboard Dashboard) string {
@@ -533,13 +466,6 @@ func countObjectTicketsByGoal(tickets []maat.ObjectTicket) map[string]int {
 		counts[ticket.GoalID]++
 	}
 	return counts
-}
-
-func legacyTicketStatus(done bool) string {
-	if done {
-		return "done"
-	}
-	return "active"
 }
 
 func emptyFallback(value, fallback string) string {

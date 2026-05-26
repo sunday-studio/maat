@@ -36,7 +36,6 @@ Tasks:
 - Parse `tickets/*.md`.
 - Parse `events/YYYY/MM/*.md`.
 - Validate required fields and object links.
-- Keep compatibility with the legacy flat `projects/*.md` files until migration exists.
 
 Initial owner:
 
@@ -66,7 +65,7 @@ Initial owner:
 
 Status:
 
-- Done in `1af445b feat(validation): add legacy store checks`.
+- Validation checks the object layout under `projects/<project-key>/`.
 
 ## Group 4: Write Path Foundations
 
@@ -204,40 +203,7 @@ Status:
 - Next orchestration API assigned to Worker B.
 - Sync orchestration API done in `024f39b feat(sync): orchestrate store sync`.
 
-## Group 10: Migration Core
-
-Goal: move from v0 flat project files to the target object layout safely.
-
-Tasks:
-
-- Plan migration from `projects/*.md` to `projects/<project-key>/`.
-- Preserve legacy source files.
-- Write target files into a separate destination or temp path first.
-- Generate enough event history to explain migrated objects.
-- Add tests for a project with goals and tickets.
-
-Initial owner:
-
-- Worker 4: migration planner and apply functions under `internal/maat`.
-
-Status:
-
-- Done in `982ae4d feat(migration): add legacy object planner`.
-- Next CLI migration command wiring assigned to Worker C.
-- Migration command coverage landed in `4149bea test(cli): cover migration commands`; command wiring landed with `43e7e47 feat(cli): add agent write commands`.
-- Migration dogfood and safety report assigned to Worker 5.
-- Migration overwrite protection done in `d5ea878 fix(migration): dogfood legacy apply`.
-- Historical cross-project dogfood notes were removed when the repo was scoped back to Maat-only state.
-- Migration apply now refuses to overwrite existing target files.
-
-Remaining:
-
-- Add a preflight collision scan that reports all target conflicts before writing.
-- Preserve legacy updated metadata where possible.
-- Migrate blockers and decisions into first-class target objects.
-- Design an explicit, backed-up in-place migration command.
-
-## Group 11: Agent Protocol Packaging
+## Group 10: Agent Protocol Packaging
 
 Goal: make it easy to teach other repos and agents how to use Maat.
 

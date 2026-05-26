@@ -1,34 +1,5 @@
 package maat
 
-type Project struct {
-	ID        string   `json:"id"`
-	Title     string   `json:"title"`
-	Status    string   `json:"status"`
-	Owner     string   `json:"owner,omitempty"`
-	Updated   string   `json:"updated,omitempty"`
-	Tags      []string `json:"tags,omitempty"`
-	Current   string   `json:"current,omitempty"`
-	Path      string   `json:"path"`
-	Goals     []Goal   `json:"goals,omitempty"`
-	Blockers  []string `json:"blockers,omitempty"`
-	Decisions []string `json:"decisions,omitempty"`
-}
-
-type Goal struct {
-	ID      string   `json:"id"`
-	Title   string   `json:"title"`
-	Status  string   `json:"status"`
-	Updated string   `json:"updated,omitempty"`
-	Tags    []string `json:"tags,omitempty"`
-	Tickets []Ticket `json:"tickets,omitempty"`
-}
-
-type Ticket struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
-	Done  bool   `json:"done"`
-}
-
 type StatusSummary struct {
 	Projects      int `json:"projects"`
 	Goals         int `json:"goals"`
@@ -49,9 +20,9 @@ type Document struct {
 }
 
 type Index struct {
-	Version   int        `json:"version"`
-	Projects  []Project  `json:"projects"`
-	Documents []Document `json:"documents"`
+	Version   int             `json:"version"`
+	Projects  []ObjectProject `json:"projects"`
+	Documents []Document      `json:"documents"`
 }
 
 type SearchResult struct {

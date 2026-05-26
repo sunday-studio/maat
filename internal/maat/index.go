@@ -8,7 +8,7 @@ import (
 )
 
 func BuildIndex(store string) (Index, error) {
-	projects, err := LoadProjects(store)
+	projects, err := LoadObjectProjects(store)
 	if err != nil {
 		return Index{}, err
 	}
@@ -86,10 +86,6 @@ func documentType(store, path string) string {
 		return "decision"
 	case isTargetObjectFile(parts, "reports"):
 		return "report"
-	case strings.HasPrefix(rel, "projects/"):
-		return "project"
-	case strings.HasPrefix(rel, "ledger/"):
-		return "event"
 	case strings.HasPrefix(rel, "decisions/"):
 		return "decision"
 	case strings.HasPrefix(rel, "reports/"):

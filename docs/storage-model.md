@@ -40,7 +40,7 @@ maat-state/
 └── README.md
 ```
 
-The product repository ignores `state/` so local smoke data and nested storage experiments do not clutter the source tree. A storage repo should normally use the root layout above. For compatibility, Maat can also read a checkout where the content root is a top-level `state/` directory.
+The product repository ignores `state/` so local smoke data and nested storage experiments do not clutter the source tree. Storage repos use the root layout above.
 
 ## Local Cache Layout
 
@@ -229,7 +229,6 @@ Claims expire automatically. An expired claim should not block another agent.
 
 These should be generated from object and event files:
 
-- monthly ledger
 - project summary
 - open ticket list
 - blocked ticket list
@@ -246,7 +245,7 @@ This storage model reduces conflicts because most operations add files:
 - two agents creating tickets create two different files
 - two agents commenting create two different event files
 - two agents recording progress create two different event files
-- status history is event-based instead of one shared ledger append
+- status history is event-based instead of one shared append target
 
 The remaining conflict risk is low-frequency metadata editing, such as project summaries or ticket descriptions. Those edits should be small and validated.
 

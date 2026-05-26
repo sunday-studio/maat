@@ -9,24 +9,21 @@ import (
 	"github.com/sunday-studio/maat/internal/maat"
 )
 
-func TestDashboardFromLegacyProjectsCountsStatus(t *testing.T) {
-	dashboard := DashboardFromLegacyProjects([]maat.Project{
+func TestDashboardFromObjectProjectsCountsStatus(t *testing.T) {
+	dashboard := DashboardFromObjectProjects([]maat.ObjectProject{
 		{
-			ID:      "sample",
-			Title:   "Sample",
-			Status:  "active",
-			Updated: "2026-05-25",
-			Current: "Current Sample summary.",
-			Goals: []maat.Goal{
-				{
-					ID:     "G-001",
-					Status: "active",
-					Tickets: []maat.Ticket{
-						{ID: "T-001", Title: "Open monitor ticket", Done: false},
-						{ID: "T-002", Title: "Done monitor ticket", Done: true},
-					},
-				},
-				{ID: "G-002", Status: "done"},
+			Key:         "sample",
+			DisplayName: "Sample",
+			Status:      "active",
+			Updated:     "2026-05-25",
+			Summary:     "Current Sample summary.",
+			Goals: []maat.ObjectGoal{
+				{ID: "G-001", Title: "Ship", Status: "active"},
+				{ID: "G-002", Title: "Done", Status: "done"},
+			},
+			Tickets: []maat.ObjectTicket{
+				{ID: "T-001", Title: "Open monitor ticket", Status: "active", GoalID: "G-001"},
+				{ID: "T-002", Title: "Done monitor ticket", Status: "done", GoalID: "G-001"},
 			},
 		},
 	})

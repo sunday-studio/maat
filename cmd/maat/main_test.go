@@ -110,11 +110,11 @@ func TestProjectsJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var projects []maat.Project
+	var projects []projectListItem
 	if err := json.Unmarshal([]byte(output), &projects); err != nil {
 		t.Fatal(err)
 	}
-	if len(projects) != 1 || projects[0].ID != "sample" || projects[0].Title != "Sample" {
+	if len(projects) != 1 || projects[0].ID != "sample" || projects[0].Title != "Sample" || projects[0].Layout != "object" {
 		t.Fatalf("unexpected projects: %#v", projects)
 	}
 }
@@ -505,7 +505,7 @@ func TestValidateCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output, "validated 1 files: ok") {
+	if !strings.Contains(output, "validated 7 files: ok") {
 		t.Fatalf("unexpected output: %q", output)
 	}
 }
@@ -533,76 +533,6 @@ func TestIndexRebuildAndSearchCommand(t *testing.T) {
 	}
 	if !strings.Contains(output, "docs/note.md:3") {
 		t.Fatalf("unexpected search output: %q", output)
-	}
-}
-
-func TestMigratePlanCommandJSON(t *testing.T) {
-	store := writeCommandFixture(t)
-
-	output, err := captureRun("migrate", "plan", "--storage", store, "--json")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var plan maat.MigrationPlan
-	if err := json.Unmarshal([]byte(output), &plan); err != nil {
-		t.Fatal(err)
-	}
-	if plan.Source != store {
-		t.Fatalf("unexpected source: %q", plan.Source)
-	}
-	if len(plan.Projects) != 1 {
-		t.Fatalf("expected one project plan, got %d", len(plan.Projects))
-	}
-	project := plan.Projects[0]
-	if project.LegacyPath != "projects/sample.md" || project.ProjectPath != "projects/sample/project.md" {
-		t.Fatalf("unexpected project plan: %#v", project)
-	}
-	if len(project.GoalPaths) != 1 || len(project.TicketPaths) != 2 || len(project.EventPaths) != 1 {
-		t.Fatalf("unexpected migrated object paths: %#v", project)
-	}
-	if strings.Contains(output, "Content") || strings.Contains(output, "Current state.") {
-		t.Fatalf("plan json should not expose planned file contents: %q", output)
-	}
-}
-
-func TestMigrateApplyCommandWritesDestinationOnly(t *testing.T) {
-	store := writeCommandFixture(t)
-	dest := t.TempDir()
-	legacyPath := filepath.Join(store, "projects", "sample.md")
-	before, err := os.ReadFile(legacyPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	output, err := captureRun("migrate", "apply", "--storage", store, "--dest", dest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(output, "migrated 1 projects into") || !strings.Contains(output, "wrote 5 files") {
-		t.Fatalf("unexpected output: %q", output)
-	}
-
-	after, err := os.ReadFile(legacyPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(after) != string(before) {
-		t.Fatal("legacy source file changed")
-	}
-	if _, err := os.Stat(filepath.Join(dest, "projects", "sample", "project.md")); err != nil {
-		t.Fatalf("expected migrated project file: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(store, "projects", "sample", "project.md")); !os.IsNotExist(err) {
-		t.Fatalf("source store should not receive target layout file, got err=%v", err)
-	}
-
-	objectStore, err := maat.LoadObjectStore(dest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(objectStore.Projects) != 1 || objectStore.Projects[0].Key != "sample" {
-		t.Fatalf("unexpected migrated object store: %#v", objectStore.Projects)
 	}
 }
 
@@ -693,19 +623,6 @@ func TestProjectShowCommandJSON(t *testing.T) {
 	store := writeCommandFixture(t)
 
 	output, err := captureRun("project", "show", "sample", "--storage", store, "--json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var legacy maat.Project
-	if err := json.Unmarshal([]byte(output), &legacy); err != nil {
-		t.Fatal(err)
-	}
-	if legacy.ID != "sample" || legacy.Title != "Sample" || len(legacy.Goals) != 1 {
-		t.Fatalf("unexpected legacy project json: %#v", legacy)
-	}
-
-	objectStore := writeObjectCommandFixture(t)
-	output, err = captureRun("project", "show", "sample", "--storage", objectStore, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1295,15 +1212,12 @@ func TestAgentInitializeCommand(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"# Maat Agent Setup",
-		"Audience: any agent that can read files, run shell commands, and update Git",
+		"# Maat Agent Instructions",
 		"maat setup --storage " + store,
+		"maat initialize --project maat --storage " + store,
 		"maat project show maat --storage " + store,
 		"maat ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",
-		"Codex: add it to the repo's `AGENTS.md`",
-		"Claude Code: add it to `CLAUDE.md`",
-		"Cursor or Cursor Cloud: add it to the repo's Cursor rules",
-		"Do not rely on the human to manually update Maat state",
+		"Save the snippet below into `AGENTS.md`, `CLAUDE.md`, Cursor rules",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected initialize output to include %q, got %q", want, output)
@@ -1326,7 +1240,7 @@ func TestInitializeCommandJSON(t *testing.T) {
 	if payload.ProjectKey != "maat" || payload.StoragePath != store || payload.LinkedProject.ProjectKey != "maat" {
 		t.Fatalf("unexpected initialize payload: %#v", payload)
 	}
-	if !strings.Contains(payload.Document, "Audience: any agent") || !strings.Contains(payload.Document, "maat setup --storage "+store) {
+	if !strings.Contains(payload.Document, "# Maat Agent Instructions") || !strings.Contains(payload.Document, "maat initialize --project maat --storage "+store) {
 		t.Fatalf("unexpected initialize payload: %#v", payload)
 	}
 }
@@ -1355,7 +1269,7 @@ func TestInitializeCommandRegistersCurrentGitRepo(t *testing.T) {
 	if payload.LinkedProject.RemoteURL != "git@github.com:sunday-studio/sample.git" {
 		t.Fatalf("expected remote in initialize payload, got %#v", payload.LinkedProject)
 	}
-	if !strings.Contains(payload.Document, "This repo is registered in Maat as `sample`.") || !strings.Contains(payload.Document, "maat project show sample --storage "+store) {
+	if !strings.Contains(payload.Document, "This repo is registered as `sample`.") || !strings.Contains(payload.Document, "maat project show sample --storage "+store) {
 		t.Fatalf("expected concrete project setup document, got %q", payload.Document)
 	}
 	project, err := maat.LoadObjectProject(store, "sample")
@@ -1639,43 +1553,41 @@ func writeCommandFixture(t *testing.T) string {
 	t.Helper()
 
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "projects"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	if err := os.MkdirAll(filepath.Join(root, "docs"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "docs", "note.md"), []byte("# Note\n\nAgent health needs clarity.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "projects", "sample.md"), []byte(`# Project: Sample
-
-| Field | Value |
-|---|---|
-| ID | sample |
-| Status | active |
-| Owner | agents |
-| Updated | 2026-05-25 |
-| Tags | #infra |
-
-## Current
-
-Current state.
-
-## Goals
-
-### G-001: Ship
-
-| Field | Value |
-|---|---|
-| Status | active |
-| Updated | 2026-05-25 |
-
-#### Tasks
-
-- [ ] T-001: Open item
-- [x] T-002: Done item
-`), 0o644); err != nil {
+	writer := maat.NewWriteStore(root)
+	if _, err := writer.CreateProject(maat.CreateProjectInput{
+		Key:         "sample",
+		DisplayName: "Sample",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	goal, _, err := writer.CreateGoal(maat.CreateGoalInput{
+		ProjectKey: "sample",
+		Title:      "Ship",
+		Actor:      "test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := writer.CreateTicket(maat.CreateTicketInput{
+		ProjectKey: "sample",
+		GoalID:     goal.ID,
+		Title:      "Open item",
+		Actor:      "test",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := writer.CreateTicket(maat.CreateTicketInput{
+		ProjectKey: "sample",
+		GoalID:     goal.ID,
+		Title:      "Second item",
+		Actor:      "test",
+	}); err != nil {
 		t.Fatal(err)
 	}
 	return root

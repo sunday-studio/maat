@@ -85,7 +85,6 @@ Use stable IDs:
 Events are append-only.
 
 - Current object-layout storage writes new event files under `projects/<project-key>/events/YYYY/MM/` in the storage repo.
-- Legacy v0 storage may still use monthly files such as `ledger/2026-05.md`.
 - Do not rewrite old events unless you are correcting your own uncommitted mistake.
 - If a previous event was wrong, append a new correction event.
 - Every event must reference the project and changed object.
@@ -104,7 +103,7 @@ Prefer storage patterns that avoid conflicts in the first place:
 
 - Add new files for comments, events, reports, and tickets when possible.
 - Avoid shared append targets for high-frequency agent writes.
-- Treat generated summaries and rendered ledgers as rebuildable views unless explicitly committed.
+- Treat generated summaries and rendered reports as rebuildable views unless explicitly committed.
 - Pull before writing, validate before committing, and sync after committing.
 
 ## Integration Pattern

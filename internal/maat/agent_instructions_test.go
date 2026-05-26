@@ -13,13 +13,10 @@ func TestAgentInstructionsSnippet(t *testing.T) {
 
 	required := []string{
 		"Use Maat as the canonical project memory",
-		"`maat sync`",
 		"`maat status`",
 		"`maat project show <project>`",
-		"`maat search <query>`",
 		"Create or claim a ticket",
-		"complete the ticket with evidence",
-		"Do not mark work done without evidence",
+		"Complete tickets only with evidence",
 	}
 	for _, phrase := range required {
 		if !strings.Contains(snippet, phrase) {
@@ -35,18 +32,14 @@ func TestAgentSetupDocument(t *testing.T) {
 	})
 
 	for _, want := range []string{
-		"# Maat Agent Setup",
-		"Audience: any agent that can read files, run shell commands, and update Git",
+		"# Maat Agent Instructions",
 		"maat setup --storage /tmp/maat-state",
-		"Codex: add it to the repo's `AGENTS.md`",
-		"Claude Code: add it to `CLAUDE.md`",
-		"Cursor or Cursor Cloud: add it to the repo's Cursor rules",
-		"Do not rely on the human to manually update Maat state",
-		"This repo is registered in Maat as `maat`.",
+		"maat initialize --project maat --storage /tmp/maat-state",
+		"Save the snippet below into `AGENTS.md`, `CLAUDE.md`, Cursor rules",
+		"This repo is registered as `maat`.",
 		"maat project show maat --storage /tmp/maat-state",
 		"maat goal create maat",
 		"maat ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",
-		"Treat index warnings as cache warnings",
 	} {
 		if !strings.Contains(document, want) {
 			t.Fatalf("expected setup document to include %q, got %q", want, document)

@@ -74,9 +74,8 @@ The current executable slice includes:
 - setup config with storage path and auto-sync defaults
 - project registration with `maat initialize` or `maat project link`
 - object-layout project, goal, ticket, and event files under `projects/<project-key>/`
-- legacy flat project reads for older storage repos
 - validation for required fields, status values, timestamps, duplicate IDs, object links, malformed tables, and event paths
-- status totals across legacy and object-layout projects
+- status totals across object-layout projects
 - search through the rebuildable SQLite index, with direct Markdown search as a fallback
 - rebuildable JSON and SQLite indexes under `.maat/`
 - write commands for goals, tickets, comments, claims, completion, and explicit sync

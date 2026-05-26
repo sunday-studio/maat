@@ -89,12 +89,11 @@ maat ticket complete T-20260525-190700-b91c --evidence "go test ./... passed" --
 maat sync
 ```
 
-Migration and setup:
+Setup:
 
 ```sh
 maat project link
-maat migrate plan --storage <path>
-maat migrate apply --storage <path> --dest <path>
+maat initialize --storage <path>
 ```
 
 Future status update commands may add direct transitions without completing tickets.

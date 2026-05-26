@@ -180,7 +180,7 @@ Examples:
 - complete ticket: new status event
 - record decision: new decision file plus event file
 
-Monthly ledgers, project summaries, dashboards, and status reports should be generated views unless a human explicitly asks to commit a snapshot.
+Project summaries, dashboards, status reports, and activity feeds should be generated views unless a human explicitly asks to commit a snapshot.
 
 See [Storage Model](./storage-model.md).
 

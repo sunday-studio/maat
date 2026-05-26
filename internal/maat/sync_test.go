@@ -104,13 +104,19 @@ func TestSyncStoreValidationFailureStopsBeforeIndexAndCommit(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "projects"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeSyncProject(t, root, "broken.md", `# Project: Broken
+	brokenDir := filepath.Join(root, "projects", "broken")
+	if err := os.MkdirAll(brokenDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeSyncProject(t, root, filepath.Join("broken", "project.md"), `# Project: Broken
 
 | Field | Value |
 |---|---|
-| ID | broken |
+| Project Key | wrong |
+| Display Name | Broken |
 | Status | mystery |
-| Updated | 2026-05-25 |
+| Created | yesterday |
+| Updated | 2026-05-25T19:05:00+02:00 |
 `)
 	runner := &fakeGitRunner{responses: []fakeGitResponse{
 		{result: GitCommandResult{Stdout: "true\n"}},

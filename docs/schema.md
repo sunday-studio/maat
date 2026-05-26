@@ -4,7 +4,7 @@ Maat uses plain Markdown conventions as the durable store.
 
 The schema is designed to be readable by humans, reliable enough for agents, and easy to index into SQLite.
 
-The current schema is directory-per-project and object-per-file. See [Storage Model](./storage-model.md) for the full rationale. Examples below use paths relative to the configured storage repo content root. New storage repos should use the root layout; older repos may keep the same paths under a top-level `state/` directory.
+The current schema is directory-per-project and object-per-file. See [Storage Model](./storage-model.md) for the full rationale. Examples below use paths relative to the configured storage repo root.
 
 ## Project File
 
@@ -153,17 +153,6 @@ Marked T-20260525-190700-b91c complete after verification.
 ```
 
 Events are append-only. Correction events should be used instead of rewriting committed history.
-
-## Legacy Flat Files
-
-Legacy storage repos may still include:
-
-```text
-projects/<project-id>.md
-ledger/YYYY-MM.md
-```
-
-These are v0 planning artifacts. Maat can read them as legacy input, and `maat migrate` can plan or apply a conversion into the object layout.
 
 ## Report File
 
