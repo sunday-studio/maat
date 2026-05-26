@@ -853,6 +853,54 @@ func TestAgentInstructionsCommandJSONAndOutput(t *testing.T) {
 	}
 }
 
+func TestAgentInitializeCommand(t *testing.T) {
+	store := t.TempDir()
+
+	output, err := captureRun("agent", "initialize", "--agent", "codex", "--project", "maat", "--storage", store)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{
+		"# Maat Agent Setup",
+		"Audience: codex agent",
+		"matt init " + store,
+		"matt project show maat --storage " + store,
+		"matt ticket claim <ticket-id> --project maat --agent \"codex\"",
+		"Codex: add it to the repo's `AGENTS.md`",
+		"Claude Code: add it to `CLAUDE.md`",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected initialize output to include %q, got %q", want, output)
+		}
+	}
+}
+
+func TestInitializeAliasCommandJSONAndOutput(t *testing.T) {
+	store := t.TempDir()
+	path := filepath.Join(t.TempDir(), "maat-agent-setup.md")
+
+	output, err := captureRun("initialize", "--agent", "claude", "--project", "maat", "--storage", store, "--json", "--output", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var payload map[string]string
+	if err := json.Unmarshal([]byte(output), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(payload["document"], "Audience: claude agent") || !strings.Contains(payload["document"], "matt storage link "+store) {
+		t.Fatalf("unexpected initialize payload: %#v", payload)
+	}
+	written, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(written), "Audience: claude agent") || !strings.HasSuffix(string(written), "\n") {
+		t.Fatalf("unexpected written setup document: %q", string(written))
+	}
+}
+
 func TestSyncStatusCommandReportsDirtyState(t *testing.T) {
 	store := writeCommandFixture(t)
 	initGitStore(t, store)

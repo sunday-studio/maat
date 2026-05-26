@@ -27,3 +27,28 @@ func TestAgentInstructionsSnippet(t *testing.T) {
 		}
 	}
 }
+
+func TestAgentSetupDocument(t *testing.T) {
+	document := AgentSetupDocument(AgentSetupOptions{
+		Agent:       "codex",
+		ProjectKey:  "maat",
+		StoragePath: "/tmp/maat-state",
+	})
+
+	for _, want := range []string{
+		"# Maat Agent Setup",
+		"Audience: codex agent",
+		"matt init /tmp/maat-state",
+		"matt storage link /tmp/maat-state",
+		"Codex: add it to the repo's `AGENTS.md`",
+		"Claude Code: add it to `CLAUDE.md`",
+		"matt project show maat --storage /tmp/maat-state",
+		"matt goal create maat",
+		"matt ticket claim <ticket-id> --project maat --agent \"codex\"",
+		"Treat index warnings as cache warnings",
+	} {
+		if !strings.Contains(document, want) {
+			t.Fatalf("expected setup document to include %q, got %q", want, document)
+		}
+	}
+}

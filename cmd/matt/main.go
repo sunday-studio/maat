@@ -44,6 +44,8 @@ func run(args []string) error {
 		return nil
 	case "version":
 		return versionCommand(args[1:])
+	case "initialize":
+		return agentInitializeCommand(args[1:])
 	case "init":
 		return initConfig(args[1:])
 	case "storage":
@@ -132,6 +134,7 @@ Usage:
   matt <command> [flags]
 
 Common:
+  matt initialize [--agent <name>] [--project <project-key>] [--storage <path>] [--output <path>] [--json]
   matt status [--storage <path>] [--json]
   matt projects [--storage <path>] [--json]
   matt search <query> [--storage <path>] [--json]
@@ -157,6 +160,7 @@ Setup and maintenance:
   matt validate [--storage <path>] [--json]
   matt migrate plan [--storage <path>] [--json]
   matt migrate apply --dest <path> [--storage <path>]
+  matt agent initialize [--agent <name>] [--project <project-key>] [--storage <path>] [--output <path>] [--json]
   matt agent instructions [--json] [--output <path>]
   matt tui [--storage <path>]
   matt version [--json]
@@ -946,12 +950,23 @@ func ticketCompleteCommand(args []string) error {
 }
 
 func agentCommand(args []string) error {
-	if len(args) == 0 || args[0] != "instructions" {
-		return errors.New("usage: matt agent instructions [--json] [--output <path>]")
+	if len(args) == 0 {
+		return errors.New("usage: matt agent <initialize|instructions>")
 	}
+	switch args[0] {
+	case "initialize":
+		return agentInitializeCommand(args[1:])
+	case "instructions":
+		return agentInstructionsCommand(args[1:])
+	default:
+		return fmt.Errorf("unknown agent command %q", args[0])
+	}
+}
+
+func agentInstructionsCommand(args []string) error {
 	jsonOut := false
 	outputPath := ""
-	for i := 1; i < len(args); i++ {
+	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
 			jsonOut = true
@@ -979,6 +994,73 @@ func agentCommand(args []string) error {
 		return writeJSON(map[string]string{"instructions": snippet})
 	}
 	fmt.Println(snippet)
+	return nil
+}
+
+func agentInitializeCommand(args []string) error {
+	jsonOut := false
+	outputPath := ""
+	agentName := ""
+	projectKey := ""
+	store := ""
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--json":
+			jsonOut = true
+		case "--output":
+			if i+1 >= len(args) {
+				return errors.New("--output requires a path")
+			}
+			outputPath = args[i+1]
+			i++
+		case "--agent":
+			if i+1 >= len(args) {
+				return errors.New("--agent requires a name")
+			}
+			agentName = args[i+1]
+			i++
+		case "--project":
+			if i+1 >= len(args) {
+				return errors.New("--project requires a project key")
+			}
+			projectKey = args[i+1]
+			i++
+		case "--storage":
+			if i+1 >= len(args) {
+				return errors.New("--storage requires a path")
+			}
+			abs, err := filepath.Abs(args[i+1])
+			if err != nil {
+				return err
+			}
+			store = abs
+			i++
+		default:
+			return fmt.Errorf("unexpected agent initialize argument %q", args[i])
+		}
+	}
+	if store == "" {
+		if cfg, err := readConfig(); err == nil && cfg.StoragePath != "" {
+			store = cfg.StoragePath
+		}
+	}
+	document := maat.AgentSetupDocument(maat.AgentSetupOptions{
+		Agent:       agentName,
+		ProjectKey:  projectKey,
+		StoragePath: store,
+	})
+	if outputPath != "" {
+		if err := os.WriteFile(outputPath, []byte(document+"\n"), 0o644); err != nil {
+			return err
+		}
+	}
+	if agentUse {
+		return agentUpdate("agent.initialize.ready", "ok", "agent setup document ready", map[string]string{"document": document})
+	}
+	if jsonOut {
+		return writeJSON(map[string]string{"document": document})
+	}
+	fmt.Println(document)
 	return nil
 }
 

@@ -162,3 +162,14 @@ matt agent instructions
 ```
 
 prints exactly this snippet. Use `matt agent instructions --output AGENTS.md` when creating a new project-level agent instruction file.
+
+## Agent Setup Document
+
+Use this when handing Maat to a new agent, a hosted agent, or a skill/instruction system that needs the full operating protocol:
+
+```sh
+matt agent initialize --agent codex --project maat --storage /absolute/path/to/maat-state
+matt initialize --output maat-agent-setup.md
+```
+
+The setup document explains how to link storage, where to place the Maat rule for Codex, Claude Code, cloud agents, or generic agents, and which commands to run before planning, during work, and when finishing with evidence.
