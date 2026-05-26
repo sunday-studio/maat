@@ -115,8 +115,8 @@ func RunTUI(storage string) error {
 }
 
 func RunTUIWithOptions(storage string, options TUIOptions) error {
-	dashboard, err := LoadDashboard(storage)
-	model := NewLiveModelWithOptions(storage, dashboard, err, options)
+	loaded := loadInitialDashboard(storage, options)
+	model := newLiveModelFromInitialLoad(storage, loaded, options)
 	_, runErr := tea.NewProgram(model, tea.WithAltScreen()).Run()
 	if runErr != nil {
 		return runErr
@@ -135,9 +135,13 @@ func NewLiveModel(storage string, dashboard Dashboard, err error) Model {
 func NewLiveModelWithOptions(storage string, dashboard Dashboard, err error, options TUIOptions) Model {
 	model := NewModel(dashboard, err)
 	model.storage = storage
-	if options.AutoPullBeforeRefresh {
-		model.load = loadDashboardWithPull
-	}
+	model.load = refreshDashboardLoader(options)
+	return model
+}
+
+func newLiveModelFromInitialLoad(storage string, loaded dashboardLoadedMsg, options TUIOptions) Model {
+	model := NewLiveModelWithOptions(storage, loaded.dashboard, loaded.err, options)
+	model.refreshErr = loaded.warning
 	return model
 }
 
@@ -260,6 +264,33 @@ func (m Model) withLoadedDashboard(msg dashboardLoadedMsg) Model {
 func loadDashboardWithoutPull(storage string) dashboardLoadedMsg {
 	dashboard, err := LoadDashboard(storage)
 	return dashboardLoadedMsg{dashboard: dashboard, err: err}
+}
+
+func loadInitialDashboard(storage string, options TUIOptions) dashboardLoadedMsg {
+	return initialDashboardLoader(options)(storage)
+}
+
+func refreshDashboardLoader(options TUIOptions) dashboardLoader {
+	return refreshDashboardLoaderWithOptions(options, loadDashboardWithPull, loadDashboardWithoutPull)
+}
+
+func initialDashboardLoader(options TUIOptions) dashboardLoader {
+	return initialDashboardLoaderWithOptions(options, loadDashboardWithPull, loadDashboardWithoutPull)
+}
+
+func refreshDashboardLoaderWithOptions(options TUIOptions, withPull dashboardLoader, withoutPull dashboardLoader) dashboardLoader {
+	return selectDashboardLoader(options, withPull, withoutPull)
+}
+
+func initialDashboardLoaderWithOptions(options TUIOptions, withPull dashboardLoader, withoutPull dashboardLoader) dashboardLoader {
+	return selectDashboardLoader(options, withPull, withoutPull)
+}
+
+func selectDashboardLoader(options TUIOptions, withPull dashboardLoader, withoutPull dashboardLoader) dashboardLoader {
+	if options.AutoPullBeforeRefresh {
+		return withPull
+	}
+	return withoutPull
 }
 
 func loadDashboardWithPull(storage string) dashboardLoadedMsg {

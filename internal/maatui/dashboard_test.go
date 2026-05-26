@@ -332,6 +332,81 @@ func TestLiveModelStartsRefreshLoop(t *testing.T) {
 	}
 }
 
+func TestInitialDashboardLoadUsesPullAwareLoaderWhenEnabled(t *testing.T) {
+	calls := []string{}
+	withPull := func(storage string) dashboardLoadedMsg {
+		calls = append(calls, "with:"+storage)
+		return dashboardLoadedMsg{dashboard: Dashboard{Projects: []ProjectRow{{Key: "with-pull"}}}}
+	}
+	withoutPull := func(storage string) dashboardLoadedMsg {
+		calls = append(calls, "without:"+storage)
+		return dashboardLoadedMsg{dashboard: Dashboard{Projects: []ProjectRow{{Key: "without-pull"}}}}
+	}
+
+	loaded := initialDashboardLoaderWithOptions(TUIOptions{AutoPullBeforeRefresh: true}, withPull, withoutPull)("/tmp/maat-state")
+	if len(calls) != 1 || calls[0] != "with:/tmp/maat-state" {
+		t.Fatalf("initial load calls = %+v, want pull-aware loader", calls)
+	}
+	if loaded.dashboard.Projects[0].Key != "with-pull" {
+		t.Fatalf("initial dashboard = %+v, want pull-aware result", loaded.dashboard)
+	}
+}
+
+func TestInitialDashboardLoadUsesPlainLoaderWhenPullDisabled(t *testing.T) {
+	calls := []string{}
+	withPull := func(storage string) dashboardLoadedMsg {
+		calls = append(calls, "with:"+storage)
+		return dashboardLoadedMsg{dashboard: Dashboard{Projects: []ProjectRow{{Key: "with-pull"}}}}
+	}
+	withoutPull := func(storage string) dashboardLoadedMsg {
+		calls = append(calls, "without:"+storage)
+		return dashboardLoadedMsg{dashboard: Dashboard{Projects: []ProjectRow{{Key: "without-pull"}}}}
+	}
+
+	loaded := initialDashboardLoaderWithOptions(TUIOptions{}, withPull, withoutPull)("/tmp/maat-state")
+	if len(calls) != 1 || calls[0] != "without:/tmp/maat-state" {
+		t.Fatalf("initial load calls = %+v, want plain loader", calls)
+	}
+	if loaded.dashboard.Projects[0].Key != "without-pull" {
+		t.Fatalf("initial dashboard = %+v, want plain result", loaded.dashboard)
+	}
+}
+
+func TestRefreshDashboardLoadUsesPullAwareLoaderWhenEnabled(t *testing.T) {
+	model := NewLiveModelWithOptions("/tmp/maat-state", Dashboard{}, nil, TUIOptions{AutoPullBeforeRefresh: true})
+	model.load = refreshDashboardLoaderWithOptions(TUIOptions{AutoPullBeforeRefresh: true}, func(storage string) dashboardLoadedMsg {
+		return dashboardLoadedMsg{dashboard: Dashboard{Projects: []ProjectRow{{Key: "with-pull"}}}}
+	}, func(storage string) dashboardLoadedMsg {
+		return dashboardLoadedMsg{dashboard: Dashboard{Projects: []ProjectRow{{Key: "without-pull"}}}}
+	})
+
+	msg := model.loadDashboardCmd(3)()
+	loaded, ok := msg.(dashboardLoadedMsg)
+	if !ok {
+		t.Fatalf("unexpected load message: %#v", msg)
+	}
+	if loaded.requestID != 3 || loaded.dashboard.Projects[0].Key != "with-pull" {
+		t.Fatalf("refresh load = %#v, want pull-aware result with request id", loaded)
+	}
+}
+
+func TestInitialPullWarningKeepsLoadedDashboardVisible(t *testing.T) {
+	model := newLiveModelFromInitialLoad("/tmp/maat-state", dashboardLoadedMsg{
+		dashboard: Dashboard{Projects: []ProjectRow{{Key: "sample", DisplayName: "Sample"}}},
+		warning:   errors.New("git pull failed"),
+	}, TUIOptions{AutoPullBeforeRefresh: true})
+
+	if model.err != nil || model.refreshErr == nil {
+		t.Fatalf("expected warning-only initial model, got err=%v refreshErr=%v", model.err, model.refreshErr)
+	}
+	view := model.View()
+	for _, want := range []string{"Sample", "Auto-refresh warning", "git pull failed"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("view missing %q after initial warning:\n%s", want, view)
+		}
+	}
+}
+
 func TestModelRefreshReloadsDashboardAndPreservesSelection(t *testing.T) {
 	model := NewLiveModel("/tmp/maat-state", Dashboard{Projects: []ProjectRow{
 		{Key: "first"},
