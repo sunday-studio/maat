@@ -71,7 +71,7 @@ func collectDocuments(store string) ([]Document, error) {
 }
 
 func documentType(store, path string) string {
-	rel := relPath(store, path)
+	rel := logicalRelPath(store, path)
 	parts := strings.Split(filepath.ToSlash(rel), "/")
 	switch {
 	case isTargetProjectFile(parts):

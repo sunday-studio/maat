@@ -31,12 +31,12 @@ Goal: support the conflict-resistant target layout from `docs/storage-model.md`.
 
 Tasks:
 
-- Parse `projects/<project-key>/project.md`.
+- Parse `state/projects/<project-key>/project.md`.
 - Parse `goals/*.md`.
 - Parse `tickets/*.md`.
 - Parse `events/YYYY/MM/*.md`.
 - Validate required fields and object links.
-- Keep compatibility with the legacy flat `projects/*.md` files until migration exists.
+- Keep compatibility with the legacy flat `state/projects/*.md` files until migration exists.
 
 Initial owner:
 
@@ -207,7 +207,7 @@ Goal: move from v0 flat project files to the target object layout safely.
 
 Tasks:
 
-- Plan migration from `projects/*.md` to `projects/<project-key>/`.
+- Plan migration from `state/projects/*.md` to `state/projects/<project-key>/`.
 - Preserve legacy source files.
 - Write target files into a separate destination or temp path first.
 - Generate enough event history to explain migrated objects.

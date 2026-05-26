@@ -71,8 +71,9 @@ func ApplyLegacyMigration(source, destination string, options MigrationOptions) 
 	if err != nil {
 		return MigrationPlan{}, err
 	}
+	destinationRoot := contentRoot(destination)
 	for _, file := range plan.Files {
-		path := filepath.Join(destination, filepath.FromSlash(file.Path))
+		path := filepath.Join(destinationRoot, filepath.FromSlash(file.Path))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return MigrationPlan{}, err
 		}

@@ -68,7 +68,7 @@ GitHub Actions runs the same test and release build path on `v*` tags and manual
 
 The first executable slice is intentionally small:
 
-- parse legacy flat project files from `projects/*.md`
+- parse legacy flat project files from `state/projects/*.md`
 - validate known status values
 - compute status totals
 - search through the rebuildable SQLite index, with direct Markdown search as a fallback

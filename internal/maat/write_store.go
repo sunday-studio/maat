@@ -408,7 +408,7 @@ func (store WriteStore) newActorEventID(at time.Time, actor string) (string, err
 }
 
 func (store WriteStore) abs(relative string) string {
-	return filepath.Join(store.Root, filepath.FromSlash(relative))
+	return filepath.Join(contentRoot(store.Root), filepath.FromSlash(relative))
 }
 
 func renderProjectMarkdown(project ObjectProject) string {

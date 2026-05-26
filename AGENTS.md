@@ -6,14 +6,8 @@ These conventions define how agents should work inside Maat.
 
 ## Repository Map
 
-- `agents/`: agent identity notes, integration expectations, and future agent profile templates.
-- `decisions/`: durable product and architecture decisions.
+- `state/`: all Maat-managed Markdown state, including agents, decisions, ledger, projects, reports, tags, and templates.
 - `docs/`: architecture, workflows, storage model, CLI/TUI/UI design, and integration notes.
-- `ledger/`: early append-only ledger files. The target architecture prefers per-event files to reduce merge conflicts.
-- `projects/`: current project state.
-- `reports/`: generated or agent-written summaries, handoffs, and status digests.
-- `tags.md`: shared tag vocabulary.
-- `templates/`: reusable Markdown templates for agents, projects, and ledger events.
 
 ## Naming Rules
 
@@ -54,7 +48,7 @@ Keep Maat accurate without requiring the human to manage it.
 
 For any meaningful project-management action, update both the current state and transaction history.
 
-The early repository uses `projects/<project-id>.md` and `ledger/YYYY-MM.md`. The target architecture moves toward conflict-resistant per-project directories and per-event files.
+The early repository uses `state/projects/<project-id>.md` and `state/ledger/YYYY-MM.md`. The target architecture moves toward conflict-resistant per-project directories and per-event files.
 
 Then commit the change to Git.
 
@@ -62,12 +56,12 @@ Then commit the change to Git.
 
 1. Pull or inspect the latest repository state.
 2. Read this file.
-3. Check whether a project already exists in `projects/`.
+3. Check whether a project already exists in `state/projects/`.
 4. If uncertain, prefer adding a small `waiting` note or handoff instead of overwriting status.
 
 ## Project Files
 
-Legacy project files are plain Markdown using the template in `templates/project.md`. Target architecture uses `projects/<project-key>/project.md` plus separate goal, ticket, and event files.
+Legacy project files are plain Markdown using the template in `state/templates/project.md`. Target architecture uses `state/projects/<project-key>/project.md` plus separate goal, ticket, and event files.
 
 Legacy project fields:
 
@@ -88,8 +82,8 @@ Use stable IDs:
 
 Events are append-only.
 
-- Target architecture writes new event files under `projects/<project-key>/events/YYYY/MM/`.
-- Legacy v0 docs may still use monthly files such as `ledger/2026-05.md`.
+- Target architecture writes new event files under `state/projects/<project-key>/events/YYYY/MM/`.
+- Legacy v0 docs may still use monthly files such as `state/ledger/2026-05.md`.
 - Do not rewrite old events unless you are correcting your own uncommitted mistake.
 - If a previous event was wrong, append a new correction event.
 - Every event must reference the project and changed object.
@@ -127,7 +121,7 @@ The preferred integration is:
 4. Commit as the agent identity.
 5. Push to the shared remote.
 
-For systems that cannot push directly, write a complete handoff file in `reports/` and include the exact object and event changes another agent should apply.
+For systems that cannot push directly, write a complete handoff file in `state/reports/` and include the exact object and event changes another agent should apply.
 
 ## What Not To Do
 

@@ -82,7 +82,7 @@ Use the Maat repository as the canonical project tracker. Prefer the `matt` CLI.
 
 If an agent cannot push:
 
-1. Write a complete handoff report in `reports/`.
+1. Write a complete handoff report in `state/reports/`.
 2. Include proposed object changes.
 3. Include proposed event files.
 4. Ask a Git-capable agent to apply and commit the update.
@@ -93,6 +93,6 @@ The Markdown and Git core should remain the source of truth. Optional adapters c
 
 - MCP server exposing project, goal, ticket, and event operations.
 - CLI wrapper that validates templates before commit.
-- GitHub Action that checks ledger/project consistency.
+- GitHub Action that checks state consistency.
 - Static dashboard generated from Markdown.
 - Local menu bar watcher for unread reports and blockers.

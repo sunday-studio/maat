@@ -5,7 +5,7 @@ The ledger is the chronological, append-only history of all meaningful project-m
 Use one file per month:
 
 ```text
-ledger/YYYY-MM.md
+YYYY-MM.md
 ```
 
 Each event should be specific enough that another agent can reconstruct what changed and why.

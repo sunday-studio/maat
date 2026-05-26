@@ -79,7 +79,7 @@ func LoadObjectStore(store string) (ObjectStore, error) {
 }
 
 func LoadObjectProjects(store string) ([]ObjectProject, error) {
-	projectsDir := filepath.Join(store, "projects")
+	projectsDir := contentPath(store, "projects")
 	entries, err := os.ReadDir(projectsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -106,7 +106,7 @@ func LoadObjectProjects(store string) ([]ObjectProject, error) {
 }
 
 func LoadObjectProject(store, projectKey string) (ObjectProject, error) {
-	projectDir := filepath.Join(store, "projects", projectKey)
+	projectDir := contentPath(store, "projects", projectKey)
 	project, err := ParseObjectProjectFile(store, filepath.Join(projectDir, "project.md"))
 	if err != nil {
 		return ObjectProject{}, err
@@ -259,7 +259,7 @@ func ParseObjectEventFile(store, path string) (ObjectEvent, error) {
 }
 
 func loadObjectGoals(store, projectKey string) ([]ObjectGoal, error) {
-	paths, err := filepath.Glob(filepath.Join(store, "projects", projectKey, "goals", "*.md"))
+	paths, err := filepath.Glob(contentPath(store, "projects", projectKey, "goals", "*.md"))
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +281,7 @@ func loadObjectGoals(store, projectKey string) ([]ObjectGoal, error) {
 }
 
 func loadObjectTickets(store, projectKey string) ([]ObjectTicket, error) {
-	paths, err := filepath.Glob(filepath.Join(store, "projects", projectKey, "tickets", "*.md"))
+	paths, err := filepath.Glob(contentPath(store, "projects", projectKey, "tickets", "*.md"))
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +304,7 @@ func loadObjectTickets(store, projectKey string) ([]ObjectTicket, error) {
 
 func loadObjectEvents(store, projectKey string) ([]ObjectEvent, error) {
 	var events []ObjectEvent
-	eventsDir := filepath.Join(store, "projects", projectKey, "events")
+	eventsDir := contentPath(store, "projects", projectKey, "events")
 	err := filepath.WalkDir(eventsDir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err

@@ -18,7 +18,7 @@ This plan keeps implementation small while preserving the target architecture.
 
 Current bootstrap status:
 
-- legacy flat project parsing exists for `projects/*.md`
+- legacy flat project parsing exists for `state/projects/*.md`
 - known status validation exists for project and goal state
 - status totals can be computed from parsed projects
 - target object layout parsing remains future work

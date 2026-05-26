@@ -16,7 +16,7 @@ The system is intentionally file-first: agents should be able to clone the repo,
 
 The implementation now has a usable read CLI, validation, SQLite-backed search/indexing, target object parsing, write-path core operations, Git sync primitives, migration planning, a first Bubble Tea dashboard, and local install documentation.
 
-The latest cleanup grouped reusable Markdown templates into a single `templates/` directory so agents do not need to hunt through state directories for starter files.
+The latest cleanup moved all Maat-managed Markdown state under `state/` so projects, ledger, decisions, reports, agents, tags, and templates are no longer scattered across the repository root.
 
 The local installer now gives visible step-by-step progress, supports ANSI color control, and ends with a `maat ready to use` banner plus starter commands.
 
@@ -197,7 +197,7 @@ The local installer now gives visible step-by-step progress, supports ANSI color
 
 #### Tasks
 
-- [x] T-001: Remove unrelated project files from `projects/`.
+- [x] T-001: Remove unrelated project files from `state/projects/`.
 - [x] T-002: Remove cross-project registration events from the legacy ledger.
 - [x] T-003: Replace public examples and test fixtures that used real project names.
 - [x] T-004: Verify Maat now validates as a one-project store.
@@ -212,7 +212,7 @@ The local installer now gives visible step-by-step progress, supports ANSI color
 
 #### Tasks
 
-- [x] T-001: Move agent, project, and ledger event templates into `templates/`.
+- [x] T-001: Move agent, project, and ledger event templates into `state/templates/`.
 - [x] T-002: Add a template directory index.
 - [x] T-003: Update agent, project, and ledger docs to point at the new template paths.
 
@@ -230,6 +230,21 @@ The local installer now gives visible step-by-step progress, supports ANSI color
 - [x] T-002: Add an ANSI completion banner that says `maat ready to use`.
 - [x] T-003: Print practical starter commands after install.
 - [x] T-004: Document installer color and post-install output.
+
+### G-014: Consolidate Markdown state layout
+
+| Field | Value |
+|---|---|
+| Status | done |
+| Updated | 2026-05-26 |
+| Tags | #cleanup #storage #docs |
+
+#### Tasks
+
+- [x] T-001: Move agents, decisions, ledger, projects, reports, tags, and templates under `state/`.
+- [x] T-002: Keep product documentation in `docs/` and root onboarding files at the repo root.
+- [x] T-003: Teach the core loaders and writers to use `state/` when present while preserving legacy root-layout compatibility.
+- [x] T-004: Add tests for state-layout project loading and writes.
 
 ## Blockers
 
@@ -250,8 +265,8 @@ The local installer now gives visible step-by-step progress, supports ANSI color
 
 ## Links
 
-- [Agent instructions](../AGENTS.md)
-- [Schema](../docs/schema.md)
-- [Workflows](../docs/workflows.md)
-- [Development](../docs/development.md)
-- [Work plan](../docs/work-plan.md)
+- [Agent instructions](../../AGENTS.md)
+- [Schema](../../docs/schema.md)
+- [Workflows](../../docs/workflows.md)
+- [Development](../../docs/development.md)
+- [Work plan](../../docs/work-plan.md)

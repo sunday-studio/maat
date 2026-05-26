@@ -40,6 +40,32 @@ func TestWriteStoreCreatesProject(t *testing.T) {
 	}
 }
 
+func TestWriteStoreUsesStateDirectoryWhenPresent(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "state"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 5, 26, 10, 45, 0, 0, time.FixedZone("CEST", 2*60*60))
+	store := WriteStore{Root: root, Now: func() time.Time { return at }}
+
+	project, err := store.CreateProject(CreateProjectInput{
+		Key:         "maat",
+		DisplayName: "Maat",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if project.Path != "state/projects/maat/project.md" {
+		t.Fatalf("unexpected path: %q", project.Path)
+	}
+	if _, err := os.Stat(filepath.Join(root, "state", "projects", "maat", "project.md")); err != nil {
+		t.Fatalf("expected state project file: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "projects", "maat", "project.md")); !os.IsNotExist(err) {
+		t.Fatalf("expected no root project file, got %v", err)
+	}
+}
+
 func TestWriteStoreCreatesGoalAndEvent(t *testing.T) {
 	root := t.TempDir()
 	at := time.Date(2026, 5, 25, 19, 5, 33, 0, time.FixedZone("CEST", 2*60*60))

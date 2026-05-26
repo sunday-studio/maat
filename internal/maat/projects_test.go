@@ -73,6 +73,38 @@ Current state.
 	}
 }
 
+func TestLoadProjectsUsesStateDirectory(t *testing.T) {
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "state", "projects")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(projectDir, "maat.md")
+	if err := os.WriteFile(path, []byte(`# Project: Maat
+
+| Field | Value |
+|---|---|
+| ID | maat |
+| Status | active |
+| Owner | agents |
+| Updated | 2026-05-26 |
+| Tags | #product |
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	projects, err := LoadProjects(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projects) != 1 || projects[0].ID != "maat" {
+		t.Fatalf("unexpected projects: %#v", projects)
+	}
+	if projects[0].Path != "state/projects/maat.md" {
+		t.Fatalf("unexpected path: %q", projects[0].Path)
+	}
+}
+
 func TestSearchMarkdown(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "docs"), 0o755); err != nil {

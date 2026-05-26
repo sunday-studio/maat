@@ -3,20 +3,20 @@
 ## Start A New Project
 
 1. Run `matt project link` from the source repo or provide a path.
-2. Create `projects/<project-key>/project.md`.
-3. Record repository metadata under `projects/<project-key>/repos/`.
+2. Create `state/projects/<project-key>/project.md`.
+3. Record repository metadata under `state/projects/<project-key>/repos/`.
 4. Create a `project.created` event file.
 5. Validate, index, commit, and sync.
 
 ## Add A Goal
 
-1. Create `projects/<project-key>/goals/<goal-id>.md`.
+1. Create `state/projects/<project-key>/goals/<goal-id>.md`.
 2. Create a `goal.created` event file.
 3. Validate, index, commit, and sync.
 
 ## Add A Ticket
 
-1. Create `projects/<project-key>/tickets/<ticket-id>.md`.
+1. Create `state/projects/<project-key>/tickets/<ticket-id>.md`.
 2. Attach a goal ID if the ticket belongs to a goal.
 3. Create a `ticket.created` event file.
 4. Validate, index, commit, and sync.
@@ -55,13 +55,13 @@
 
 ## Record A Decision
 
-1. Create a decision file in `decisions/` or inside the project.
+1. Create a decision file in `state/decisions/` or inside the project.
 2. Create a `decision.recorded` event.
 3. Validate, index, commit, and sync.
 
 ## Create A Cross-Project Report
 
 1. Read all relevant project files.
-2. Write `reports/YYYY-MM-DD-<scope>.md`.
+2. Write `state/reports/YYYY-MM-DD-<scope>.md`.
 3. Create a `report.created` event when the report is part of durable history.
 4. Validate, index, commit, and sync.

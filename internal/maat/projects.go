@@ -20,7 +20,7 @@ var validStatuses = map[string]bool{
 }
 
 func LoadProjects(store string) ([]Project, error) {
-	paths, err := filepath.Glob(filepath.Join(store, "projects", "*.md"))
+	paths, err := filepath.Glob(contentPath(store, "projects", "*.md"))
 	if err != nil {
 		return nil, err
 	}

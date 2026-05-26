@@ -18,28 +18,32 @@ The target storage model is object-oriented and conflict-resistant. Most agent a
 ```text
 maat-state/
 ├── maat.toml
-├── agents/
-├── decisions/
-│   └── D-20260525-architecture-direction.md
-├── projects/
-│   └── maat/
-│       ├── project.md
-│       ├── repos/
-│       │   └── R-20260525-190100-a31f.md
-│       ├── goals/
-│       │   └── G-20260525-190533-a7f3.md
-│       ├── tickets/
-│       │   └── T-20260525-190700-b91c.md
-│       ├── reports/
-│       └── events/
-│           └── 2026/
-│               └── 05/
-│                   └── E-20260525-190812-codex-4c9a.md
-├── reports/
-└── tags.md
+├── state/
+│   ├── agents/
+│   ├── decisions/
+│   │   └── D-20260525-architecture-direction.md
+│   ├── projects/
+│   │   └── maat/
+│   │       ├── project.md
+│   │       ├── repos/
+│   │       │   └── R-20260525-190100-a31f.md
+│   │       ├── goals/
+│   │       │   └── G-20260525-190533-a7f3.md
+│   │       ├── tickets/
+│   │       │   └── T-20260525-190700-b91c.md
+│   │       ├── reports/
+│   │       └── events/
+│   │           └── 2026/
+│   │               └── 05/
+│   │                   └── E-20260525-190812-codex-4c9a.md
+│   ├── reports/
+│   ├── templates/
+│   └── tags.md
+├── docs/
+└── README.md
 ```
 
-The current repository still has early flat files such as `projects/maat.md` and `ledger/2026-05.md`. Those are useful v0 documents. The architecture target is the directory-per-project layout above.
+The current repository still has early flat files such as `state/projects/maat.md` and `state/ledger/2026-05.md`. Those are useful v0 documents. The architecture target is the directory-per-project layout above.
 
 ## Project Identity
 
@@ -60,7 +64,7 @@ If a project has a Git remote, the remote should be the strongest identity signa
 Path:
 
 ```text
-projects/<project-key>/project.md
+state/projects/<project-key>/project.md
 ```
 
 Shape:
@@ -96,7 +100,7 @@ Project files should change rarely. Frequent updates belong in event files.
 Path:
 
 ```text
-projects/<project-key>/goals/<goal-id>.md
+state/projects/<project-key>/goals/<goal-id>.md
 ```
 
 Shape:
@@ -124,7 +128,7 @@ Goal status may be computed from events once event processing exists. Until then
 Path:
 
 ```text
-projects/<project-key>/tickets/<ticket-id>.md
+state/projects/<project-key>/tickets/<ticket-id>.md
 ```
 
 Shape:
@@ -159,7 +163,7 @@ Tickets may be goal-linked or standalone.
 Path:
 
 ```text
-projects/<project-key>/events/YYYY/MM/<event-id>.md
+state/projects/<project-key>/events/YYYY/MM/<event-id>.md
 ```
 
 Shape:

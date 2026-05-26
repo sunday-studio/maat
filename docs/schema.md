@@ -11,7 +11,7 @@ The repository currently contains early flat files. The target schema is directo
 Path:
 
 ```text
-projects/<project-key>/project.md
+state/projects/<project-key>/project.md
 ```
 
 Required shape:
@@ -38,7 +38,7 @@ Short current-state summary.
 Path:
 
 ```text
-projects/<project-key>/goals/<goal-id>.md
+state/projects/<project-key>/goals/<goal-id>.md
 ```
 
 Required shape:
@@ -64,7 +64,7 @@ The outcome this goal is trying to achieve.
 Path:
 
 ```text
-projects/<project-key>/tickets/<ticket-id>.md
+state/projects/<project-key>/tickets/<ticket-id>.md
 ```
 
 Required shape:
@@ -118,14 +118,14 @@ Examples:
 - `#backend`
 - `#infra`
 
-Add new tags to `tags.md` when they become reusable across projects.
+Add new tags to `state/tags.md` when they become reusable across projects.
 
 ## Event File
 
 Events live under the project they affect:
 
 ```text
-projects/<project-key>/events/YYYY/MM/<event-id>.md
+state/projects/<project-key>/events/YYYY/MM/<event-id>.md
 ```
 
 Required shape:
@@ -156,8 +156,8 @@ Events are append-only. Correction events should be used instead of rewriting co
 The current repository still includes:
 
 ```text
-projects/<project-id>.md
-ledger/YYYY-MM.md
+state/projects/<project-id>.md
+state/ledger/YYYY-MM.md
 ```
 
 These are v0 planning artifacts. The implementation should either migrate them to the target layout or read them as legacy input.
@@ -169,7 +169,7 @@ Reports are agent-written summaries. They do not replace append-only events.
 Path:
 
 ```text
-reports/YYYY-MM-DD-<scope>.md
+state/reports/YYYY-MM-DD-<scope>.md
 ```
 
 Use reports for:
@@ -181,10 +181,10 @@ Use reports for:
 
 ## Decision File
 
-Use `decisions/` for durable choices that affect multiple projects or the Maat system itself.
+Use `state/decisions/` for durable choices that affect multiple projects or the Maat system itself.
 
 Path:
 
 ```text
-decisions/D-YYYYMMDD-<slug>.md
+state/decisions/D-YYYYMMDD-<slug>.md
 ```

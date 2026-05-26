@@ -35,7 +35,7 @@ type validatedProjectFile struct {
 // detected schema issues. Validation problems are reported in the result rather
 // than as errors so callers can present the full list to users and agents.
 func ValidateStore(store string) (ValidationReport, error) {
-	paths, err := filepath.Glob(filepath.Join(store, "projects", "*.md"))
+	paths, err := filepath.Glob(contentPath(store, "projects", "*.md"))
 	if err != nil {
 		return ValidationReport{}, err
 	}
