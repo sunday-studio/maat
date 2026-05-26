@@ -97,11 +97,7 @@ maat migrate plan --storage <path>
 maat migrate apply --storage <path> --dest <path>
 ```
 
-Future status update command:
-
-```sh
-maat ticket status T-20260525-190700-b91c active
-```
+Future status update commands may add direct transitions without completing tickets.
 
 Sync:
 

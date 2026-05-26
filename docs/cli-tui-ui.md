@@ -76,11 +76,7 @@ maat ticket complete T-20260525-190700-b91c --evidence "smoke test passed" --pro
 
 Tickets may stand alone or belong to a goal.
 
-Future ticket commands:
-
-```sh
-maat ticket status T-20260525-190700-b91c waiting --reason "needs credentials"
-```
+Future ticket commands may add direct status transitions for blocked or waiting work.
 
 ### Query Commands
 
