@@ -158,8 +158,10 @@ This product repository ignores `state/`; keep real Maat state in a separate Git
 
 ```sh
 maat update
-maat uninstall --install-dir "$HOME/.local/bin"
+maat uninstall
 ```
+
+Successful installs remember the binary path in local config, so `maat uninstall` can remove the same binary without repeating `--install-dir`.
 
 ## TUI
 

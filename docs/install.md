@@ -131,7 +131,7 @@ maat tui
 
 ## Update And Uninstall
 
-`maat update` checks GitHub Releases, downloads the matching archive for the current OS and CPU architecture, verifies checksums when available, and replaces the installed binary.
+`maat update` checks GitHub Releases, downloads the matching archive for the current OS and CPU architecture, verifies checksums when available, and replaces the installed binary. Successful installs remember the binary path in the local Maat config so `maat uninstall` can remove the same binary later.
 
 ```sh
 maat update
@@ -145,7 +145,7 @@ maat uninstall
 maat uninstall --install-dir "$HOME/.local/bin"
 ```
 
-By default, uninstall removes only the binary and keeps Maat config. Remove local config explicitly with:
+By default, uninstall uses the remembered install location when available, removes only the binary, and keeps Maat config. Remove local config explicitly with:
 
 ```sh
 maat uninstall --purge-config

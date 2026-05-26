@@ -203,6 +203,7 @@ type installCommandResult struct {
 	InstallDir       string `json:"install_dir"`
 	TargetPath       string `json:"target_path"`
 	SourcePath       string `json:"source_path,omitempty"`
+	InstallRecorded  bool   `json:"install_recorded,omitempty"`
 	CurrentVersion   string `json:"current_version,omitempty"`
 	LatestVersion    string `json:"latest_version,omitempty"`
 	AssetName        string `json:"asset_name,omitempty"`
@@ -346,6 +347,12 @@ func updateCommand(args []string) error {
 	result.SourcePath = absSource
 	if samePath(absSource, targetPath) {
 		result.Action = "update.skipped"
+		cfgPath, err := rememberInstalledBinary(binaryName, absInstallDir, targetPath)
+		if err != nil {
+			return err
+		}
+		result.ConfigPath = cfgPath
+		result.InstallRecorded = true
 		if agentUse {
 			return agentUpdate("update.ready", "ok", "binary already installed at target path", result)
 		}
@@ -366,6 +373,12 @@ func updateCommand(args []string) error {
 		return err
 	}
 	result.Action = "update.installed"
+	cfgPath, err := rememberInstalledBinary(binaryName, absInstallDir, targetPath)
+	if err != nil {
+		return err
+	}
+	result.ConfigPath = cfgPath
+	result.InstallRecorded = true
 	if agentUse {
 		return agentUpdate("update.ready", "ok", "binary updated", result)
 	}
@@ -391,7 +404,9 @@ func updateCommand(args []string) error {
 func uninstallCommand(args []string) error {
 	filtered, jsonOut := splitJSONFlag(args)
 	installDir := ""
+	installDirProvided := false
 	binaryName := defaultBinaryName()
+	binaryNameProvided := false
 	purgeConfig := false
 	for i := 0; i < len(filtered); i++ {
 		switch filtered[i] {
@@ -400,12 +415,14 @@ func uninstallCommand(args []string) error {
 				return errors.New("--install-dir requires a path")
 			}
 			installDir = filtered[i+1]
+			installDirProvided = true
 			i++
 		case "--binary-name":
 			if i+1 >= len(filtered) {
 				return errors.New("--binary-name requires a name")
 			}
 			binaryName = strings.TrimSpace(filtered[i+1])
+			binaryNameProvided = true
 			i++
 		case "--purge-config":
 			purgeConfig = true
@@ -415,6 +432,30 @@ func uninstallCommand(args []string) error {
 	}
 	if binaryName == "" {
 		return errors.New("--binary-name cannot be empty")
+	}
+	if !installDirProvided || !binaryNameProvided {
+		cfg, err := readConfig()
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if err == nil {
+			if !installDirProvided {
+				switch {
+				case strings.TrimSpace(cfg.InstallDir) != "":
+					installDir = strings.TrimSpace(cfg.InstallDir)
+				case strings.TrimSpace(cfg.BinaryPath) != "":
+					installDir = filepath.Dir(strings.TrimSpace(cfg.BinaryPath))
+				}
+			}
+			if !binaryNameProvided {
+				switch {
+				case strings.TrimSpace(cfg.BinaryName) != "":
+					binaryName = strings.TrimSpace(cfg.BinaryName)
+				case strings.TrimSpace(cfg.BinaryPath) != "":
+					binaryName = filepath.Base(strings.TrimSpace(cfg.BinaryPath))
+				}
+			}
+		}
 	}
 	if installDir == "" {
 		installDir = defaultInstallDir()
@@ -445,6 +486,13 @@ func uninstallCommand(args []string) error {
 		InstallDir: absInstallDir,
 		TargetPath: targetPath,
 		Removed:    removed,
+	}
+	if !purgeConfig {
+		cfgPath, err := forgetInstalledBinary(targetPath)
+		if err != nil {
+			return err
+		}
+		result.ConfigPath = cfgPath
 	}
 	if purgeConfig {
 		cfgPath, err := configPath()
@@ -545,6 +593,7 @@ func setupCommand(args []string) error {
 		return err
 	}
 	cfg.StoragePath = abs
+	preserveInstalledBinaryConfig(&cfg)
 	configFile, err := persistConfig(cfg)
 	if err != nil {
 		return err
@@ -2464,6 +2513,9 @@ type config struct {
 	AutoPullBeforeRead   bool   `json:"auto_pull_before_read"`
 	AutoCommitAfterWrite bool   `json:"auto_commit_after_write"`
 	AutoPushAfterCommit  bool   `json:"auto_push_after_commit"`
+	InstallDir           string `json:"install_dir,omitempty"`
+	BinaryName           string `json:"binary_name,omitempty"`
+	BinaryPath           string `json:"binary_path,omitempty"`
 }
 
 func defaultConfig() config {
@@ -2490,6 +2542,58 @@ func defaultSetupActor() string {
 		return value
 	}
 	return defaultSystemActor()
+}
+
+func rememberInstalledBinary(binaryName, installDir, binaryPath string) (string, error) {
+	cfg, err := readConfig()
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+		cfg = defaultConfig()
+	}
+	cfg.BinaryName = binaryName
+	cfg.InstallDir = installDir
+	cfg.BinaryPath = binaryPath
+	return persistConfig(cfg)
+}
+
+func preserveInstalledBinaryConfig(cfg *config) {
+	existing, err := readConfig()
+	if err != nil {
+		return
+	}
+	cfg.BinaryName = existing.BinaryName
+	cfg.InstallDir = existing.InstallDir
+	cfg.BinaryPath = existing.BinaryPath
+}
+
+func forgetInstalledBinary(targetPath string) (string, error) {
+	cfg, err := readConfig()
+	if err != nil {
+		return "", nil
+	}
+	if !configMatchesBinaryPath(cfg, targetPath) {
+		return "", nil
+	}
+	cfg.BinaryName = ""
+	cfg.InstallDir = ""
+	cfg.BinaryPath = ""
+	path, err := persistConfig(cfg)
+	if err != nil {
+		return "", nil
+	}
+	return path, nil
+}
+
+func configMatchesBinaryPath(cfg config, targetPath string) bool {
+	if strings.TrimSpace(cfg.BinaryPath) != "" && samePath(cfg.BinaryPath, targetPath) {
+		return true
+	}
+	if strings.TrimSpace(cfg.InstallDir) == "" || strings.TrimSpace(cfg.BinaryName) == "" {
+		return false
+	}
+	return samePath(filepath.Join(strings.TrimSpace(cfg.InstallDir), strings.TrimSpace(cfg.BinaryName)), targetPath)
 }
 
 func persistConfig(cfg config) (string, error) {

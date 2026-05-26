@@ -51,7 +51,7 @@ else
   yellow=""
 fi
 
-step_total=5
+step_total=6
 step_number=0
 
 step() {
@@ -307,6 +307,13 @@ target_path="$install_dir/$binary_name"
 cp "$source_path" "$target_path"
 chmod 0755 "$target_path"
 done_line "$target_path"
+
+step "Remembering install location"
+if "$target_path" update --source "$target_path" --install-dir "$install_dir" --binary-name "$binary_name" --json >/dev/null 2>&1; then
+  done_line "saved uninstall target"
+else
+  info_line "could not save uninstall target; use: $binary_name uninstall --install-dir \"$install_dir\""
+fi
 
 profile_path() {
   shell_name=$(basename "${SHELL:-}")

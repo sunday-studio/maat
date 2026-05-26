@@ -166,6 +166,8 @@ func TestUpdateCommandInstallsSourceBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 	installDir := t.TempDir()
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("MAAT_CONFIG", configPath)
 
 	output, err := captureRun("update", "--source", source, "--install-dir", installDir, "--binary-name", "maat-test", "--json")
 	if err != nil {
@@ -177,8 +179,15 @@ func TestUpdateCommandInstallsSourceBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 	target := filepath.Join(installDir, "maat-test")
-	if result.Action != "update.installed" || result.SourcePath != source || result.TargetPath != target {
+	if result.Action != "update.installed" || result.SourcePath != source || result.TargetPath != target || !result.InstallRecorded || result.ConfigPath != configPath {
 		t.Fatalf("unexpected update result: %#v", result)
+	}
+	cfg, err := readConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.InstallDir != installDir || cfg.BinaryName != "maat-test" || cfg.BinaryPath != target {
+		t.Fatalf("unexpected persisted install location: %#v", cfg)
 	}
 	data, err := os.ReadFile(target)
 	if err != nil {
@@ -196,8 +205,38 @@ func TestUpdateCommandInstallsSourceBinary(t *testing.T) {
 	}
 }
 
+func TestUpdateCommandRecordsLocationWhenBinaryAlreadyAtTarget(t *testing.T) {
+	installDir := t.TempDir()
+	target := filepath.Join(installDir, "maat-test")
+	if err := os.WriteFile(target, []byte("installed binary\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MAAT_CONFIG", filepath.Join(t.TempDir(), "config.json"))
+
+	output, err := captureRun("update", "--source", target, "--install-dir", installDir, "--binary-name", "maat-test", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result installCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Action != "update.skipped" || !result.InstallRecorded || result.TargetPath != target {
+		t.Fatalf("unexpected skipped update result: %#v", result)
+	}
+	cfg, err := readConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.InstallDir != installDir || cfg.BinaryName != "maat-test" || cfg.BinaryPath != target {
+		t.Fatalf("unexpected persisted install location: %#v", cfg)
+	}
+}
+
 func TestUpdateCommandDownloadsLatestGitHubRelease(t *testing.T) {
 	installDir := t.TempDir()
+	t.Setenv("MAAT_CONFIG", filepath.Join(t.TempDir(), "config.json"))
 	assetName := fmt.Sprintf("maat-v9.9.9-%s-%s.tar.gz", runtime.GOOS, runtime.GOARCH)
 	archive := writeTestReleaseArchive(t, "maat-v9.9.9-"+runtime.GOOS+"-"+runtime.GOARCH, "release binary\n")
 	checksum := fmt.Sprintf("%x  %s\n", sha256.Sum256(archive), assetName)
@@ -344,6 +383,7 @@ func TestUninstallCommandRemovesBinaryAndCanPurgeConfig(t *testing.T) {
 
 func TestUninstallCommandDoesNotReportRemovingMissingBinary(t *testing.T) {
 	installDir := t.TempDir()
+	t.Setenv("MAAT_CONFIG", filepath.Join(t.TempDir(), "config.json"))
 
 	output, err := captureRun("uninstall", "--install-dir", installDir, "--binary-name", "maat-test")
 	if err != nil {
@@ -358,12 +398,58 @@ func TestUninstallCommandDoesNotReportRemovingMissingBinary(t *testing.T) {
 	}
 }
 
+func TestUninstallCommandUsesRememberedInstallLocation(t *testing.T) {
+	installDir := t.TempDir()
+	target := filepath.Join(installDir, "maat-test")
+	if err := os.WriteFile(target, []byte("old binary\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MAAT_CONFIG", filepath.Join(t.TempDir(), "config.json"))
+	cfg := defaultConfig()
+	cfg.InstallDir = installDir
+	cfg.BinaryName = "maat-test"
+	cfg.BinaryPath = target
+	if _, err := persistConfig(cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := captureRun("uninstall", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result installCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Action != "uninstall.removed" || !result.Removed || result.TargetPath != target {
+		t.Fatalf("unexpected uninstall result: %#v", result)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("expected remembered binary to be removed, got err=%v", err)
+	}
+	cfg, err = readConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.InstallDir != "" || cfg.BinaryName != "" || cfg.BinaryPath != "" {
+		t.Fatalf("expected uninstall to clear remembered install location: %#v", cfg)
+	}
+}
+
 func TestSetupCommandWritesConfig(t *testing.T) {
 	store := t.TempDir()
 	runGit(t, store, "init", "-b", "main")
 	configFile := filepath.Join(t.TempDir(), "config.json")
 	t.Setenv("MAAT_CONFIG", configFile)
 	t.Setenv("MAAT_ACTOR", "test-agent")
+	existing := defaultConfig()
+	existing.InstallDir = "/tmp/maat-bin"
+	existing.BinaryName = "maat-test"
+	existing.BinaryPath = "/tmp/maat-bin/maat-test"
+	if _, err := persistConfig(existing); err != nil {
+		t.Fatal(err)
+	}
 
 	output, err := captureRunWithInput("", "setup", "--storage", store, "--no-auto-push", "--json")
 	if err != nil {
@@ -386,6 +472,9 @@ func TestSetupCommandWritesConfig(t *testing.T) {
 	}
 	if cfg.StoragePath != store || cfg.DefaultActor != "test-agent" || !cfg.AutoPullBeforeRead || !cfg.AutoCommitAfterWrite || cfg.AutoPushAfterCommit {
 		t.Fatalf("unexpected persisted config: %#v", cfg)
+	}
+	if cfg.InstallDir != existing.InstallDir || cfg.BinaryName != existing.BinaryName || cfg.BinaryPath != existing.BinaryPath {
+		t.Fatalf("setup should preserve install location: %#v", cfg)
 	}
 }
 
