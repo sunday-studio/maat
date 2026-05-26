@@ -390,6 +390,9 @@ func TestModelManualReloadStartsImmediatelyAndKeepsDataVisible(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected reload message: %#v", msg)
 	}
+	if loaded.requestID == 0 {
+		t.Fatal("manual reload message is missing request id")
+	}
 	updated, _ = loading.Update(loaded)
 	got := updated.(Model)
 	if got.refreshing {
@@ -400,6 +403,83 @@ func TestModelManualReloadStartsImmediatelyAndKeepsDataVisible(t *testing.T) {
 	}
 	if got.selected != 0 || got.dashboard.Projects[got.selected].DisplayName != "Second Reloaded" {
 		t.Fatalf("manual reload did not preserve selected project: selected=%d projects=%+v", got.selected, got.dashboard.Projects)
+	}
+}
+
+func TestModelAutoRefreshTickDoesNotStartOverlappingLoad(t *testing.T) {
+	model := NewLiveModel("/tmp/maat-state", Dashboard{Projects: []ProjectRow{{Key: "sample"}}}, nil)
+	model.refreshing = true
+	model.nextRefreshID = 1
+	model.activeRefreshID = 1
+	model.load = func(string) dashboardLoadedMsg {
+		t.Fatal("in-flight refresh tick started another load")
+		return dashboardLoadedMsg{}
+	}
+
+	updated, cmd := model.Update(dashboardRefreshTickMsg{})
+	got := updated.(Model)
+	if !got.refreshing {
+		t.Fatal("in-flight refresh tick should keep refreshing state")
+	}
+	if got.nextRefreshID != 1 || got.activeRefreshID != 1 {
+		t.Fatalf("in-flight refresh tick changed request ids: next=%d active=%d", got.nextRefreshID, got.activeRefreshID)
+	}
+	if cmd == nil {
+		t.Fatal("in-flight refresh tick should schedule the next tick")
+	}
+}
+
+func TestModelIgnoresStaleRefreshResultWhileNewerReloadIsActive(t *testing.T) {
+	model := NewLiveModel("/tmp/maat-state", Dashboard{Projects: []ProjectRow{
+		{Key: "current", DisplayName: "Current"},
+	}}, nil)
+	model.refreshing = true
+	model.nextRefreshID = 2
+	model.activeRefreshID = 2
+
+	updated, _ := model.Update(dashboardLoadedMsg{
+		requestID: 1,
+		dashboard: Dashboard{Projects: []ProjectRow{
+			{Key: "stale", DisplayName: "Stale"},
+		}},
+	})
+	got := updated.(Model)
+	if !got.refreshing || got.activeRefreshID != 2 {
+		t.Fatalf("stale result changed active reload state: refreshing=%v active=%d", got.refreshing, got.activeRefreshID)
+	}
+	if got.dashboard.Projects[0].Key != "current" {
+		t.Fatalf("stale result clobbered dashboard: %+v", got.dashboard.Projects)
+	}
+}
+
+func TestModelIgnoresLateRefreshResultAfterNewerSuccess(t *testing.T) {
+	model := NewLiveModel("/tmp/maat-state", Dashboard{Projects: []ProjectRow{
+		{Key: "current", DisplayName: "Current"},
+	}}, nil)
+	model.refreshing = true
+	model.nextRefreshID = 2
+	model.activeRefreshID = 2
+
+	updated, _ := model.Update(dashboardLoadedMsg{
+		requestID: 2,
+		dashboard: Dashboard{Projects: []ProjectRow{
+			{Key: "newer", DisplayName: "Newer"},
+		}},
+	})
+	got := updated.(Model)
+	if got.refreshing || got.activeRefreshID != 0 {
+		t.Fatalf("newer result did not complete active reload: refreshing=%v active=%d", got.refreshing, got.activeRefreshID)
+	}
+
+	updated, _ = got.Update(dashboardLoadedMsg{
+		requestID: 1,
+		dashboard: Dashboard{Projects: []ProjectRow{
+			{Key: "older", DisplayName: "Older"},
+		}},
+	})
+	got = updated.(Model)
+	if got.dashboard.Projects[0].Key != "newer" {
+		t.Fatalf("late stale result clobbered newer dashboard: %+v", got.dashboard.Projects)
 	}
 }
 
@@ -455,10 +535,13 @@ func TestModelLoadCommandUsesConfiguredLoader(t *testing.T) {
 		return dashboardLoadedMsg{dashboard: Dashboard{Projects: []ProjectRow{{Key: "loaded"}}}}
 	}
 
-	msg := model.loadDashboardCmd()()
+	msg := model.loadDashboardCmd(7)()
 	loaded, ok := msg.(dashboardLoadedMsg)
 	if !ok {
 		t.Fatalf("unexpected load message: %#v", msg)
+	}
+	if loaded.requestID != 7 {
+		t.Fatalf("request id = %d, want 7", loaded.requestID)
 	}
 	if loaded.err != nil || len(loaded.dashboard.Projects) != 1 || loaded.dashboard.Projects[0].Key != "loaded" {
 		t.Fatalf("unexpected loaded dashboard: %#v", loaded)

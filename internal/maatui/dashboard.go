@@ -67,15 +67,17 @@ const (
 )
 
 type Model struct {
-	dashboard  Dashboard
-	err        error
-	refreshErr error
-	refreshing bool
-	width      int
-	selected   int
-	mode       DetailMode
-	storage    string
-	load       dashboardLoader
+	dashboard       Dashboard
+	err             error
+	refreshErr      error
+	refreshing      bool
+	nextRefreshID   int
+	activeRefreshID int
+	width           int
+	selected        int
+	mode            DetailMode
+	storage         string
+	load            dashboardLoader
 }
 
 type dashboardLoader func(string) dashboardLoadedMsg
@@ -87,6 +89,7 @@ type TUIOptions struct {
 type dashboardRefreshTickMsg struct{}
 
 type dashboardLoadedMsg struct {
+	requestID int
 	dashboard Dashboard
 	err       error
 	warning   error
@@ -197,14 +200,16 @@ func refreshTickCmd() tea.Cmd {
 	})
 }
 
-func (m Model) loadDashboardCmd() tea.Cmd {
+func (m Model) loadDashboardCmd(requestID int) tea.Cmd {
 	load := m.load
 	if load == nil {
 		load = loadDashboardWithoutPull
 	}
 	storage := m.storage
 	return func() tea.Msg {
-		return load(storage)
+		msg := load(storage)
+		msg.requestID = requestID
+		return msg
 	}
 }
 
@@ -221,8 +226,10 @@ func (m Model) startDashboardReload(includeNextTick bool) (Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	m.nextRefreshID++
+	m.activeRefreshID = m.nextRefreshID
 	m.refreshing = true
-	cmd := m.loadDashboardCmd()
+	cmd := m.loadDashboardCmd(m.activeRefreshID)
 	if includeNextTick {
 		cmd = tea.Batch(cmd, refreshTickCmd())
 	}
@@ -230,7 +237,11 @@ func (m Model) startDashboardReload(includeNextTick bool) (Model, tea.Cmd) {
 }
 
 func (m Model) withLoadedDashboard(msg dashboardLoadedMsg) Model {
+	if msg.requestID != 0 && msg.requestID != m.activeRefreshID {
+		return m
+	}
 	m.refreshing = false
+	m.activeRefreshID = 0
 	if msg.err != nil {
 		m.refreshErr = msg.err
 		return m
