@@ -45,6 +45,19 @@ maat-state/
 
 The product repository ignores `state/` so local smoke data and real storage repos do not clutter the source tree. The architecture target for a storage repo is the directory-per-project layout above.
 
+## Local Cache Layout
+
+Maat may create local cache data under `.maat/`, including `index.json` and `index.sqlite`.
+
+That cache is rebuildable from `state/` and should normally stay ignored:
+
+- product repos should ignore `.maat/`
+- local storage checkouts should ignore `.maat/` unless the storage repo deliberately chooses otherwise
+- agents should not commit `.maat/` as primary state
+- cache deletion should only require `matt index rebuild`
+
+For concurrency, each agent, process, or machine can have its own cache. Shared state is the Markdown files plus Git history, not a shared SQLite database.
+
 ## Project Identity
 
 A project needs a stable identity even if the source repo moves.
@@ -239,3 +252,5 @@ This storage model reduces conflicts because most operations add files:
 - status history is event-based instead of one shared ledger append
 
 The remaining conflict risk is low-frequency metadata editing, such as project summaries or ticket descriptions. Those edits should be small and validated.
+
+Index rebuild conflicts are not state conflicts. If SQLite is locked, stale, or missing, agents should keep the Markdown changes and rebuild the cache later.

@@ -98,6 +98,8 @@ The default CLI output is for humans. It should use concise progress states such
 
 `--agent-use` cannot be combined with `--json`.
 
+When a write command updates Markdown successfully but the local search index cannot be refreshed, the command should not ask the agent to repeat the write. Human output should show a warning that the index is stale. `--agent-use` should emit a warning update with the index failure so the agent can run `matt index rebuild` later without duplicating project history.
+
 ### Sync Commands
 
 ```sh
@@ -109,6 +111,8 @@ matt index rebuild
 ```
 
 The normal agent write path should validate and commit. Push can be opt-in or configured by policy.
+
+Sync and index commands operate on the local checkout. SQLite is not a coordination service; agents coordinate by syncing the Git-backed Markdown state.
 
 ## TUI
 
@@ -170,6 +174,8 @@ The first version can be local-only.
 - agent activity
 
 The web UI should read primarily from SQLite for speed and ask the core layer to perform writes.
+
+If the SQLite cache is stale, missing, or being rebuilt, the UI should surface that state and offer a rebuild path rather than treating it as lost project data.
 
 ## MCP Adapter
 

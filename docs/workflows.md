@@ -1,5 +1,19 @@
 # Workflows
 
+## Concurrency Baseline
+
+For all workflows, Markdown and Git are authoritative. SQLite is a local search cache.
+
+Agents should:
+
+1. Pull or sync before writing.
+2. Create object and event files for the action.
+3. Validate the Markdown state.
+4. Rebuild or refresh the local index when possible.
+5. Commit and push according to policy.
+
+If the index refresh fails after the Markdown write, keep the write and warn. The agent should not retry the same write just because SQLite was busy; it can run `matt index rebuild` later.
+
 ## Start A New Project
 
 1. Run `matt project link` from the source repo or provide a path.

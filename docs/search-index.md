@@ -4,6 +4,19 @@ Maat uses SQLite as a local, rebuildable index over the Markdown storage repo.
 
 The index exists for speed, search, ranking, UI queries, and agent-friendly retrieval. It is not the source of truth.
 
+## Concurrency Model
+
+Markdown in Git is the source of truth. SQLite is a local cache for the process or machine that built it.
+
+The preferred many-agent setup is:
+
+- agents write append-only Markdown object and event files
+- agents coordinate through Git pull, commit, and push
+- each agent, process, or machine keeps its own `.maat` SQLite cache
+- stale caches are rebuilt from Markdown instead of merged or repaired by hand
+
+This avoids turning one SQLite file into a shared write target for hundreds of agents. If a deployment later needs centralized query service behavior, that service should read from Git-backed Markdown and own its cache separately.
+
 ## Index Responsibilities
 
 - Parse Markdown object files.
@@ -23,6 +36,8 @@ matt index rebuild
 ```
 
 Deleting the SQLite file must not lose user data.
+
+If a write succeeds but index rebuild fails, the command should treat the write as durable and report a warning. Human output should say that search or UI views may be stale until `matt index rebuild` runs. `--agent-use` should emit a structured warning update so agents can continue without repeating the state write.
 
 ## Suggested Tables
 

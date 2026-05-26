@@ -13,9 +13,13 @@ This product repository ignores `state/`; keep real Maat state in a separate Git
 The `matt` CLI builds local indexes from that Markdown for faster search and dashboard views:
 
 - Markdown in Git is canonical.
-- `.maat/index.json` and `.maat/index.sqlite` are rebuildable.
+- `.maat/index.json` and `.maat/index.sqlite` are local, rebuildable caches.
 - Agents should write through `matt` instead of hand-editing files.
 - Events are stored as small object files to reduce merge conflicts.
+
+For many-agent use, do not treat SQLite as the shared coordination layer. Each agent, process, or machine can keep its own local `.maat` cache and rebuild it from Markdown whenever needed. Coordination happens through Git commits, pulls, pushes, and append-only state files.
+
+If an index rebuild is stale or temporarily fails, the Markdown write still owns the truth. Human output should warn that search may be stale, and `--agent-use` should emit a machine-readable warning so the agent can rebuild the index later instead of retrying the write and creating duplicate history.
 
 ## Install Or Build
 
