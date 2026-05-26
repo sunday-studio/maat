@@ -9,3 +9,5 @@ ledger/YYYY-MM.md
 ```
 
 Each event should be specific enough that another agent can reconstruct what changed and why.
+
+Use `../templates/ledger-event.md` for the legacy monthly event shape.

@@ -9,10 +9,11 @@ These conventions define how agents should work inside Maat.
 - `agents/`: agent identity notes, integration expectations, and future agent profile templates.
 - `decisions/`: durable product and architecture decisions.
 - `docs/`: architecture, workflows, storage model, CLI/TUI/UI design, and integration notes.
-- `ledger/`: early append-only ledger templates and migration notes. The target architecture prefers per-event files to reduce merge conflicts.
-- `projects/`: current project state and project templates.
+- `ledger/`: early append-only ledger files. The target architecture prefers per-event files to reduce merge conflicts.
+- `projects/`: current project state.
 - `reports/`: generated or agent-written summaries, handoffs, and status digests.
 - `tags.md`: shared tag vocabulary.
+- `templates/`: reusable Markdown templates for agents, projects, and ledger events.
 
 ## Naming Rules
 
@@ -66,7 +67,7 @@ Then commit the change to Git.
 
 ## Project Files
 
-Legacy project files are plain Markdown using the template in `projects/_template.md`. Target architecture uses `projects/<project-key>/project.md` plus separate goal, ticket, and event files.
+Legacy project files are plain Markdown using the template in `templates/project.md`. Target architecture uses `projects/<project-key>/project.md` plus separate goal, ticket, and event files.
 
 Legacy project fields:
 

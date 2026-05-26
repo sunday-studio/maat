@@ -16,7 +16,7 @@ The system is intentionally file-first: agents should be able to clone the repo,
 
 The implementation now has a usable read CLI, validation, SQLite-backed search/indexing, target object parsing, write-path core operations, Git sync primitives, migration planning, a first Bubble Tea dashboard, and local install documentation.
 
-The latest cleanup scoped the repository back to Maat-only state by removing unrelated project records and external project names from public docs and test fixtures.
+The latest cleanup grouped reusable Markdown templates into a single `templates/` directory so agents do not need to hunt through state directories for starter files.
 
 ## Goals
 
@@ -199,6 +199,20 @@ The latest cleanup scoped the repository back to Maat-only state by removing unr
 - [x] T-002: Remove cross-project registration events from the legacy ledger.
 - [x] T-003: Replace public examples and test fixtures that used real project names.
 - [x] T-004: Verify Maat now validates as a one-project store.
+
+### G-012: Group reusable templates
+
+| Field | Value |
+|---|---|
+| Status | done |
+| Updated | 2026-05-26 |
+| Tags | #cleanup #docs #templates |
+
+#### Tasks
+
+- [x] T-001: Move agent, project, and ledger event templates into `templates/`.
+- [x] T-002: Add a template directory index.
+- [x] T-003: Update agent, project, and ledger docs to point at the new template paths.
 
 ## Blockers
 
