@@ -426,6 +426,49 @@ func TestRenderDashboardCanShowTicketMode(t *testing.T) {
 	}
 }
 
+func TestFilterDashboardNarrowsProjectsTicketsAndOwnership(t *testing.T) {
+	dashboard := Dashboard{Projects: []ProjectRow{
+		{
+			Key:         "sample",
+			DisplayName: "Sample",
+			TicketRows: []TicketRow{
+				{ID: "T-001", Title: "Owned active work", Status: "active", Owner: "hilbert"},
+				{ID: "T-002", Title: "Waiting review", Status: "blocked"},
+			},
+		},
+		{
+			Key:         "second",
+			DisplayName: "Second",
+			TicketRows: []TicketRow{
+				{ID: "T-003", Title: "Completed work", Status: "done", Owner: "boole"},
+			},
+		},
+	}}
+
+	filtered := FilterDashboard(dashboard, DashboardFilters{ProjectKey: "sample", Query: "review", Status: "waiting", Owner: "unowned"})
+	if len(filtered.Projects) != 1 || filtered.Projects[0].Key != "sample" {
+		t.Fatalf("filtered projects = %+v", filtered.Projects)
+	}
+	if len(filtered.Projects[0].TicketRows) != 1 || filtered.Projects[0].TicketRows[0].ID != "T-002" {
+		t.Fatalf("filtered tickets = %+v", filtered.Projects[0].TicketRows)
+	}
+	if filtered.Summary.OpenTickets != 1 || filtered.Summary.DoneTickets != 0 || filtered.Summary.Tickets != 1 {
+		t.Fatalf("filtered summary = %+v", filtered.Summary)
+	}
+}
+
+func TestRenderDashboardShowsActiveFilters(t *testing.T) {
+	got := RenderDashboardWithFilters(Dashboard{Projects: []ProjectRow{
+		{Key: "sample", DisplayName: "Sample", TicketRows: []TicketRow{{ID: "T-001", Title: "Owned active work", Status: "active", Owner: "hilbert"}}},
+	}}, 0, DetailModeTickets, 96, 0, false, DashboardFilters{ProjectKey: "sample", Query: "active", Status: "open", Owner: "owned"}, true)
+
+	for _, want := range []string{"Filters:", "project sample", "state open", "owner owned", "query \"active_\"", "c clear"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderDashboardWithFilters() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
 func TestRenderTimelineShowsRecentEvents(t *testing.T) {
 	got := RenderTimeline([]EventRow{
 		{
@@ -472,10 +515,50 @@ func TestRenderDashboardShowsNavigationHelp(t *testing.T) {
 		{Key: "sample", DisplayName: "Sample", Status: "active"},
 	}}, 0)
 
-	for _, want := range []string{"up/down or k/j", "tab/right to switch project/tickets/timeline", "enter to select tickets", "backspace for projects", "q to quit"} {
+	for _, want := range []string{"up/down or k/j", "tab/right to switch project/tickets/timeline", "enter to select tickets", "/ query", "s state", "o owner", "p project", "c clear", "q quit"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderDashboardWithSelection() missing %q in:\n%s", want, got)
 		}
+	}
+}
+
+func TestModelFiltersTicketsWithoutLosingSelectedProject(t *testing.T) {
+	model := NewModel(Dashboard{Projects: []ProjectRow{
+		{Key: "first", TicketRows: []TicketRow{{ID: "T-001", Title: "First active", Status: "active"}}},
+		{Key: "second", TicketRows: []TicketRow{{ID: "T-002", Title: "Second waiting", Status: "blocked", Owner: "hilbert"}}},
+	}}, nil)
+	model.selected = 1
+	model.mode = DetailModeTickets
+
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	got := updated.(Model)
+	if got.filters.ProjectKey != "second" || got.selected != 1 {
+		t.Fatalf("project filter did not preserve selected project: filters=%+v selected=%d", got.filters, got.selected)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	got = updated.(Model)
+	if got.filters.Status != "open" {
+		t.Fatalf("status filter = %q, want open", got.filters.Status)
+	}
+	view := got.View()
+	if !strings.Contains(view, "No projects found.") || !strings.Contains(view, "Filters:") {
+		t.Fatalf("filtered view should show empty filtered state:\n%s", view)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	got = updated.(Model)
+	if got.filters.Status != "waiting" || got.selected != 1 {
+		t.Fatalf("waiting filter did not preserve selected project: filters=%+v selected=%d", got.filters, got.selected)
+	}
+	if !strings.Contains(got.View(), "T-002") {
+		t.Fatalf("waiting filter did not show selected project ticket:\n%s", got.View())
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	got = updated.(Model)
+	if filtersActive(got.filters) {
+		t.Fatalf("clear did not reset filters: %+v", got.filters)
 	}
 }
 

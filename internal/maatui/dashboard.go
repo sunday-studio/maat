@@ -68,6 +68,13 @@ type Dashboard struct {
 	Events   []EventRow
 }
 
+type DashboardFilters struct {
+	ProjectKey string
+	Query      string
+	Status     string
+	Owner      string
+}
+
 type DetailMode int
 
 const (
@@ -87,6 +94,8 @@ type Model struct {
 	selected        int
 	selectedTicket  int
 	ticketFocus     bool
+	filters         DashboardFilters
+	filterEditing   bool
 	mode            DetailMode
 	storage         string
 	load            dashboardLoader
@@ -176,6 +185,10 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if m.filterEditing && msg.String() != "ctrl+c" {
+			m = m.updateFilterQuery(msg)
+			return m, nil
+		}
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
 			return m, tea.Quit
@@ -190,14 +203,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = previousDetailMode(m.mode)
 			m.ticketFocus = false
 		case "enter":
-			if m.mode == DetailModeTickets && len(selectedProject(m.dashboard.Projects, m.selected).TicketRows) > 0 {
+			filtered := FilterDashboard(m.dashboard, m.filters)
+			selected := selectedIndexByKey(filtered.Projects, selectedProject(m.dashboard.Projects, m.selected).Key, m.selected)
+			if m.mode == DetailModeTickets && len(selectedProject(filtered.Projects, selected).TicketRows) > 0 {
 				m.ticketFocus = true
-				m.selectedTicket = clampSelection(m.selectedTicket, len(selectedProject(m.dashboard.Projects, m.selected).TicketRows))
+				m.selectedTicket = clampSelection(m.selectedTicket, len(selectedProject(filtered.Projects, selected).TicketRows))
 			}
 		case "backspace":
 			m.ticketFocus = false
 		case "r":
 			return m.startDashboardReload(false)
+		case "/":
+			m.filterEditing = true
+		case "c":
+			m.filters = DashboardFilters{}
+			m.filterEditing = false
+			m = m.withFilterSelection()
+		case "s":
+			m.filters.Status = nextStatusFilter(m.filters.Status)
+			m = m.withFilterSelection()
+		case "o":
+			m.filters.Owner = nextOwnerFilter(m.filters.Owner)
+			m = m.withFilterSelection()
+		case "p":
+			if m.filters.ProjectKey != "" {
+				m.filters.ProjectKey = ""
+			} else {
+				m.filters.ProjectKey = selectedProject(m.dashboard.Projects, m.selected).Key
+			}
+			m = m.withFilterSelection()
 		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -216,7 +250,9 @@ func (m Model) View() string {
 	if m.err != nil && len(m.dashboard.Projects) == 0 {
 		return errorStyle.Render(fmt.Sprintf("Maat TUI failed: %v", m.err)) + "\n\n" + mutedStyle.Render("Press q to quit.") + "\n"
 	}
-	view := RenderDashboardWithState(m.dashboard, m.selected, m.mode, m.width, m.selectedTicket, m.ticketFocus)
+	filtered := FilterDashboard(m.dashboard, m.filters)
+	selected := selectedIndexByKey(filtered.Projects, selectedProject(m.dashboard.Projects, m.selected).Key, m.selected)
+	view := RenderDashboardWithFilters(filtered, selected, m.mode, m.width, m.selectedTicket, m.ticketFocus, m.filters, m.filterEditing)
 	if m.refreshing {
 		view += mutedStyle.Render("Refreshing...")
 		view += "\n"
@@ -282,8 +318,10 @@ func (m Model) withLoadedDashboard(msg dashboardLoadedMsg) Model {
 	}
 	selectedKey := ""
 	selectedTicketID := ""
-	if len(m.dashboard.Projects) > 0 {
-		project := selectedProject(m.dashboard.Projects, m.selected)
+	filtered := FilterDashboard(m.dashboard, m.filters)
+	if len(filtered.Projects) > 0 {
+		selectedIndex := selectedIndexByKey(filtered.Projects, selectedProject(m.dashboard.Projects, m.selected).Key, m.selected)
+		project := selectedProject(filtered.Projects, selectedIndex)
 		selectedKey = project.Key
 		selectedTicketID = selectedTicket(project.TicketRows, m.selectedTicket).ID
 	}
@@ -291,7 +329,9 @@ func (m Model) withLoadedDashboard(msg dashboardLoadedMsg) Model {
 	m.err = nil
 	m.refreshErr = msg.warning
 	m.selected = selectedIndexByKey(m.dashboard.Projects, selectedKey, m.selected)
-	project := selectedProject(m.dashboard.Projects, m.selected)
+	filtered = FilterDashboard(m.dashboard, m.filters)
+	selectedIndex := selectedIndexByKey(filtered.Projects, selectedProject(m.dashboard.Projects, m.selected).Key, m.selected)
+	project := selectedProject(filtered.Projects, selectedIndex)
 	m.selectedTicket = selectedTicketIndexByID(project.TicketRows, selectedTicketID, m.selectedTicket)
 	if len(project.TicketRows) == 0 || m.mode != DetailModeTickets {
 		m.ticketFocus = false
@@ -300,18 +340,56 @@ func (m Model) withLoadedDashboard(msg dashboardLoadedMsg) Model {
 }
 
 func (m Model) moveSelection(delta int) Model {
+	filtered := FilterDashboard(m.dashboard, m.filters)
+	selectedKey := selectedProject(m.dashboard.Projects, m.selected).Key
+	selectedIndex := selectedIndexByKey(filtered.Projects, selectedKey, m.selected)
 	if m.mode == DetailModeTickets && m.ticketFocus {
-		project := selectedProject(m.dashboard.Projects, m.selected)
+		project := selectedProject(filtered.Projects, selectedIndex)
 		m.selectedTicket = clampSelection(m.selectedTicket+delta, len(project.TicketRows))
 		return m
 	}
-	m.selected = clampSelection(m.selected+delta, len(m.dashboard.Projects))
-	project := selectedProject(m.dashboard.Projects, m.selected)
+	selectedIndex = clampSelection(selectedIndex+delta, len(filtered.Projects))
+	project := selectedProject(filtered.Projects, selectedIndex)
+	m.selected = selectedIndexByKey(m.dashboard.Projects, project.Key, m.selected)
 	m.selectedTicket = clampSelection(m.selectedTicket, len(project.TicketRows))
 	if len(project.TicketRows) == 0 {
 		m.ticketFocus = false
 	}
 	return m
+}
+
+func (m Model) withFilterSelection() Model {
+	filtered := FilterDashboard(m.dashboard, m.filters)
+	selectedKey := selectedProject(m.dashboard.Projects, m.selected).Key
+	selectedIndex := selectedIndexByKey(filtered.Projects, selectedKey, m.selected)
+	project := selectedProject(filtered.Projects, selectedIndex)
+	if project.Key != "" {
+		m.selected = selectedIndexByKey(m.dashboard.Projects, project.Key, m.selected)
+	}
+	m.selectedTicket = clampSelection(m.selectedTicket, len(project.TicketRows))
+	if len(project.TicketRows) == 0 {
+		m.ticketFocus = false
+	}
+	return m
+}
+
+func (m Model) updateFilterQuery(msg tea.KeyMsg) Model {
+	switch msg.String() {
+	case "enter", "esc":
+		m.filterEditing = false
+	case "backspace":
+		runes := []rune(m.filters.Query)
+		if len(runes) > 0 {
+			m.filters.Query = string(runes[:len(runes)-1])
+		}
+	case "ctrl+u":
+		m.filters.Query = ""
+	default:
+		if len(msg.Runes) > 0 {
+			m.filters.Query += string(msg.Runes)
+		}
+	}
+	return m.withFilterSelection()
 }
 
 func loadDashboardWithoutPull(storage string) dashboardLoadedMsg {
@@ -454,6 +532,148 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 	return Dashboard{Projects: rows, Summary: summary, Events: sortedEventRows(events)}
 }
 
+func FilterDashboard(dashboard Dashboard, filters DashboardFilters) Dashboard {
+	filters = normalizeFilters(filters)
+	if !filtersActive(filters) {
+		return dashboard
+	}
+	rows := make([]ProjectRow, 0, len(dashboard.Projects))
+	for _, project := range dashboard.Projects {
+		if filters.ProjectKey != "" && project.Key != filters.ProjectKey {
+			continue
+		}
+		projectMatchesQuery := filters.Query == "" || projectMatchesFilterQuery(project, filters.Query)
+		tickets := make([]TicketRow, 0, len(project.TicketRows))
+		for _, ticket := range project.TicketRows {
+			if !ticketMatchesFilters(ticket, filters) {
+				continue
+			}
+			tickets = append(tickets, ticket)
+		}
+		if filters.Query != "" && !projectMatchesQuery && len(tickets) == 0 {
+			continue
+		}
+		if (filters.Status != "" || filters.Owner != "") && len(tickets) == 0 {
+			continue
+		}
+		row := project
+		row.TicketRows = tickets
+		row.Tickets = len(tickets)
+		row.OpenTickets, row.DoneTickets = countTicketRows(tickets)
+		rows = append(rows, row)
+	}
+	return Dashboard{Projects: rows, Summary: summarizeProjectRows(rows), Events: filterEventRows(dashboard.Events, rows)}
+}
+
+func normalizeFilters(filters DashboardFilters) DashboardFilters {
+	filters.ProjectKey = strings.TrimSpace(filters.ProjectKey)
+	filters.Query = strings.TrimSpace(filters.Query)
+	filters.Status = strings.TrimSpace(strings.ToLower(filters.Status))
+	filters.Owner = strings.TrimSpace(strings.ToLower(filters.Owner))
+	return filters
+}
+
+func filtersActive(filters DashboardFilters) bool {
+	filters = normalizeFilters(filters)
+	return filters.ProjectKey != "" || filters.Query != "" || filters.Status != "" || filters.Owner != ""
+}
+
+func ticketMatchesFilters(ticket TicketRow, filters DashboardFilters) bool {
+	if filters.Query != "" && !ticketMatchesFilterQuery(ticket, filters.Query) {
+		return false
+	}
+	if filters.Status != "" && ticketBoardStatus(ticket.Status) != filters.Status {
+		return false
+	}
+	if filters.Owner == "owned" && strings.TrimSpace(ticket.Owner) == "" {
+		return false
+	}
+	if filters.Owner == "unowned" && strings.TrimSpace(ticket.Owner) != "" {
+		return false
+	}
+	return true
+}
+
+func projectMatchesFilterQuery(project ProjectRow, query string) bool {
+	haystack := strings.Join([]string{
+		project.Key,
+		project.DisplayName,
+		project.Status,
+		project.Summary,
+	}, " ")
+	return strings.Contains(strings.ToLower(haystack), strings.ToLower(query))
+}
+
+func ticketMatchesFilterQuery(ticket TicketRow, query string) bool {
+	haystack := strings.Join([]string{
+		ticket.ID,
+		ticket.Title,
+		ticket.Status,
+		ticket.GoalID,
+		ticket.GoalTitle,
+		ticket.ProjectKey,
+		ticket.Description,
+		strings.Join(ticket.Tags, " "),
+		strings.Join(ticket.Acceptance, " "),
+		ticket.Owner,
+	}, " ")
+	return strings.Contains(strings.ToLower(haystack), strings.ToLower(query))
+}
+
+func countTicketRows(tickets []TicketRow) (int, int) {
+	openTickets := 0
+	doneTickets := 0
+	for _, ticket := range tickets {
+		if ticketBoardStatus(ticket.Status) == "done" {
+			doneTickets++
+		} else {
+			openTickets++
+		}
+	}
+	return openTickets, doneTickets
+}
+
+func summarizeProjectRows(projects []ProjectRow) maat.StatusSummary {
+	summary := maat.StatusSummary{Projects: len(projects)}
+	for _, project := range projects {
+		summary.Goals += len(project.GoalRows)
+		summary.Tickets += len(project.TicketRows)
+		summary.OpenTickets += project.OpenTickets
+		summary.DoneTickets += project.DoneTickets
+		for _, goal := range project.GoalRows {
+			if goal.Status == "active" {
+				summary.ActiveGoals++
+			}
+			if goal.Status == "done" {
+				summary.DoneGoals++
+			}
+		}
+	}
+	return summary
+}
+
+func filterEventRows(events []EventRow, projects []ProjectRow) []EventRow {
+	projectKeys := map[string]struct{}{}
+	ticketIDs := map[string]struct{}{}
+	for _, project := range projects {
+		projectKeys[project.Key] = struct{}{}
+		for _, ticket := range project.TicketRows {
+			ticketIDs[ticket.ID] = struct{}{}
+		}
+	}
+	filtered := make([]EventRow, 0, len(events))
+	for _, event := range events {
+		if _, ok := ticketIDs[event.ObjectID]; ok {
+			filtered = append(filtered, event)
+			continue
+		}
+		if _, ok := projectKeys[event.ProjectKey]; ok && event.ObjectID == event.ProjectKey {
+			filtered = append(filtered, event)
+		}
+	}
+	return filtered
+}
+
 func RenderDashboard(dashboard Dashboard) string {
 	return RenderDashboardWithSelection(dashboard, 0)
 }
@@ -471,6 +691,10 @@ func RenderDashboardWithSelectionModeAndWidth(dashboard Dashboard, selected int,
 }
 
 func RenderDashboardWithState(dashboard Dashboard, selected int, mode DetailMode, width int, selectedTicket int, ticketFocus bool) string {
+	return RenderDashboardWithFilters(dashboard, selected, mode, width, selectedTicket, ticketFocus, DashboardFilters{}, false)
+}
+
+func RenderDashboardWithFilters(dashboard Dashboard, selected int, mode DetailMode, width int, selectedTicket int, ticketFocus bool, filters DashboardFilters, editingFilter bool) string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Maat"))
 	b.WriteString("\n")
@@ -478,6 +702,10 @@ func RenderDashboardWithState(dashboard Dashboard, selected int, mode DetailMode
 	b.WriteString("\n\n")
 	b.WriteString(RenderSummary(dashboard.Summary))
 	b.WriteString("\n\n")
+	if filtersActive(filters) || editingFilter {
+		b.WriteString(RenderFilterBar(filters, editingFilter))
+		b.WriteString("\n\n")
+	}
 	b.WriteString(RenderSelectableProjectTable(dashboard.Projects, selected))
 	b.WriteString("\n\n")
 	project := selectedProject(dashboard.Projects, selected)
@@ -490,9 +718,33 @@ func RenderDashboardWithState(dashboard Dashboard, selected int, mode DetailMode
 		b.WriteString(RenderProjectDetail(project))
 	}
 	b.WriteString("\n\n")
-	b.WriteString(mutedStyle.Render("Use up/down or k/j to select, tab/right to switch project/tickets/timeline, enter to select tickets, backspace for projects, r to reload, q to quit."))
+	b.WriteString(mutedStyle.Render("Use up/down or k/j to select, tab/right to switch project/tickets/timeline, enter to select tickets, / query, s state, o owner, p project, c clear, r reload, q quit."))
 	b.WriteString("\n")
 	return b.String()
+}
+
+func RenderFilterBar(filters DashboardFilters, editing bool) string {
+	parts := []string{}
+	if filters.ProjectKey != "" {
+		parts = append(parts, "project "+filters.ProjectKey)
+	}
+	if filters.Status != "" {
+		parts = append(parts, "state "+filters.Status)
+	}
+	if filters.Owner != "" {
+		parts = append(parts, "owner "+filters.Owner)
+	}
+	query := filters.Query
+	if editing {
+		query += "_"
+	}
+	if strings.TrimSpace(query) != "" {
+		parts = append(parts, fmt.Sprintf("query %q", query))
+	}
+	if len(parts) == 0 {
+		parts = append(parts, "none")
+	}
+	return mutedStyle.Render("Filters: " + strings.Join(parts, " | ") + "  (c clear)")
 }
 
 func RenderSummary(summary maat.StatusSummary) string {
@@ -896,6 +1148,30 @@ func ticketDetailMetadata(ticket TicketRow) string {
 		parts = append(parts, "claim until "+compactTime(ticket.ClaimUntil))
 	}
 	return strings.Join(parts, "  ")
+}
+
+func nextStatusFilter(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "":
+		return "open"
+	case "open":
+		return "waiting"
+	case "waiting":
+		return "done"
+	default:
+		return ""
+	}
+}
+
+func nextOwnerFilter(owner string) string {
+	switch strings.ToLower(strings.TrimSpace(owner)) {
+	case "":
+		return "owned"
+	case "owned":
+		return "unowned"
+	default:
+		return ""
+	}
 }
 
 func detailContentWidth(width int) int {
