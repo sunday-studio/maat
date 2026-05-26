@@ -46,6 +46,8 @@ type TicketRow struct {
 	Tags        []string
 	Description string
 	Acceptance  []string
+	Owner       string
+	ClaimUntil  string
 }
 
 type EventRow struct {
@@ -56,6 +58,7 @@ type EventRow struct {
 	ProjectName string
 	Type        string
 	ObjectID    string
+	Expires     string
 	Summary     string
 }
 
@@ -378,6 +381,11 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 		ticketsByGoal := countObjectTicketsByGoal(project.Tickets)
 		goalsByID := objectGoalsByID(project.Goals)
 		openTickets, doneTickets := countObjectTickets(project.Tickets)
+		for _, event := range project.Events {
+			eventRows = append(eventRows, eventRowFromObject(project, event))
+		}
+		eventRows = sortedEventRows(eventRows)
+		claims := currentTicketClaims(eventRows)
 		for _, goal := range project.Goals {
 			goalRows = append(goalRows, GoalRow{
 				ID:      goal.ID,
@@ -391,6 +399,7 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 			if goal, ok := goalsByID[ticket.GoalID]; ok {
 				goalTitle = goal.Title
 			}
+			claim := claims[ticket.ID]
 			ticketRows = append(ticketRows, TicketRow{
 				ID:          ticket.ID,
 				Title:       ticket.Title,
@@ -402,10 +411,9 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 				Tags:        ticket.Tags,
 				Description: ticket.Description,
 				Acceptance:  ticket.Acceptance,
+				Owner:       claim.Owner,
+				ClaimUntil:  claim.Expires,
 			})
-		}
-		for _, event := range project.Events {
-			eventRows = append(eventRows, eventRowFromObject(project, event))
 		}
 		row := ProjectRow{
 			Key:         project.Key,
@@ -419,7 +427,7 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 			Updated:     project.Updated,
 			GoalRows:    goalRows,
 			TicketRows:  ticketRows,
-			EventRows:   sortedEventRows(eventRows),
+			EventRows:   eventRows,
 		}
 		rows = append(rows, row)
 		summary.Goals += len(project.Goals)
@@ -644,7 +652,7 @@ func RenderFocusedTicketPane(project ProjectRow, ticket TicketRow, width int) st
 	b.WriteString("\n")
 	b.WriteString(titleStyle.Render(wrapLine(ticket.Title, contentWidth)))
 	b.WriteString("\n")
-	b.WriteString(wrapLine(fmt.Sprintf("%s  status %s  owner %s", emptyFallback(ticket.ID, "ticket"), emptyFallback(ticket.Status, "open"), ticketOwner(project.EventRows, ticket.ID)), contentWidth))
+	b.WriteString(wrapLine(ticketDetailMetadata(ticket), contentWidth))
 	b.WriteString("\n")
 	b.WriteString(wrapLine(fmt.Sprintf("Project: %s  Goal: %s", emptyFallback(projectName, "project"), goal), contentWidth))
 	b.WriteString("\n")
@@ -762,7 +770,7 @@ func renderTicketColumnLines(column ticketBoardColumn, width int, limit int, sel
 		end = len(column.Tickets)
 	}
 	for _, ticket := range column.Tickets[start:end] {
-		lines = append(lines, renderTicketCard(ticket, width, selectedID != "" && ticket.ID == selectedID))
+		lines = append(lines, renderTicketCardLines(ticket, width, selectedID != "" && ticket.ID == selectedID)...)
 	}
 	if end < len(column.Tickets) {
 		lines = append(lines, mutedStyle.Render(fmt.Sprintf("+ %d more", len(column.Tickets)-end)))
@@ -782,7 +790,7 @@ func visibleTicketStart(tickets []TicketRow, limit int, selectedID string) int {
 	return 0
 }
 
-func renderTicketCard(ticket TicketRow, width int, selected bool) string {
+func renderTicketCardLines(ticket TicketRow, width int, selected bool) []string {
 	label := ticket.ID
 	if label == "" {
 		label = "ticket"
@@ -791,16 +799,25 @@ func renderTicketCard(ticket TicketRow, width int, selected bool) string {
 	if ticket.GoalID != "" {
 		goal = ticket.GoalID
 	}
-	status := emptyFallback(ticket.Status, "open")
-	titleLimit := width - len(label) - len(status) - 7
-	if titleLimit < 12 {
-		titleLimit = 12
-	}
+	state := ticketStateLabel(ticket.Status)
+	owner := ticketOwnerDisplay(ticket)
 	prefix := "-"
 	if selected {
 		prefix = ">"
 	}
-	return fmt.Sprintf("%s %s [%s] %s (%s)", prefix, label, status, truncate(ticket.Title, titleLimit), goal)
+	header := fmt.Sprintf("%s %s [%s]", prefix, label, state)
+	ownerLine := "  " + owner
+	detail := fmt.Sprintf("  %s (%s)", ticket.Title, goal)
+	rawStatus := strings.TrimSpace(ticket.Status)
+	if rawStatus != "" && !ticketStatusIsCanonical(rawStatus, state) {
+		detail = fmt.Sprintf("  %s %s (%s)", rawStatus, ticket.Title, goal)
+	}
+	if width > 0 {
+		header = truncate(header, width)
+		ownerLine = truncate(ownerLine, width)
+		detail = truncate(detail, width)
+	}
+	return []string{header, ownerLine, detail}
 }
 
 func ticketBoardStatus(status string) string {
@@ -814,6 +831,73 @@ func ticketBoardStatus(status string) string {
 	}
 }
 
+type ticketClaimInfo struct {
+	Owner   string
+	Expires string
+}
+
+func currentTicketClaims(events []EventRow) map[string]ticketClaimInfo {
+	claims := map[string]ticketClaimInfo{}
+	for _, event := range events {
+		if event.Type != "ticket.claimed" || event.ObjectID == "" || strings.TrimSpace(event.Actor) == "" {
+			continue
+		}
+		if _, exists := claims[event.ObjectID]; exists {
+			continue
+		}
+		claims[event.ObjectID] = ticketClaimInfo{Owner: event.Actor, Expires: event.Expires}
+	}
+	return claims
+}
+
+func ticketStateDisplay(status string) string {
+	state := ticketStateLabel(status)
+	raw := strings.TrimSpace(status)
+	if raw == "" {
+		return state
+	}
+	if ticketStatusIsCanonical(raw, state) {
+		return state
+	}
+	return fmt.Sprintf("%s:%s", state, raw)
+}
+
+func ticketStateLabel(status string) string {
+	switch ticketBoardStatus(status) {
+	case "waiting":
+		return "Waiting"
+	case "done":
+		return "Done"
+	default:
+		return "Open"
+	}
+}
+
+func ticketStatusIsCanonical(status string, state string) bool {
+	lowerStatus := strings.ToLower(strings.TrimSpace(status))
+	lowerState := strings.ToLower(strings.TrimSpace(state))
+	return lowerStatus == lowerState || (lowerState == "open" && lowerStatus == "active")
+}
+
+func ticketOwnerDisplay(ticket TicketRow) string {
+	if strings.TrimSpace(ticket.Owner) == "" {
+		return "unowned"
+	}
+	return "@" + ticket.Owner
+}
+
+func ticketDetailMetadata(ticket TicketRow) string {
+	parts := []string{
+		emptyFallback(ticket.ID, "ticket"),
+		"state " + ticketStateDisplay(ticket.Status),
+		"owner " + emptyFallback(ticket.Owner, "unassigned"),
+	}
+	if strings.TrimSpace(ticket.ClaimUntil) != "" {
+		parts = append(parts, "claim until "+compactTime(ticket.ClaimUntil))
+	}
+	return strings.Join(parts, "  ")
+}
+
 func detailContentWidth(width int) int {
 	if width <= 0 {
 		return 88
@@ -825,15 +909,6 @@ func detailContentWidth(width int) int {
 		return 40
 	}
 	return width
-}
-
-func ticketOwner(events []EventRow, ticketID string) string {
-	for _, event := range events {
-		if event.ObjectID == ticketID && event.Type == "ticket.claimed" && event.Actor != "" {
-			return event.Actor
-		}
-	}
-	return "unassigned"
 }
 
 func tagsLabel(tags []string) string {
@@ -1133,6 +1208,7 @@ func eventRowFromObject(project maat.ObjectProject, event maat.ObjectEvent) Even
 		ProjectName: project.DisplayName,
 		Type:        event.Type,
 		ObjectID:    event.ObjectID,
+		Expires:     event.Expires,
 		Summary:     event.Summary,
 	}
 }

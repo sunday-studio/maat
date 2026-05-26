@@ -175,6 +175,9 @@ func TestWriteStoreCreatesTicketLifecycleEvents(t *testing.T) {
 	if comment.Type != "ticket.commented" || claim.Type != "ticket.claimed" || completed.Type != "ticket.completed" {
 		t.Fatalf("unexpected events: %#v %#v %#v", comment, claim, completed)
 	}
+	if claim.Expires != "2026-05-25T21:07:00+02:00" {
+		t.Fatalf("claim expiration = %q, want 2026-05-25T21:07:00+02:00", claim.Expires)
+	}
 	claimContent := readFile(t, filepath.Join(root, filepath.FromSlash(claim.Path)))
 	if !strings.Contains(claimContent, "| Expires | 2026-05-25T21:07:00+02:00 |") {
 		t.Fatalf("expected claim expiration, got:\n%s", claimContent)

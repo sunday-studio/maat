@@ -95,6 +95,7 @@ func TestDashboardFromObjectProjectsIncludesTicketRows(t *testing.T) {
 					ProjectKey: "sample",
 					Type:       "ticket.claimed",
 					ObjectID:   "T-001",
+					Expires:    "2026-05-25T21:08:00+02:00",
 					Summary:    "Claimed ticket T-001.",
 				},
 			},
@@ -110,6 +111,9 @@ func TestDashboardFromObjectProjectsIncludesTicketRows(t *testing.T) {
 	}
 	if project.TicketRows[0].GoalTitle != "Improve monitor clarity" || project.TicketRows[0].Description == "" || len(project.TicketRows[0].Acceptance) != 1 {
 		t.Fatalf("ticket detail fields = %+v", project.TicketRows[0])
+	}
+	if project.TicketRows[0].Owner != "codex-worker" || project.TicketRows[0].ClaimUntil != "2026-05-25T21:08:00+02:00" {
+		t.Fatalf("ticket claim fields = %+v", project.TicketRows[0])
 	}
 	if len(project.EventRows) != 2 || project.EventRows[0].Type != "ticket.claimed" {
 		t.Fatalf("project event rows = %+v", project.EventRows)
@@ -221,13 +225,34 @@ func TestRenderProjectTicketBoardGroupsUsefulStatusColumns(t *testing.T) {
 		DoneTickets: 2,
 		TicketRows: []TicketRow{
 			{ID: "T-001", Title: "Build board shell", Status: "active", GoalID: "G-001"},
-			{ID: "T-002", Title: "Await review", Status: "waiting", GoalID: "G-001"},
+			{ID: "T-002", Title: "Await review", Status: "waiting", GoalID: "G-001", Owner: "codex-worker"},
 			{ID: "T-003", Title: "Ship old work", Status: "done"},
 			{ID: "T-004", Title: "Close release note", Status: "completed"},
 		},
 	}, 96)
 
-	for _, want := range []string{"Open (1)", "Waiting (1)", "Done (2)", "T-001", "T-002", "T-003", "T-004", "completed"} {
+	for _, want := range []string{"Open (1)", "Waiting (1)", "Done (2)", "T-001", "[Open]", "T-002", "[Waiting]", "@codex-worker", "T-003", "T-004", "completed Close"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderProjectTicketBoard() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderProjectTicketBoardShowsOwnershipWithoutOpeningFiles(t *testing.T) {
+	got := RenderProjectTicketBoard(ProjectRow{
+		Key:         "sample",
+		DisplayName: "Sample",
+		Tickets:     3,
+		OpenTickets: 2,
+		DoneTickets: 1,
+		TicketRows: []TicketRow{
+			{ID: "T-001", Title: "Unclaimed active work", Status: "active"},
+			{ID: "T-002", Title: "Owned waiting work", Status: "blocked", Owner: "hilbert", ClaimUntil: "2026-05-25T21:08:00+02:00"},
+			{ID: "T-003", Title: "Completed owned work", Status: "done", Owner: "boole"},
+		},
+	}, 96)
+
+	for _, want := range []string{"T-001", "[Open]", "unowned", "T-002", "[Waiting]", "blocked Owned", "@hilbert", "T-003", "[Done]", "@boole"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderProjectTicketBoard() missing %q in:\n%s", want, got)
 		}
@@ -325,6 +350,8 @@ func TestRenderProjectTicketBoardShowsFocusedTicketDetailPane(t *testing.T) {
 				Tags:        []string{"tui", "detail"},
 				Description: "Show enough ticket context to keep an agent oriented inside the terminal.",
 				Acceptance:  []string{"Ticket metadata is visible.", "Action affordances are visible."},
+				Owner:       "codex-worker",
+				ClaimUntil:  "2026-05-25T21:08:00+02:00",
 			},
 		},
 		EventRows: []EventRow{
@@ -345,7 +372,7 @@ func TestRenderProjectTicketBoardShowsFocusedTicketDetailPane(t *testing.T) {
 		},
 	}, 96, 0, true)
 
-	for _, want := range []string{"Tickets Board", "> T-001", "Ticket Detail", "Add focused ticket pane", "status active", "owner codex-worker", "G-001 - Make TUI useful", "Ticket metadata is visible.", "ticket.commented", "r refresh | backspace back | up/down move | enter inspect"} {
+	for _, want := range []string{"Tickets Board", "> T-001", "Ticket Detail", "Add focused ticket pane", "state Open", "owner codex-worker", "claim until 2026-05-25 21:08", "G-001 - Make TUI useful", "Ticket metadata is visible.", "ticket.commented", "r refresh | backspace back | up/down move | enter inspect"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderProjectTicketBoardWithSelection() missing %q in:\n%s", want, got)
 		}

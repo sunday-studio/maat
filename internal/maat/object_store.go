@@ -59,6 +59,7 @@ type ObjectEvent struct {
 	Type       string   `json:"type"`
 	ObjectID   string   `json:"object_id"`
 	Commit     string   `json:"commit,omitempty"`
+	Expires    string   `json:"expires,omitempty"`
 	Summary    string   `json:"summary,omitempty"`
 	Evidence   []string `json:"evidence,omitempty"`
 	Path       string   `json:"path"`
@@ -241,6 +242,7 @@ func ParseObjectEventFile(store, path string) (ObjectEvent, error) {
 		Type:       doc.Fields["type"],
 		ObjectID:   doc.Fields["object"],
 		Commit:     doc.Fields["commit"],
+		Expires:    doc.Fields["expires"],
 		Summary:    strings.TrimSpace(doc.Sections["summary"]),
 		Evidence:   parseBulletList(doc.Sections["evidence"]),
 		Path:       relPath(store, path),
