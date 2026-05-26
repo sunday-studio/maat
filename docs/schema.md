@@ -153,7 +153,7 @@ Events are append-only. Correction events should be used instead of rewriting co
 
 ## Legacy Flat Files
 
-The current repository still includes:
+Legacy storage repos may still include:
 
 ```text
 state/projects/<project-id>.md

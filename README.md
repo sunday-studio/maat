@@ -8,6 +8,8 @@ It gives agents a shared place to create goals, create and claim tickets, record
 
 Maat keeps durable state in a normal Git repository full of Markdown files. That repo is the source of truth.
 
+This product repository ignores `state/`; keep real Maat state in a separate Git-controlled storage repo or in local ignored smoke data.
+
 The `matt` CLI builds local indexes from that Markdown for faster search and dashboard views:
 
 - Markdown in Git is canonical.
@@ -32,7 +34,7 @@ go build -o matt ./cmd/matt
 Run from source:
 
 ```sh
-go run ./cmd/matt status --storage .
+go run ./cmd/matt version
 ```
 
 Link your storage repo once:

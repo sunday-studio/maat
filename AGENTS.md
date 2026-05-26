@@ -1,13 +1,17 @@
 # Agent Instructions
 
-This repository is primarily for agents. Treat it as the source of truth for project state and history.
+This repository contains the Maat product source. Treat code, product docs, and tests here as canonical.
 
 These conventions define how agents should work inside Maat.
 
 ## Repository Map
 
-- `state/`: all Maat-managed Markdown state, including agents, decisions, ledger, projects, reports, tags, and templates.
+- `cmd/`: the `matt` CLI entrypoint.
 - `docs/`: architecture, workflows, storage model, CLI/TUI/UI design, and integration notes.
+- `internal/`: Go packages for storage, indexing, sync, validation, and TUI logic.
+- `scripts/`: local install and release helper scripts.
+
+`state/` is ignored in this repository. Use it only for local smoke data, or keep real Maat state in a separate Git-controlled storage repo.
 
 ## Naming Rules
 
@@ -44,24 +48,20 @@ conventional-commit-type(scope): one liner
 
 ## Prime Directive
 
-Keep Maat accurate without requiring the human to manage it.
+Keep the product repo clean. Do not commit local Maat state to this repository.
 
-For any meaningful project-management action, update both the current state and transaction history.
-
-The early repository uses `state/projects/<project-id>.md` and `state/ledger/YYYY-MM.md`. The target architecture moves toward conflict-resistant per-project directories and per-event files.
-
-Then commit the change to Git.
+For project-management actions, update the configured external Maat storage repo. For product changes here, update code or docs, run relevant checks, commit, and push.
 
 ## Before You Change Anything
 
 1. Pull or inspect the latest repository state.
 2. Read this file.
-3. Check whether a project already exists in `state/projects/`.
-4. If uncertain, prefer adding a small `waiting` note or handoff instead of overwriting status.
+3. Inspect the relevant code and docs before editing.
+4. If project state is needed, use the configured external storage repo instead of adding tracked Markdown state here.
 
 ## Project Files
 
-Legacy project files are plain Markdown using the template in `state/templates/project.md`. Target architecture uses `state/projects/<project-key>/project.md` plus separate goal, ticket, and event files.
+Legacy project files are plain Markdown in a Maat storage repo. Target architecture uses `state/projects/<project-key>/project.md` plus separate goal, ticket, and event files inside that storage repo.
 
 Legacy project fields:
 
@@ -82,8 +82,8 @@ Use stable IDs:
 
 Events are append-only.
 
-- Target architecture writes new event files under `state/projects/<project-key>/events/YYYY/MM/`.
-- Legacy v0 docs may still use monthly files such as `state/ledger/2026-05.md`.
+- Target architecture writes new event files under `state/projects/<project-key>/events/YYYY/MM/` in the storage repo.
+- Legacy v0 storage may still use monthly files such as `state/ledger/2026-05.md`.
 - Do not rewrite old events unless you are correcting your own uncommitted mistake.
 - If a previous event was wrong, append a new correction event.
 - Every event must reference the project and changed object.
@@ -113,20 +113,20 @@ Any agent system can participate if it can:
 - Run Git commands.
 - Follow Markdown templates.
 
-The preferred integration is:
+The preferred product-repo integration is:
 
 1. Clone this repo.
-2. Perform the project update.
-3. Create the matching event.
+2. Perform the code or documentation update.
+3. Run the relevant checks.
 4. Commit as the agent identity.
 5. Push to the shared remote.
 
-For systems that cannot push directly, write a complete handoff file in `state/reports/` and include the exact object and event changes another agent should apply.
+For systems that cannot push directly, write a complete handoff in the external Maat storage repo or in the conversation.
 
 ## What Not To Do
 
 - Do not use hidden databases as the source of truth.
-- Do not store primary state outside Markdown.
+- Do not commit repo-local `state/` content.
 - Do not delete history.
 - Do not silently change the meaning of a status.
 - Do not mark work done unless the completion evidence is clear.

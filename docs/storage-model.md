@@ -43,7 +43,7 @@ maat-state/
 └── README.md
 ```
 
-The current repository still has early flat files such as `state/projects/maat.md` and `state/ledger/2026-05.md`. Those are useful v0 documents. The architecture target is the directory-per-project layout above.
+The product repository ignores `state/` so local smoke data and real storage repos do not clutter the source tree. The architecture target for a storage repo is the directory-per-project layout above.
 
 ## Project Identity
 

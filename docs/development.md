@@ -10,13 +10,13 @@ Use a writable Go build cache when running inside restricted environments:
 GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt status --storage .
 ```
 
-Useful commands:
+Useful commands against a local or external Maat storage repo:
 
 ```sh
-GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt projects --storage .
-GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt project show maat --storage .
-GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt search "agent health" --storage .
-GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt index rebuild --storage .
+GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt projects --storage /path/to/maat-state
+GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt project show maat --storage /path/to/maat-state
+GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt search "agent health" --storage /path/to/maat-state
+GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt index rebuild --storage /path/to/maat-state
 ```
 
 ## Install Locally
@@ -68,7 +68,7 @@ GitHub Actions runs the same test and release build path on `v*` tags and manual
 
 The first executable slice is intentionally small:
 
-- parse legacy flat project files from `state/projects/*.md`
+- parse legacy flat project files from `state/projects/*.md` in a storage repo
 - validate known status values
 - compute status totals
 - search through the rebuildable SQLite index, with direct Markdown search as a fallback
