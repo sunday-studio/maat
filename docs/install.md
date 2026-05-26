@@ -64,6 +64,60 @@ MATT_COLOR=never scripts/install.sh
 
 During install, the script prints step-by-step progress for selecting the target directory, finding or building the binary, preparing the target, installing the executable, and checking whether the target directory is on `PATH`.
 
+## Update And Uninstall
+
+`matt update` installs a local binary into the install directory. This is intentionally offline: download or build the new binary first, then run that binary as the updater.
+
+```sh
+matt update
+matt update --source ./dist/matt --install-dir "$HOME/.local/bin"
+matt update --source /tmp/matt-new --install-dir /usr/local/bin --binary-name matt
+```
+
+When `--source` is omitted, `matt update` uses the currently running executable. This is useful when running a freshly downloaded binary from `/tmp` and installing it over the older installed copy.
+
+Remove the installed binary with:
+
+```sh
+matt uninstall
+matt uninstall --install-dir "$HOME/.local/bin"
+```
+
+By default, uninstall removes only the binary and keeps Maat config. Remove the local config explicitly with:
+
+```sh
+matt uninstall --purge-config
+```
+
+Use `--binary-name <name>` for test installs or renamed binaries.
+
+## Test Install, Update, And Uninstall
+
+Use a temporary install directory so the test does not touch your real system path:
+
+```sh
+GOCACHE=/private/tmp/maat-go-cache go build -o /tmp/matt ./cmd/matt
+
+INSTALL_DIR=$(mktemp -d)
+MATT_INSTALL_DIR="$INSTALL_DIR" MATT_SOURCE_BIN=/tmp/matt scripts/install.sh
+
+"$INSTALL_DIR/matt" version
+"$INSTALL_DIR/matt" update --source /tmp/matt --install-dir "$INSTALL_DIR"
+"$INSTALL_DIR/matt" uninstall --install-dir "$INSTALL_DIR"
+
+test ! -e "$INSTALL_DIR/matt"
+```
+
+Test config purge without touching your normal config:
+
+```sh
+CONFIG_FILE=$(mktemp)
+printf '{}\n' > "$CONFIG_FILE"
+
+MAAT_CONFIG="$CONFIG_FILE" /tmp/matt uninstall --install-dir "$INSTALL_DIR" --purge-config
+test ! -e "$CONFIG_FILE"
+```
+
 ## Build From Source
 
 Build the local binary into `dist/matt`:

@@ -150,6 +150,74 @@ func TestVersionCommand(t *testing.T) {
 	}
 }
 
+func TestUpdateCommandInstallsSourceBinary(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "matt-new")
+	if err := os.WriteFile(source, []byte("new binary\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	installDir := t.TempDir()
+
+	output, err := captureRun("update", "--source", source, "--install-dir", installDir, "--binary-name", "matt-test", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result installCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(installDir, "matt-test")
+	if result.Action != "update.installed" || result.SourcePath != source || result.TargetPath != target {
+		t.Fatalf("unexpected update result: %#v", result)
+	}
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "new binary\n" {
+		t.Fatalf("unexpected installed binary content: %q", string(data))
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&0o111 == 0 {
+		t.Fatalf("expected installed binary to be executable, mode=%v", info.Mode())
+	}
+}
+
+func TestUninstallCommandRemovesBinaryAndCanPurgeConfig(t *testing.T) {
+	installDir := t.TempDir()
+	target := filepath.Join(installDir, "matt-test")
+	if err := os.WriteFile(target, []byte("old binary\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("MAAT_CONFIG", configPath)
+	if err := os.WriteFile(configPath, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := captureRun("uninstall", "--install-dir", installDir, "--binary-name", "matt-test", "--purge-config", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result installCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Action != "uninstall.removed" || !result.Removed || !result.ConfigPurged || result.TargetPath != target {
+		t.Fatalf("unexpected uninstall result: %#v", result)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("expected binary to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
+		t.Fatalf("expected config to be removed, got err=%v", err)
+	}
+}
+
 func TestValidateCommand(t *testing.T) {
 	store := writeCommandFixture(t)
 

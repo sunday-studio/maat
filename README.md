@@ -29,6 +29,13 @@ From a checkout:
 scripts/install.sh
 ```
 
+Update or remove a local install:
+
+```sh
+matt update --source ./dist/matt --install-dir "$HOME/.local/bin"
+matt uninstall --install-dir "$HOME/.local/bin"
+```
+
 Build directly:
 
 ```sh

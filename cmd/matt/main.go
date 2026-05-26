@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -44,6 +45,10 @@ func run(args []string) error {
 		return nil
 	case "version":
 		return versionCommand(args[1:])
+	case "update":
+		return updateCommand(args[1:])
+	case "uninstall":
+		return uninstallCommand(args[1:])
 	case "initialize":
 		return agentInitializeCommand(args[1:])
 	case "init":
@@ -154,6 +159,8 @@ Tickets:
 Setup and maintenance:
   matt init [storage-path]
   matt storage link <storage-path>
+  matt update [--source <path>] [--install-dir <path>] [--binary-name <name>] [--json]
+  matt uninstall [--install-dir <path>] [--binary-name <name>] [--purge-config] [--json]
   matt index rebuild [--storage <path>]
   matt validate [--storage <path>] [--json]
   matt migrate plan [--storage <path>] [--json]
@@ -181,6 +188,214 @@ func versionCommand(args []string) error {
 		return writeJSON(info)
 	}
 	fmt.Println(info.String())
+	return nil
+}
+
+type installCommandResult struct {
+	Action       string `json:"action"`
+	BinaryName   string `json:"binary_name"`
+	InstallDir   string `json:"install_dir"`
+	TargetPath   string `json:"target_path"`
+	SourcePath   string `json:"source_path,omitempty"`
+	Removed      bool   `json:"removed,omitempty"`
+	ConfigPath   string `json:"config_path,omitempty"`
+	ConfigPurged bool   `json:"config_purged,omitempty"`
+}
+
+func updateCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	sourcePath := ""
+	installDir := ""
+	binaryName := defaultBinaryName()
+	for i := 0; i < len(filtered); i++ {
+		switch filtered[i] {
+		case "--source":
+			if i+1 >= len(filtered) {
+				return errors.New("--source requires a path")
+			}
+			sourcePath = filtered[i+1]
+			i++
+		case "--install-dir":
+			if i+1 >= len(filtered) {
+				return errors.New("--install-dir requires a path")
+			}
+			installDir = filtered[i+1]
+			i++
+		case "--binary-name":
+			if i+1 >= len(filtered) {
+				return errors.New("--binary-name requires a name")
+			}
+			binaryName = strings.TrimSpace(filtered[i+1])
+			i++
+		default:
+			return fmt.Errorf("unexpected update argument %q", filtered[i])
+		}
+	}
+	if binaryName == "" {
+		return errors.New("--binary-name cannot be empty")
+	}
+	if sourcePath == "" {
+		var err error
+		sourcePath, err = os.Executable()
+		if err != nil {
+			return err
+		}
+	}
+	absSource, err := filepath.Abs(sourcePath)
+	if err != nil {
+		return err
+	}
+	sourceInfo, err := os.Stat(absSource)
+	if err != nil {
+		return fmt.Errorf("read update source: %w", err)
+	}
+	if sourceInfo.IsDir() {
+		return fmt.Errorf("update source is a directory: %s", absSource)
+	}
+	if installDir == "" {
+		installDir = defaultInstallDir()
+	}
+	absInstallDir, err := filepath.Abs(installDir)
+	if err != nil {
+		return err
+	}
+	targetPath := filepath.Join(absInstallDir, binaryName)
+	if samePath(absSource, targetPath) {
+		result := installCommandResult{
+			Action:     "update.skipped",
+			BinaryName: binaryName,
+			InstallDir: absInstallDir,
+			TargetPath: targetPath,
+			SourcePath: absSource,
+		}
+		if agentUse {
+			return agentUpdate("update.ready", "ok", "binary already installed at target path", result)
+		}
+		if jsonOut {
+			return writeJSON(result)
+		}
+		ok("update.ready", "binary already installed at target path", nil)
+		printField("Binary", binaryName)
+		printField("Target", targetPath)
+		return nil
+	}
+	progress("update.prepare", "preparing install directory", map[string]string{"install_dir": absInstallDir})
+	if err := os.MkdirAll(absInstallDir, 0o755); err != nil {
+		return err
+	}
+	progress("update.install", "installing binary", map[string]string{"source": absSource, "target": targetPath})
+	if err := installBinary(absSource, targetPath, sourceInfo.Mode().Perm()); err != nil {
+		return err
+	}
+	result := installCommandResult{
+		Action:     "update.installed",
+		BinaryName: binaryName,
+		InstallDir: absInstallDir,
+		TargetPath: targetPath,
+		SourcePath: absSource,
+	}
+	if agentUse {
+		return agentUpdate("update.ready", "ok", "binary updated", result)
+	}
+	if jsonOut {
+		return writeJSON(result)
+	}
+	ok("update.ready", "binary updated", nil)
+	printField("Binary", binaryName)
+	printField("Source", absSource)
+	printField("Target", targetPath)
+	if !dirOnPath(absInstallDir) {
+		warn("update.path", absInstallDir+" is not on PATH", nil)
+	}
+	return nil
+}
+
+func uninstallCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	installDir := ""
+	binaryName := defaultBinaryName()
+	purgeConfig := false
+	for i := 0; i < len(filtered); i++ {
+		switch filtered[i] {
+		case "--install-dir":
+			if i+1 >= len(filtered) {
+				return errors.New("--install-dir requires a path")
+			}
+			installDir = filtered[i+1]
+			i++
+		case "--binary-name":
+			if i+1 >= len(filtered) {
+				return errors.New("--binary-name requires a name")
+			}
+			binaryName = strings.TrimSpace(filtered[i+1])
+			i++
+		case "--purge-config":
+			purgeConfig = true
+		default:
+			return fmt.Errorf("unexpected uninstall argument %q", filtered[i])
+		}
+	}
+	if binaryName == "" {
+		return errors.New("--binary-name cannot be empty")
+	}
+	if installDir == "" {
+		installDir = defaultInstallDir()
+	}
+	absInstallDir, err := filepath.Abs(installDir)
+	if err != nil {
+		return err
+	}
+	targetPath := filepath.Join(absInstallDir, binaryName)
+	progress("uninstall.remove", "removing installed binary", map[string]string{"target": targetPath})
+	removed := true
+	if err := os.Remove(targetPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			removed = false
+		} else {
+			return err
+		}
+	}
+	result := installCommandResult{
+		Action:     "uninstall.removed",
+		BinaryName: binaryName,
+		InstallDir: absInstallDir,
+		TargetPath: targetPath,
+		Removed:    removed,
+	}
+	if purgeConfig {
+		cfgPath, err := configPath()
+		if err != nil {
+			return err
+		}
+		result.ConfigPath = cfgPath
+		if err := os.Remove(cfgPath); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+		} else {
+			result.ConfigPurged = true
+		}
+	}
+	if agentUse {
+		return agentUpdate("uninstall.ready", "ok", "uninstall complete", result)
+	}
+	if jsonOut {
+		return writeJSON(result)
+	}
+	if removed {
+		ok("uninstall.ready", "removed installed binary", nil)
+	} else {
+		warn("uninstall.ready", "installed binary was not found", nil)
+	}
+	printField("Binary", binaryName)
+	printField("Target", targetPath)
+	if purgeConfig {
+		if result.ConfigPurged {
+			printField("Config", "removed "+result.ConfigPath)
+		} else {
+			printField("Config", "not found "+result.ConfigPath)
+		}
+	}
 	return nil
 }
 
@@ -1520,6 +1735,109 @@ func printField(label, value string) {
 		return
 	}
 	fmt.Printf("%-10s %s\n", label+":", value)
+}
+
+func defaultBinaryName() string {
+	if name := strings.TrimSpace(os.Getenv("MATT_BINARY_NAME")); name != "" {
+		return name
+	}
+	return "matt"
+}
+
+func defaultInstallDir() string {
+	if dir := strings.TrimSpace(os.Getenv("MATT_INSTALL_DIR")); dir != "" {
+		return dir
+	}
+	if info, err := os.Stat("/usr/local/bin"); err == nil && info.IsDir() && isWritableDir("/usr/local/bin") {
+		return "/usr/local/bin"
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		return filepath.Join(home, ".local", "bin")
+	}
+	return "."
+}
+
+func isWritableDir(path string) bool {
+	file, err := os.CreateTemp(path, ".matt-write-test-*")
+	if err != nil {
+		return false
+	}
+	name := file.Name()
+	_ = file.Close()
+	_ = os.Remove(name)
+	return true
+}
+
+func installBinary(sourcePath, targetPath string, sourcePerm os.FileMode) error {
+	input, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer input.Close()
+	tmp, err := os.CreateTemp(filepath.Dir(targetPath), "."+filepath.Base(targetPath)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+	if _, err := io.Copy(tmp, input); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	mode := sourcePerm
+	if mode == 0 {
+		mode = 0o755
+	}
+	mode |= 0o111
+	if err := tmp.Chmod(mode); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, targetPath); err != nil {
+		return err
+	}
+	cleanup = false
+	return nil
+}
+
+func samePath(left, right string) bool {
+	leftAbs, leftErr := filepath.Abs(left)
+	rightAbs, rightErr := filepath.Abs(right)
+	if leftErr != nil || rightErr != nil {
+		return filepath.Clean(left) == filepath.Clean(right)
+	}
+	return filepath.Clean(leftAbs) == filepath.Clean(rightAbs)
+}
+
+func dirOnPath(dir string) bool {
+	if dir == "" {
+		return false
+	}
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		absDir = filepath.Clean(dir)
+	}
+	for _, entry := range filepath.SplitList(os.Getenv("PATH")) {
+		if entry == "" {
+			continue
+		}
+		absEntry, err := filepath.Abs(entry)
+		if err != nil {
+			absEntry = filepath.Clean(entry)
+		}
+		if filepath.Clean(absEntry) == filepath.Clean(absDir) {
+			return true
+		}
+	}
+	return false
 }
 
 func agentUpdate(step, status, message string, data any) error {
