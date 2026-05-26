@@ -7,7 +7,7 @@ on:
       - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   check:
@@ -26,7 +26,12 @@ jobs:
         run: go test ./...
 
       - name: Build release artifacts
-        run: make release
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME}" make release
+          else
+            make release
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -35,3 +40,14 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/checksums-*.txt
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          artifactErrorsFail: true
+          artifacts: "dist/*.tar.gz,dist/checksums-*.txt"
+          generateReleaseNotes: true
+          replacesArtifacts: true
+          token: ${{ secrets.GITHUB_TOKEN }}
