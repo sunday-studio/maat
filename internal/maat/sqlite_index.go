@@ -18,6 +18,9 @@ import (
 )
 
 const sqliteIndexVersion = 1
+const sqliteBusyTimeoutMillis = 10000
+
+var sqliteLockPoll = 25 * time.Millisecond
 
 type SQLiteIndexOptions struct {
 	Store      string
@@ -56,20 +59,42 @@ func RebuildSQLiteIndexWithOptions(opts SQLiteIndexOptions) (SQLiteIndexInfo, er
 		return SQLiteIndexInfo{}, err
 	}
 
-	db, err := sql.Open("sqlite", path)
+	documents, err := collectDocuments(opts.Store)
 	if err != nil {
 		return SQLiteIndexInfo{}, err
 	}
-	defer db.Close()
+
+	lock, err := acquireSQLiteIndexLock(path)
+	if err != nil {
+		return SQLiteIndexInfo{}, err
+	}
+	defer lock.Release()
+
+	tmpPath, err := createSQLiteTempPath(path)
+	if err != nil {
+		return SQLiteIndexInfo{}, err
+	}
+	defer cleanupSQLiteFiles(tmpPath)
+
+	db, err := sql.Open("sqlite", tmpPath)
+	if err != nil {
+		return SQLiteIndexInfo{}, err
+	}
+	closeDB := true
+	defer func() {
+		if closeDB {
+			db.Close()
+		}
+	}()
+
+	if err := configureSQLiteWriteConnection(db, false); err != nil {
+		return SQLiteIndexInfo{}, err
+	}
 
 	if err := rebuildSQLiteSchema(db); err != nil {
 		return SQLiteIndexInfo{}, err
 	}
 	fts, err := tryCreateFTS(db, opts.DisableFTS)
-	if err != nil {
-		return SQLiteIndexInfo{}, err
-	}
-	documents, err := collectDocuments(opts.Store)
 	if err != nil {
 		return SQLiteIndexInfo{}, err
 	}
@@ -79,14 +104,33 @@ func RebuildSQLiteIndexWithOptions(opts SQLiteIndexOptions) (SQLiteIndexInfo, er
 	if err := writeSQLiteMetadata(db, fts); err != nil {
 		return SQLiteIndexInfo{}, err
 	}
+	if err := db.Close(); err != nil {
+		return SQLiteIndexInfo{}, err
+	}
+	closeDB = false
+	if err := replaceSQLiteIndex(tmpPath, path); err != nil {
+		return SQLiteIndexInfo{}, err
+	}
+	db, err = sql.Open("sqlite", path)
+	if err != nil {
+		return SQLiteIndexInfo{}, err
+	}
+	closeDB = true
+	if err := configureSQLiteWriteConnection(db, true); err != nil {
+		return SQLiteIndexInfo{}, err
+	}
 	return SQLiteIndexInfo{Path: path, Documents: len(documents), FTS: fts}, nil
 }
 
 func OpenSQLiteIndex(path string) (*SQLiteIndex, error) {
+	if _, err := os.Stat(path); err != nil {
+		return nil, err
+	}
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err
 	}
+	configureSQLiteReadConnection(db)
 	fts, err := sqliteFTSEnabled(db)
 	if err != nil {
 		db.Close()
@@ -130,7 +174,6 @@ func SearchSQLiteIndex(path, query string) ([]SearchResult, error) {
 
 func rebuildSQLiteSchema(db *sql.DB) error {
 	statements := []string{
-		`PRAGMA journal_mode = WAL`,
 		`DROP TABLE IF EXISTS search_documents_fts`,
 		`DROP TABLE IF EXISTS search_documents`,
 		`DROP TABLE IF EXISTS index_metadata`,
@@ -148,6 +191,119 @@ func rebuildSQLiteSchema(db *sql.DB) error {
 			indexed_at TEXT NOT NULL
 		)`,
 		`CREATE INDEX search_documents_type_idx ON search_documents(type)`,
+	}
+	for _, statement := range statements {
+		if _, err := db.Exec(statement); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type sqliteIndexLock struct {
+	path string
+	file *os.File
+}
+
+func acquireSQLiteIndexLock(indexPath string) (*sqliteIndexLock, error) {
+	lockPath := indexPath + ".lock"
+	if err := os.MkdirAll(filepath.Dir(lockPath), 0o755); err != nil {
+		return nil, err
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		file, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+		if err == nil {
+			_, _ = fmt.Fprintf(file, "pid=%d\ncreated=%s\n", os.Getpid(), time.Now().UTC().Format(time.RFC3339Nano))
+			return &sqliteIndexLock{path: lockPath, file: file}, nil
+		}
+		if !errors.Is(err, os.ErrExist) {
+			return nil, err
+		}
+		if stale, statErr := sqliteLockIsStale(lockPath, 5*time.Minute); statErr == nil && stale {
+			_ = os.Remove(lockPath)
+			continue
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("timed out waiting for SQLite index lock %s", lockPath)
+		}
+		time.Sleep(sqliteLockPoll)
+	}
+}
+
+func (lock *sqliteIndexLock) Release() error {
+	if lock == nil {
+		return nil
+	}
+	var closeErr error
+	if lock.file != nil {
+		closeErr = lock.file.Close()
+	}
+	removeErr := os.Remove(lock.path)
+	if closeErr != nil {
+		return closeErr
+	}
+	if removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+		return removeErr
+	}
+	return nil
+}
+
+func sqliteLockIsStale(path string, maxAge time.Duration) (bool, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+	return time.Since(info.ModTime()) > maxAge, nil
+}
+
+func createSQLiteTempPath(indexPath string) (string, error) {
+	file, err := os.CreateTemp(filepath.Dir(indexPath), "."+filepath.Base(indexPath)+".tmp-*.sqlite")
+	if err != nil {
+		return "", err
+	}
+	path := file.Name()
+	if err := file.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	if err := os.Remove(path); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func replaceSQLiteIndex(tmpPath, indexPath string) error {
+	for _, suffix := range []string{"-wal", "-shm", "-journal"} {
+		if err := os.Remove(indexPath + suffix); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	return os.Rename(tmpPath, indexPath)
+}
+
+func cleanupSQLiteFiles(path string) {
+	for _, candidate := range []string{path, path + "-wal", path + "-shm", path + "-journal"} {
+		_ = os.Remove(candidate)
+	}
+}
+
+func configureSQLiteReadConnection(db *sql.DB) {
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	_, _ = db.Exec(fmt.Sprintf(`PRAGMA busy_timeout = %d`, sqliteBusyTimeoutMillis))
+	_, _ = db.Exec(`PRAGMA journal_mode = WAL`)
+}
+
+func configureSQLiteWriteConnection(db *sql.DB, wal bool) error {
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	statements := []string{
+		fmt.Sprintf(`PRAGMA busy_timeout = %d`, sqliteBusyTimeoutMillis),
+		`PRAGMA synchronous = NORMAL`,
+	}
+	if wal {
+		statements = append(statements, `PRAGMA journal_mode = WAL`)
 	}
 	for _, statement := range statements {
 		if _, err := db.Exec(statement); err != nil {

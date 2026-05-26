@@ -2,8 +2,10 @@ package maat
 
 import (
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -91,6 +93,52 @@ func TestSQLiteIndexKeepsBootstrapJSONIndexSeparate(t *testing.T) {
 	}
 	if _, err := os.Stat(sqliteInfo.Path); err != nil {
 		t.Fatalf("SQLite index was not written: %v", err)
+	}
+}
+
+func TestRebuildSQLiteIndexSerializesConcurrentRebuilds(t *testing.T) {
+	root := writeSQLiteIndexFixture(t)
+	const workers = 20
+
+	start := make(chan struct{})
+	errs := make(chan error, workers)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			info, err := RebuildSQLiteIndex(root)
+			if err != nil {
+				errs <- err
+				return
+			}
+			if info.Documents != 2 {
+				errs <- errors.New("unexpected document count")
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := os.Stat(SQLiteIndexPath(root) + ".lock"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected rebuild lock to be cleaned up, got %v", err)
+	}
+	results, err := SearchSQLiteIndex(SQLiteIndexPath(root), "agent health")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected one search result after concurrent rebuilds, got %d: %#v", len(results), results)
+	}
+	if results[0].Path != "docs/health.md" {
+		t.Fatalf("unexpected result after concurrent rebuilds: %#v", results[0])
 	}
 }
 
