@@ -27,11 +27,11 @@ matt index rebuild
 
 ```sh
 matt projects
-matt project show orion
+matt project show maat
 matt project link
 matt project link /absolute/path/to/source-repo
-matt project link /absolute/path/to/source-repo --key orion --name "Orion"
-matt project status orion active
+matt project link /absolute/path/to/source-repo --key maat --name "Maat"
+matt project status maat active
 ```
 
 `matt project link` should detect the current Git repository when run from inside a source repo.
@@ -39,9 +39,9 @@ matt project status orion active
 ### Goal Commands
 
 ```sh
-matt goal create orion "Ship first deploy"
+matt goal create maat "Ship first deploy"
 matt goal create "Ship first deploy"
-matt goal list orion
+matt goal list maat
 matt goal show G-20260525-190533-a7f3
 matt goal status G-20260525-190533-a7f3 done --evidence "all tickets complete"
 ```
@@ -51,8 +51,8 @@ When run from inside a repo linked with `matt project link`, create commands can
 ### Ticket Commands
 
 ```sh
-matt ticket create orion "Fix deploy doc link"
-matt ticket create orion --goal G-20260525-190533-a7f3 "Verify installer"
+matt ticket create maat "Fix deploy doc link"
+matt ticket create maat --goal G-20260525-190533-a7f3 "Verify installer"
 matt ticket create "Fix deploy doc link"
 matt ticket show T-20260525-190700-b91c
 matt ticket claim T-20260525-190700-b91c --agent codex --ttl 2h

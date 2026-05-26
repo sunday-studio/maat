@@ -10,13 +10,13 @@
 
 ## Current
 
-Maat is being established as a Git-native Markdown project management system for agent-run work. The first version defines the repository structure, agent operating instructions, current-state project files, and an append-only history model.
+Maat is being established as a Git-native Markdown project management system for agent-run work. The first version defines the repository structure, agent operating instructions, the Maat project state file, and an append-only history model.
 
 The system is intentionally file-first: agents should be able to clone the repo, update Markdown, create events, and commit without needing a separate authoritative database or hosted app.
 
 The implementation now has a usable read CLI, validation, SQLite-backed search/indexing, target object parsing, write-path core operations, Git sync primitives, migration planning, a first Bubble Tea dashboard, and local install documentation.
 
-The latest cleanup removed stale public helper code that was no longer called by the CLI or internal workflows.
+The latest cleanup scoped the repository back to Maat-only state by removing unrelated project records and external project names from public docs and test fixtures.
 
 ## Goals
 
@@ -33,7 +33,7 @@ The latest cleanup removed stale public helper code that was no longer called by
 - [x] T-001: Define the core repository structure.
 - [x] T-002: Add instructions for agents.
 - [x] T-003: Add project and ledger templates.
-- [x] T-004: Register active external projects after reading their current state.
+- [x] T-004: Keep this repository scoped to Maat project state only.
 - [ ] T-005: Add validation or automation once the Markdown workflow stabilizes.
 
 ### G-002: Design the installable Maat architecture
@@ -46,7 +46,7 @@ The latest cleanup removed stale public helper code that was no longer called by
 
 #### Tasks
 
-- [x] T-001: Capture repository and commit conventions from Orion and Aether.
+- [x] T-001: Capture repository and commit conventions for Maat agents.
 - [x] T-002: Document the durable Git and Markdown storage architecture.
 - [x] T-003: Document the SQLite search and indexing architecture.
 - [x] T-004: Document the CLI, Bubble Tea TUI, local web UI, and agent protocol.
@@ -184,6 +184,21 @@ The latest cleanup removed stale public helper code that was no longer called by
 - [x] T-001: Remove unused Git wrapper helpers superseded by `GitSync` methods.
 - [x] T-002: Remove the stale project ID prefix from generated ID validation.
 - [x] T-003: Re-run tests and vet after cleanup.
+
+### G-011: Scope this repository to Maat only
+
+| Field | Value |
+|---|---|
+| Status | done |
+| Updated | 2026-05-26 |
+| Tags | #cleanup #storage #docs |
+
+#### Tasks
+
+- [x] T-001: Remove unrelated project files from `projects/`.
+- [x] T-002: Remove cross-project registration events from the legacy ledger.
+- [x] T-003: Replace public examples and test fixtures that used real project names.
+- [x] T-004: Verify Maat now validates as a one-project store.
 
 ## Blockers
 

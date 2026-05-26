@@ -22,7 +22,7 @@ maat-state/
 ├── decisions/
 │   └── D-20260525-architecture-direction.md
 ├── projects/
-│   └── orion/
+│   └── maat/
 │       ├── project.md
 │       ├── repos/
 │       │   └── R-20260525-190100-a31f.md
@@ -39,7 +39,7 @@ maat-state/
 └── tags.md
 ```
 
-The current repository still has early flat files such as `projects/orion.md` and `ledger/2026-05.md`. Those are useful v0 documents. The architecture target is the directory-per-project layout above.
+The current repository still has early flat files such as `projects/maat.md` and `ledger/2026-05.md`. Those are useful v0 documents. The architecture target is the directory-per-project layout above.
 
 ## Project Identity
 
@@ -66,27 +66,27 @@ projects/<project-key>/project.md
 Shape:
 
 ```markdown
-# Project: Orion
+# Project: Maat
 
 | Field | Value |
 |---|---|
-| Project Key | orion-a31f |
-| Display Name | Orion |
+| Project Key | maat |
+| Display Name | Maat |
 | Status | active |
 | Created | 2026-05-25T19:05:00+02:00 |
 | Updated | 2026-05-25T19:05:00+02:00 |
-| Tags | #infra #agent-run |
+| Tags | #product #agent-run |
 
 ## Summary
 
-Self-hosted monitoring app with Agent, Core, and Console.
+Git-native project memory for agent-managed work.
 
 ## Identity
 
 | Field | Value |
 |---|---|
 | Primary Repo | R-20260525-190100-a31f |
-| Remote | git@github.com:sunday-studio/orion.git |
+| Remote | git@github.com:sunday-studio/maat.git |
 ```
 
 Project files should change rarely. Frequent updates belong in event files.
@@ -107,14 +107,14 @@ Shape:
 | Field | Value |
 |---|---|
 | Goal ID | G-20260525-190533-a7f3 |
-| Project | orion-a31f |
+| Project | maat |
 | Status | active |
 | Created | 2026-05-25T19:05:33+02:00 |
 | Tags | #backend #frontend |
 
 ## Outcome
 
-Agent health should explain whether the problem is the agent, monitor rollup, stale data, or check failure.
+Agent workflow docs should make the state model and handoff expectations clear.
 ```
 
 Goal status may be computed from events once event processing exists. Until then the file can carry a status field.
@@ -130,12 +130,12 @@ projects/<project-key>/tickets/<ticket-id>.md
 Shape:
 
 ```markdown
-# Ticket: Separate Agent Availability From Monitor Health
+# Ticket: Separate Project State From Product Examples
 
 | Field | Value |
 |---|---|
 | Ticket ID | T-20260525-190700-b91c |
-| Project | orion-a31f |
+| Project | maat |
 | Goal | G-20260525-190533-a7f3 |
 | Status | active |
 | Created | 2026-05-25T19:07:00+02:00 |
@@ -143,13 +143,13 @@ Shape:
 
 ## Description
 
-Make agent availability distinct from monitor health in computed status and UI presentation.
+Keep Maat's own repository focused on Maat state while product examples remain generic.
 
 ## Acceptance
 
-- Agent heartbeat/report freshness is visible.
-- Monitor failures do not make a reporting agent look down by themselves.
-- The UI explains degraded and down causes.
+- The repository only contains Maat project state.
+- Public docs use Maat or generic examples.
+- Cross-project state lives in the user's chosen Maat storage repo, not the product repo.
 ```
 
 Tickets may be goal-linked or standalone.
@@ -172,7 +172,7 @@ Shape:
 | Event ID | E-20260525-191100-codex-4c9a |
 | Time | 2026-05-25T19:11:00+02:00 |
 | Actor | codex |
-| Project | orion-a31f |
+| Project | maat |
 | Type | ticket.completed |
 | Object | T-20260525-190700-b91c |
 | Commit | abc1234 |

@@ -133,8 +133,8 @@ Examples:
 ```sh
 matt status
 matt project link
-matt goal create orion "Ship first deploy"
-matt ticket create orion --goal G-20260525-190533-a7f3 "Verify install"
+matt goal create maat "Ship first deploy"
+matt ticket create maat --goal G-20260525-190533-a7f3 "Verify install"
 matt ticket claim T-20260525-190700-b91c --ttl 2h
 matt ticket comment T-20260525-190700-b91c "Found failing deploy path."
 matt ticket complete T-20260525-190700-b91c --evidence "installer smoke passed"

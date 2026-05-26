@@ -124,7 +124,7 @@ func TestGitSyncPullRebaseCommitAndPushConstructCommands(t *testing.T) {
 	if err := sync.PullRebase(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := sync.Commit(context.Background(), "feat(sync): test command construction", "projects/orion/project.md", "projects/orion/events"); err != nil {
+	if err := sync.Commit(context.Background(), "feat(sync): test command construction", "projects/sample/project.md", "projects/sample/events"); err != nil {
 		t.Fatal(err)
 	}
 	if err := sync.Push(context.Background(), "origin", "main"); err != nil {
@@ -133,7 +133,7 @@ func TestGitSyncPullRebaseCommitAndPushConstructCommands(t *testing.T) {
 
 	assertGitCalls(t, runner.calls, [][]string{
 		{"pull", "--rebase"},
-		{"add", "--", "projects/orion/project.md", "projects/orion/events"},
+		{"add", "--", "projects/sample/project.md", "projects/sample/events"},
 		{"commit", "-m", "feat(sync): test command construction"},
 		{"push", "origin", "main"},
 	})

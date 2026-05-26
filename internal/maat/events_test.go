@@ -30,11 +30,11 @@ func TestNewActorEventIDWithReader(t *testing.T) {
 
 func TestEventRelativePath(t *testing.T) {
 	at := time.Date(2026, 5, 25, 19, 8, 12, 0, time.UTC)
-	path, err := EventRelativePath("Orion A31F", at, "E-20260525-190812-codex-4c9a")
+	path, err := EventRelativePath("Sample A31F", at, "E-20260525-190812-codex-4c9a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "projects/orion-a31f/events/2026/05/E-20260525-190812-codex-4c9a.md"
+	want := "projects/sample-a31f/events/2026/05/E-20260525-190812-codex-4c9a.md"
 	if path != want {
 		t.Fatalf("unexpected path: %s", path)
 	}
@@ -46,7 +46,7 @@ func TestRenderEventMarkdown(t *testing.T) {
 		ID:      "E-20260525-191100-codex-4c9a",
 		Time:    at,
 		Actor:   "codex",
-		Project: "orion-a31f",
+		Project: "sample-a31f",
 		Type:    "ticket.completed",
 		Object:  "T-20260525-190700-b91c",
 		Commit:  "abc1234",
@@ -65,7 +65,7 @@ func TestRenderEventMarkdown(t *testing.T) {
 | Event ID | E-20260525-191100-codex-4c9a |
 | Time | 2026-05-25T19:11:00+02:00 |
 | Actor | codex |
-| Project | orion-a31f |
+| Project | sample-a31f |
 | Type | ticket.completed |
 | Object | T-20260525-190700-b91c |
 | Commit | abc1234 |
@@ -88,7 +88,7 @@ func TestRenderEventMarkdownRequiresStructuredFields(t *testing.T) {
 		ID:      "E-20260525-191100-codex-4c9a",
 		Time:    time.Now(),
 		Actor:   "codex",
-		Project: "orion-a31f",
+		Project: "sample-a31f",
 		Type:    "ticket.completed",
 		Object:  "T-20260525-190700-b91c",
 	})

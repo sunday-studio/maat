@@ -223,8 +223,8 @@ Status:
 - Next CLI migration command wiring assigned to Worker C.
 - Migration command coverage landed in `4149bea test(cli): cover migration commands`; command wiring landed with `43e7e47 feat(cli): add agent write commands`.
 - Migration dogfood and safety report assigned to Worker 5.
-- Migration dogfood and overwrite protection done in `d5ea878 fix(migration): dogfood legacy apply`.
-- Dogfood migration run documented in `docs/migration-dogfood.md`.
+- Migration overwrite protection done in `d5ea878 fix(migration): dogfood legacy apply`.
+- Historical cross-project dogfood notes were removed when the repo was scoped back to Maat-only state.
 - Migration apply now refuses to overwrite existing target files.
 
 Remaining:

@@ -41,7 +41,7 @@ func TestProjectsJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &projects); err != nil {
 		t.Fatal(err)
 	}
-	if len(projects) != 1 || projects[0].ID != "orion" || projects[0].Title != "Orion" {
+	if len(projects) != 1 || projects[0].ID != "sample" || projects[0].Title != "Sample" {
 		t.Fatalf("unexpected projects: %#v", projects)
 	}
 }
@@ -125,7 +125,7 @@ func TestMigratePlanCommandJSON(t *testing.T) {
 		t.Fatalf("expected one project plan, got %d", len(plan.Projects))
 	}
 	project := plan.Projects[0]
-	if project.LegacyPath != "projects/orion.md" || project.ProjectPath != "projects/orion/project.md" {
+	if project.LegacyPath != "projects/sample.md" || project.ProjectPath != "projects/sample/project.md" {
 		t.Fatalf("unexpected project plan: %#v", project)
 	}
 	if len(project.GoalPaths) != 1 || len(project.TicketPaths) != 2 || len(project.EventPaths) != 1 {
@@ -139,7 +139,7 @@ func TestMigratePlanCommandJSON(t *testing.T) {
 func TestMigrateApplyCommandWritesDestinationOnly(t *testing.T) {
 	store := writeCommandFixture(t)
 	dest := t.TempDir()
-	legacyPath := filepath.Join(store, "projects", "orion.md")
+	legacyPath := filepath.Join(store, "projects", "sample.md")
 	before, err := os.ReadFile(legacyPath)
 	if err != nil {
 		t.Fatal(err)
@@ -160,10 +160,10 @@ func TestMigrateApplyCommandWritesDestinationOnly(t *testing.T) {
 	if string(after) != string(before) {
 		t.Fatal("legacy source file changed")
 	}
-	if _, err := os.Stat(filepath.Join(dest, "projects", "orion", "project.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(dest, "projects", "sample", "project.md")); err != nil {
 		t.Fatalf("expected migrated project file: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(store, "projects", "orion", "project.md")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(store, "projects", "sample", "project.md")); !os.IsNotExist(err) {
 		t.Fatalf("source store should not receive target layout file, got err=%v", err)
 	}
 
@@ -171,7 +171,7 @@ func TestMigrateApplyCommandWritesDestinationOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(objectStore.Projects) != 1 || objectStore.Projects[0].Key != "orion" {
+	if len(objectStore.Projects) != 1 || objectStore.Projects[0].Key != "sample" {
 		t.Fatalf("unexpected migrated object store: %#v", objectStore.Projects)
 	}
 }
@@ -179,25 +179,25 @@ func TestMigrateApplyCommandWritesDestinationOnly(t *testing.T) {
 func TestProjectLinkCommand(t *testing.T) {
 	store := t.TempDir()
 	source := t.TempDir()
-	if err := os.WriteFile(filepath.Join(source, "README.md"), []byte("# Orion\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(source, "README.md"), []byte("# Sample\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	initGitStore(t, source)
-	runGit(t, source, "remote", "add", "origin", "git@github.com:sunday-studio/orion.git")
+	runGit(t, source, "remote", "add", "origin", "git@github.com:sunday-studio/sample.git")
 
 	output, err := captureRun("project", "link", source, "--storage", store)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output, "linked project orion") || !strings.Contains(output, "remote git@github.com:sunday-studio/orion.git") {
+	if !strings.Contains(output, "linked project sample") || !strings.Contains(output, "remote git@github.com:sunday-studio/sample.git") {
 		t.Fatalf("unexpected output: %q", output)
 	}
 
-	project, err := maat.LoadObjectProject(store, "orion")
+	project, err := maat.LoadObjectProject(store, "sample")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if project.DisplayName != "Orion" || project.Identity["Remote"] != "git@github.com:sunday-studio/orion.git" {
+	if project.DisplayName != "Sample" || project.Identity["Remote"] != "git@github.com:sunday-studio/sample.git" {
 		t.Fatalf("unexpected linked project: %#v", project)
 	}
 	if _, err := os.Stat(filepath.Join(store, ".maat", "index.json")); err != nil {
@@ -262,7 +262,7 @@ func TestProjectShowCommandSupportsObjectProject(t *testing.T) {
 func TestProjectShowCommandJSON(t *testing.T) {
 	store := writeCommandFixture(t)
 
-	output, err := captureRun("project", "show", "orion", "--storage", store, "--json")
+	output, err := captureRun("project", "show", "sample", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,12 +270,12 @@ func TestProjectShowCommandJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &legacy); err != nil {
 		t.Fatal(err)
 	}
-	if legacy.ID != "orion" || legacy.Title != "Orion" || len(legacy.Goals) != 1 {
+	if legacy.ID != "sample" || legacy.Title != "Sample" || len(legacy.Goals) != 1 {
 		t.Fatalf("unexpected legacy project json: %#v", legacy)
 	}
 
 	objectStore := writeObjectCommandFixture(t)
-	output, err = captureRun("project", "show", "orion", "--storage", objectStore, "--json")
+	output, err = captureRun("project", "show", "sample", "--storage", objectStore, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +283,7 @@ func TestProjectShowCommandJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &object); err != nil {
 		t.Fatal(err)
 	}
-	if object.Key != "orion" || object.DisplayName != "Orion" {
+	if object.Key != "sample" || object.DisplayName != "Sample" {
 		t.Fatalf("unexpected object project json: %#v", object)
 	}
 }
@@ -292,7 +292,7 @@ func TestGoalCreateCommand(t *testing.T) {
 	t.Setenv("MAAT_ACTOR", "codex")
 	store := writeObjectCommandFixture(t)
 
-	output, err := captureRun("goal", "create", "orion", "Ship command writes", "--storage", store)
+	output, err := captureRun("goal", "create", "sample", "Ship command writes", "--storage", store)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +300,7 @@ func TestGoalCreateCommand(t *testing.T) {
 		t.Fatalf("unexpected output: %q", output)
 	}
 
-	project, err := maat.LoadObjectProject(store, "orion")
+	project, err := maat.LoadObjectProject(store, "sample")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +322,7 @@ func TestGoalCreateCommandJSON(t *testing.T) {
 	t.Setenv("MAAT_ACTOR", "codex")
 	store := writeObjectCommandFixture(t)
 
-	output, err := captureRun("goal", "create", "orion", "Ship json writes", "--storage", store, "--json")
+	output, err := captureRun("goal", "create", "sample", "Ship json writes", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,7 +331,7 @@ func TestGoalCreateCommandJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Action != "goal.created" || result.ProjectKey != "orion" || result.GoalID == "" || result.EventID == "" {
+	if result.Action != "goal.created" || result.ProjectKey != "sample" || result.GoalID == "" || result.EventID == "" {
 		t.Fatalf("unexpected json result: %#v", result)
 	}
 }
@@ -343,8 +343,8 @@ func TestGoalCreateCommandInfersLinkedProject(t *testing.T) {
 	if _, err := maat.LinkProject(t.Context(), maat.LinkProjectInput{
 		Store:       store,
 		SourcePath:  source,
-		ProjectKey:  "orion",
-		DisplayName: "Orion",
+		ProjectKey:  "sample",
+		DisplayName: "Sample",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func TestGoalCreateCommandInfersLinkedProject(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.ProjectKey != "orion" || result.GoalID == "" {
+	if result.ProjectKey != "sample" || result.GoalID == "" {
 		t.Fatalf("unexpected inferred goal result: %#v", result)
 	}
 }
@@ -368,7 +368,7 @@ func TestTicketCreateCommand(t *testing.T) {
 	store := writeObjectCommandFixture(t)
 	goalID := createCommandGoal(t, store)
 
-	output, err := captureRun("ticket", "create", "orion", "Wire ticket command", "--goal", goalID, "--storage", store)
+	output, err := captureRun("ticket", "create", "sample", "Wire ticket command", "--goal", goalID, "--storage", store)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +376,7 @@ func TestTicketCreateCommand(t *testing.T) {
 		t.Fatalf("unexpected output: %q", output)
 	}
 
-	project, err := maat.LoadObjectProject(store, "orion")
+	project, err := maat.LoadObjectProject(store, "sample")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,7 +393,7 @@ func TestTicketCreateCommandJSON(t *testing.T) {
 	store := writeObjectCommandFixture(t)
 	goalID := createCommandGoal(t, store)
 
-	output, err := captureRun("ticket", "create", "orion", "Wire json ticket", "--goal", goalID, "--storage", store, "--json")
+	output, err := captureRun("ticket", "create", "sample", "Wire json ticket", "--goal", goalID, "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -402,7 +402,7 @@ func TestTicketCreateCommandJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Action != "ticket.created" || result.ProjectKey != "orion" || result.GoalID != goalID || result.TicketID == "" || result.EventID == "" {
+	if result.Action != "ticket.created" || result.ProjectKey != "sample" || result.GoalID != goalID || result.TicketID == "" || result.EventID == "" {
 		t.Fatalf("unexpected json result: %#v", result)
 	}
 }
@@ -414,8 +414,8 @@ func TestTicketCreateCommandInfersLinkedProject(t *testing.T) {
 	if _, err := maat.LinkProject(t.Context(), maat.LinkProjectInput{
 		Store:       store,
 		SourcePath:  source,
-		ProjectKey:  "orion",
-		DisplayName: "Orion",
+		ProjectKey:  "sample",
+		DisplayName: "Sample",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -429,7 +429,7 @@ func TestTicketCreateCommandInfersLinkedProject(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.ProjectKey != "orion" || result.TicketID == "" {
+	if result.ProjectKey != "sample" || result.TicketID == "" {
 		t.Fatalf("unexpected inferred ticket result: %#v", result)
 	}
 }
@@ -438,7 +438,7 @@ func TestTicketListAndShowCommands(t *testing.T) {
 	store := writeObjectCommandFixture(t)
 	ticketID := createCommandTicket(t, store)
 
-	output, err := captureRun("ticket", "list", "--project", "orion", "--storage", store, "--json")
+	output, err := captureRun("ticket", "list", "--project", "sample", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,11 +446,11 @@ func TestTicketListAndShowCommands(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &tickets); err != nil {
 		t.Fatal(err)
 	}
-	if len(tickets) != 1 || tickets[0].ID != ticketID || tickets[0].ProjectKey != "orion" {
+	if len(tickets) != 1 || tickets[0].ID != ticketID || tickets[0].ProjectKey != "sample" {
 		t.Fatalf("unexpected tickets: %#v", tickets)
 	}
 
-	output, err = captureRun("ticket", "show", ticketID, "--project", "orion", "--storage", store, "--json")
+	output, err = captureRun("ticket", "show", ticketID, "--project", "sample", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,29 +469,29 @@ func TestTicketListInfersLinkedProject(t *testing.T) {
 	if _, err := maat.LinkProject(t.Context(), maat.LinkProjectInput{
 		Store:       store,
 		SourcePath:  source,
-		ProjectKey:  "orion",
-		DisplayName: "Orion",
+		ProjectKey:  "sample",
+		DisplayName: "Sample",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	writer := maat.NewWriteStore(store)
 	if _, err := writer.CreateProject(maat.CreateProjectInput{
-		Key:         "neptune",
-		DisplayName: "Neptune",
+		Key:         "other",
+		DisplayName: "Other",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	orionTicket, _, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: "orion",
-		Title:      "Orion ticket",
+	sampleTicket, _, err := writer.CreateTicket(maat.CreateTicketInput{
+		ProjectKey: "sample",
+		Title:      "Sample ticket",
 		Actor:      "test",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: "neptune",
-		Title:      "Neptune ticket",
+		ProjectKey: "other",
+		Title:      "Other ticket",
 		Actor:      "test",
 	}); err != nil {
 		t.Fatal(err)
@@ -506,7 +506,7 @@ func TestTicketListInfersLinkedProject(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &tickets); err != nil {
 		t.Fatal(err)
 	}
-	if len(tickets) != 1 || tickets[0].ID != orionTicket.ID || tickets[0].ProjectKey != "orion" {
+	if len(tickets) != 1 || tickets[0].ID != sampleTicket.ID || tickets[0].ProjectKey != "sample" {
 		t.Fatalf("expected linked project ticket only, got %#v", tickets)
 	}
 }
@@ -532,7 +532,7 @@ func TestTicketEventCommands(t *testing.T) {
 		t.Fatalf("unexpected complete output: %q", output)
 	}
 
-	project, err := maat.LoadObjectProject(store, "orion")
+	project, err := maat.LoadObjectProject(store, "sample")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -554,14 +554,14 @@ func TestTicketEventCommandsInferLinkedProjectWhenTicketIDIsDuplicated(t *testin
 	if _, err := maat.LinkProject(t.Context(), maat.LinkProjectInput{
 		Store:       store,
 		SourcePath:  source,
-		ProjectKey:  "orion",
-		DisplayName: "Orion",
+		ProjectKey:  "sample",
+		DisplayName: "Sample",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	writer := maat.NewWriteStore(store)
 	ticket, _, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: "orion",
+		ProjectKey: "sample",
 		Title:      "Shared ticket id",
 		Actor:      "test",
 	})
@@ -569,12 +569,12 @@ func TestTicketEventCommandsInferLinkedProjectWhenTicketIDIsDuplicated(t *testin
 		t.Fatal(err)
 	}
 	if _, err := writer.CreateProject(maat.CreateProjectInput{
-		Key:         "neptune",
-		DisplayName: "Neptune",
+		Key:         "other",
+		DisplayName: "Other",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	writeDuplicateTicket(t, store, "neptune", ticket.ID)
+	writeDuplicateTicket(t, store, "other", ticket.ID)
 	t.Chdir(source)
 
 	output, err := captureRun("ticket", "comment", ticket.ID, "Inferred duplicate", "--storage", store, "--json")
@@ -585,7 +585,7 @@ func TestTicketEventCommandsInferLinkedProjectWhenTicketIDIsDuplicated(t *testin
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.ProjectKey != "orion" || result.TicketID != ticket.ID {
+	if result.ProjectKey != "sample" || result.TicketID != ticket.ID {
 		t.Fatalf("expected linked project inference, got %#v", result)
 	}
 }
@@ -603,7 +603,7 @@ func TestTicketEventCommandsJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &claim); err != nil {
 		t.Fatal(err)
 	}
-	if claim.Action != "ticket.claimed" || claim.TicketID != ticketID || claim.ProjectKey != "orion" || claim.Agent != "claude" || claim.ExpiresAt == "" || claim.EventID == "" {
+	if claim.Action != "ticket.claimed" || claim.TicketID != ticketID || claim.ProjectKey != "sample" || claim.Agent != "claude" || claim.ExpiresAt == "" || claim.EventID == "" {
 		t.Fatalf("unexpected claim json: %#v", claim)
 	}
 
@@ -615,7 +615,7 @@ func TestTicketEventCommandsJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &comment); err != nil {
 		t.Fatal(err)
 	}
-	if comment.Action != "ticket.commented" || comment.TicketID != ticketID || comment.ProjectKey != "orion" || comment.EventID == "" {
+	if comment.Action != "ticket.commented" || comment.TicketID != ticketID || comment.ProjectKey != "sample" || comment.EventID == "" {
 		t.Fatalf("unexpected comment json: %#v", comment)
 	}
 
@@ -627,7 +627,7 @@ func TestTicketEventCommandsJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &complete); err != nil {
 		t.Fatal(err)
 	}
-	if complete.Action != "ticket.completed" || complete.TicketID != ticketID || complete.ProjectKey != "orion" || complete.EventID == "" {
+	if complete.Action != "ticket.completed" || complete.TicketID != ticketID || complete.ProjectKey != "sample" || complete.EventID == "" {
 		t.Fatalf("unexpected complete json: %#v", complete)
 	}
 }
@@ -809,8 +809,8 @@ func writeObjectCommandFixture(t *testing.T) string {
 	root := t.TempDir()
 	writer := maat.NewWriteStore(root)
 	if _, err := writer.CreateProject(maat.CreateProjectInput{
-		Key:         "orion",
-		DisplayName: "Orion",
+		Key:         "sample",
+		DisplayName: "Sample",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -822,7 +822,7 @@ func createCommandGoal(t *testing.T, store string) string {
 
 	writer := maat.NewWriteStore(store)
 	goal, _, err := writer.CreateGoal(maat.CreateGoalInput{
-		ProjectKey: "orion",
+		ProjectKey: "sample",
 		Title:      "Existing goal",
 		Actor:      "test",
 	})
@@ -837,7 +837,7 @@ func createCommandTicket(t *testing.T, store string) string {
 
 	writer := maat.NewWriteStore(store)
 	ticket, _, err := writer.CreateTicket(maat.CreateTicketInput{
-		ProjectKey: "orion",
+		ProjectKey: "sample",
 		Title:      "Existing ticket",
 		Actor:      "test",
 	})
@@ -860,11 +860,11 @@ func writeCommandFixture(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(root, "docs", "note.md"), []byte("# Note\n\nAgent health needs clarity.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "projects", "orion.md"), []byte(`# Project: Orion
+	if err := os.WriteFile(filepath.Join(root, "projects", "sample.md"), []byte(`# Project: Sample
 
 | Field | Value |
 |---|---|
-| ID | orion |
+| ID | sample |
 | Status | active |
 | Owner | agents |
 | Updated | 2026-05-25 |

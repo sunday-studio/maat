@@ -87,7 +87,7 @@ matt ticket complete <ticket-id> --evidence "go test ./... passed"
 Sync changes:
 
 ```sh
-matt sync --message "status(orion): complete installer ticket"
+matt sync --message "status(maat): complete installer ticket"
 matt sync --push
 matt sync --status --json
 ```
@@ -134,4 +134,3 @@ The TUI currently shows projects, status totals, project detail, and ticket list
 - [Agent Protocol](docs/agent-protocol.md)
 - [Install](docs/install.md)
 - [Development](docs/development.md)
-- [Migration Dogfood](docs/migration-dogfood.md)

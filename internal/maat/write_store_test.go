@@ -14,27 +14,27 @@ func TestWriteStoreCreatesProject(t *testing.T) {
 	store := WriteStore{Root: root, Now: func() time.Time { return at }}
 
 	project, err := store.CreateProject(CreateProjectInput{
-		Key:         "Orion A31F",
-		DisplayName: "Orion",
+		Key:         "Sample A31F",
+		DisplayName: "Sample",
 		Tags:        []string{"#infra", "#agent-run"},
 		Summary:     "Self-hosted monitoring app.",
 		PrimaryRepo: "R-20260525-190100-a31f",
-		Remote:      "git@github.com:sunday-studio/orion.git",
+		Remote:      "git@github.com:sunday-studio/sample.git",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if project.Key != "orion-a31f" || project.DisplayName != "Orion" || project.Status != "active" {
+	if project.Key != "sample-a31f" || project.DisplayName != "Sample" || project.Status != "active" {
 		t.Fatalf("unexpected project: %#v", project)
 	}
-	if project.Path != "projects/orion-a31f/project.md" {
+	if project.Path != "projects/sample-a31f/project.md" {
 		t.Fatalf("unexpected path: %q", project.Path)
 	}
-	if project.Identity["Remote"] != "git@github.com:sunday-studio/orion.git" {
+	if project.Identity["Remote"] != "git@github.com:sunday-studio/sample.git" {
 		t.Fatalf("unexpected identity: %#v", project.Identity)
 	}
 	for _, dir := range []string{"goals", "tickets", "events"} {
-		if _, err := os.Stat(filepath.Join(root, "projects", "orion-a31f", dir)); err != nil {
+		if _, err := os.Stat(filepath.Join(root, "projects", "sample-a31f", dir)); err != nil {
 			t.Fatalf("expected %s directory: %v", dir, err)
 		}
 	}
@@ -47,7 +47,7 @@ func TestWriteStoreCreatesGoalAndEvent(t *testing.T) {
 	createProjectFixture(t, store, at)
 
 	goal, event, err := store.CreateGoal(CreateGoalInput{
-		ProjectKey: "orion-a31f",
+		ProjectKey: "sample-a31f",
 		Title:      "Improve Agent Health Clarity",
 		Tags:       []string{"#backend", "#frontend"},
 		Outcome:    "Agent health should explain stale data and check failures.",
@@ -57,13 +57,13 @@ func TestWriteStoreCreatesGoalAndEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if goal.ID != "G-20260525-190533-a7f3" || goal.ProjectKey != "orion-a31f" {
+	if goal.ID != "G-20260525-190533-a7f3" || goal.ProjectKey != "sample-a31f" {
 		t.Fatalf("unexpected goal: %#v", goal)
 	}
 	if event.ID != "E-20260525-190533-codex-4c9a" || event.Type != "goal.created" || event.ObjectID != goal.ID {
 		t.Fatalf("unexpected event: %#v", event)
 	}
-	if event.Path != "projects/orion-a31f/events/2026/05/E-20260525-190533-codex-4c9a.md" {
+	if event.Path != "projects/sample-a31f/events/2026/05/E-20260525-190533-codex-4c9a.md" {
 		t.Fatalf("unexpected event path: %q", event.Path)
 	}
 }
@@ -75,7 +75,7 @@ func TestWriteStoreCreatesStandaloneTicketAndEvent(t *testing.T) {
 	createProjectFixture(t, store, at)
 
 	ticket, event, err := store.CreateTicket(CreateTicketInput{
-		ProjectKey:  "orion-a31f",
+		ProjectKey:  "sample-a31f",
 		Title:       "Fix Broken Deploy Doc Link",
 		Description: "Correct the stale installer reference.",
 		Acceptance:  []string{"Link points at the current installer.", "Docs render cleanly."},
@@ -88,7 +88,7 @@ func TestWriteStoreCreatesStandaloneTicketAndEvent(t *testing.T) {
 	if ticket.ID != "T-20260525-190700-b91c" || ticket.GoalID != "" {
 		t.Fatalf("unexpected ticket: %#v", ticket)
 	}
-	content := readFile(t, filepath.Join(root, "projects", "orion-a31f", "tickets", ticket.ID+".md"))
+	content := readFile(t, filepath.Join(root, "projects", "sample-a31f", "tickets", ticket.ID+".md"))
 	if !strings.Contains(content, "| Goal | none |") {
 		t.Fatalf("expected standalone goal marker, got:\n%s", content)
 	}
@@ -103,7 +103,7 @@ func TestWriteStoreCreatesTicketLifecycleEvents(t *testing.T) {
 	store := WriteStore{Root: root, Entropy: strings.NewReader("\x10\x01\x10\x02\x10\x03\x10\x04\x10\x05\x10\x06\x10\x07\x10\x08")}
 	createProjectFixture(t, store, at)
 	ticket, _, err := store.CreateTicket(CreateTicketInput{
-		ProjectKey: "orion-a31f",
+		ProjectKey: "sample-a31f",
 		Title:      "Separate Agent Availability From Monitor Health",
 		Actor:      "codex",
 		At:         at,
@@ -113,7 +113,7 @@ func TestWriteStoreCreatesTicketLifecycleEvents(t *testing.T) {
 	}
 
 	comment, err := store.CommentTicket(TicketCommentInput{
-		ProjectKey: "orion-a31f",
+		ProjectKey: "sample-a31f",
 		TicketID:   ticket.ID,
 		Actor:      "codex",
 		Comment:    "Found the status rollup issue.",
@@ -123,7 +123,7 @@ func TestWriteStoreCreatesTicketLifecycleEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	claim, err := store.ClaimTicket(ClaimTicketInput{
-		ProjectKey: "orion-a31f",
+		ProjectKey: "sample-a31f",
 		TicketID:   ticket.ID,
 		Actor:      "claude",
 		ExpiresAt:  at.Add(2 * time.Hour),
@@ -133,7 +133,7 @@ func TestWriteStoreCreatesTicketLifecycleEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	completed, err := store.CompleteTicket(CompleteTicketInput{
-		ProjectKey: "orion-a31f",
+		ProjectKey: "sample-a31f",
 		TicketID:   ticket.ID,
 		Actor:      "codex",
 		Summary:    "Completed the ticket after backend tests passed.",
@@ -163,7 +163,7 @@ func TestWriteStoreRequiresCompletionEvidence(t *testing.T) {
 	store := WriteStore{Root: root, Entropy: strings.NewReader("\x10\x01\x10\x02")}
 	createProjectFixture(t, store, at)
 	ticket, _, err := store.CreateTicket(CreateTicketInput{
-		ProjectKey: "orion-a31f",
+		ProjectKey: "sample-a31f",
 		Title:      "Add evidence guard",
 		Actor:      "codex",
 		At:         at,
@@ -173,7 +173,7 @@ func TestWriteStoreRequiresCompletionEvidence(t *testing.T) {
 	}
 
 	_, err = store.CompleteTicket(CompleteTicketInput{
-		ProjectKey: "orion-a31f",
+		ProjectKey: "sample-a31f",
 		TicketID:   ticket.ID,
 		Actor:      "codex",
 		At:         at.Add(time.Minute),
@@ -186,8 +186,8 @@ func TestWriteStoreRequiresCompletionEvidence(t *testing.T) {
 func createProjectFixture(t *testing.T, store WriteStore, at time.Time) {
 	t.Helper()
 	_, err := store.CreateProject(CreateProjectInput{
-		Key:         "orion-a31f",
-		DisplayName: "Orion",
+		Key:         "sample-a31f",
+		DisplayName: "Sample",
 		CreatedAt:   at,
 		UpdatedAt:   at,
 	})

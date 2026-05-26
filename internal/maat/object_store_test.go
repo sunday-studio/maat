@@ -20,16 +20,16 @@ func TestLoadObjectStoreParsesTargetLayout(t *testing.T) {
 	}
 
 	project := store.Projects[0]
-	if project.Key != "orion-a31f" || project.DisplayName != "Orion" || project.Status != "active" {
+	if project.Key != "sample-a31f" || project.DisplayName != "Sample" || project.Status != "active" {
 		t.Fatalf("unexpected project: %#v", project)
 	}
-	if project.Path != "projects/orion-a31f/project.md" {
+	if project.Path != "projects/sample-a31f/project.md" {
 		t.Fatalf("unexpected project path: %q", project.Path)
 	}
 	if project.Summary != "Self-hosted monitoring app with Agent, Core, and Console." {
 		t.Fatalf("unexpected summary: %q", project.Summary)
 	}
-	if project.Identity["Remote"] != "git@github.com:sunday-studio/orion.git" {
+	if project.Identity["Remote"] != "git@github.com:sunday-studio/sample.git" {
 		t.Fatalf("unexpected identity: %#v", project.Identity)
 	}
 
@@ -69,13 +69,13 @@ func TestLoadObjectStoreParsesTargetLayout(t *testing.T) {
 
 func TestParseObjectTicketFileRejectsInvalidStatus(t *testing.T) {
 	root := t.TempDir()
-	path := filepath.Join(root, "projects", "orion-a31f", "tickets", "T-bad.md")
+	path := filepath.Join(root, "projects", "sample-a31f", "tickets", "T-bad.md")
 	writeFile(t, path, `# Ticket: Bad Status
 
 | Field | Value |
 |---|---|
 | Ticket ID | T-bad |
-| Project | orion-a31f |
+| Project | sample-a31f |
 | Status | almost |
 | Created | 2026-05-25T19:07:00+02:00 |
 `)
@@ -91,7 +91,7 @@ func TestParseObjectTicketFileRejectsInvalidStatus(t *testing.T) {
 
 func TestParseObjectEventFileRequiresObject(t *testing.T) {
 	root := t.TempDir()
-	path := filepath.Join(root, "projects", "orion-a31f", "events", "2026", "05", "E-bad.md")
+	path := filepath.Join(root, "projects", "sample-a31f", "events", "2026", "05", "E-bad.md")
 	writeFile(t, path, `# Event: ticket.completed
 
 | Field | Value |
@@ -99,7 +99,7 @@ func TestParseObjectEventFileRequiresObject(t *testing.T) {
 | Event ID | E-bad |
 | Time | 2026-05-25T19:11:00+02:00 |
 | Actor | codex |
-| Project | orion-a31f |
+| Project | sample-a31f |
 | Type | ticket.completed |
 `)
 
@@ -114,12 +114,12 @@ func TestParseObjectEventFileRequiresObject(t *testing.T) {
 
 func writeObjectFixture(t *testing.T, root string) {
 	t.Helper()
-	writeFile(t, filepath.Join(root, "projects", "orion-a31f", "project.md"), `# Project: Orion
+	writeFile(t, filepath.Join(root, "projects", "sample-a31f", "project.md"), `# Project: Sample
 
 | Field | Value |
 |---|---|
-| Project Key | orion-a31f |
-| Display Name | Orion |
+| Project Key | sample-a31f |
+| Display Name | Sample |
 | Status | active |
 | Created | 2026-05-25T19:05:00+02:00 |
 | Updated | 2026-05-25T19:05:00+02:00 |
@@ -134,14 +134,14 @@ Self-hosted monitoring app with Agent, Core, and Console.
 | Field | Value |
 |---|---|
 | Primary Repo | R-20260525-190100-a31f |
-| Remote | git@github.com:sunday-studio/orion.git |
+| Remote | git@github.com:sunday-studio/sample.git |
 `)
-	writeFile(t, filepath.Join(root, "projects", "orion-a31f", "goals", "G-20260525-190533-a7f3.md"), `# Goal: Improve Agent Health Clarity
+	writeFile(t, filepath.Join(root, "projects", "sample-a31f", "goals", "G-20260525-190533-a7f3.md"), `# Goal: Improve Agent Health Clarity
 
 | Field | Value |
 |---|---|
 | Goal ID | G-20260525-190533-a7f3 |
-| Project | orion-a31f |
+| Project | sample-a31f |
 | Status | active |
 | Created | 2026-05-25T19:05:33+02:00 |
 | Tags | #backend #frontend |
@@ -150,12 +150,12 @@ Self-hosted monitoring app with Agent, Core, and Console.
 
 Agent health should explain whether the problem is the agent, monitor rollup, stale data, or check failure.
 `)
-	writeFile(t, filepath.Join(root, "projects", "orion-a31f", "tickets", "T-20260525-190700-b91c.md"), `# Ticket: Separate Agent Availability From Monitor Health
+	writeFile(t, filepath.Join(root, "projects", "sample-a31f", "tickets", "T-20260525-190700-b91c.md"), `# Ticket: Separate Agent Availability From Monitor Health
 
 | Field | Value |
 |---|---|
 | Ticket ID | T-20260525-190700-b91c |
-| Project | orion-a31f |
+| Project | sample-a31f |
 | Goal | G-20260525-190533-a7f3 |
 | Status | waiting |
 | Created | 2026-05-25T19:07:00+02:00 |
@@ -171,14 +171,14 @@ Make agent availability distinct from monitor health in computed status and UI p
 - Monitor failures do not make a reporting agent look down by themselves.
 - The UI explains degraded and down causes.
 `)
-	writeFile(t, filepath.Join(root, "projects", "orion-a31f", "events", "2026", "05", "E-20260525-191100-codex-4c9a.md"), `# Event: ticket.completed
+	writeFile(t, filepath.Join(root, "projects", "sample-a31f", "events", "2026", "05", "E-20260525-191100-codex-4c9a.md"), `# Event: ticket.completed
 
 | Field | Value |
 |---|---|
 | Event ID | E-20260525-191100-codex-4c9a |
 | Time | 2026-05-25T19:11:00+02:00 |
 | Actor | codex |
-| Project | orion-a31f |
+| Project | sample-a31f |
 | Type | ticket.completed |
 | Object | T-20260525-190700-b91c |
 | Commit | abc1234 |

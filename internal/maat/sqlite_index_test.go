@@ -62,7 +62,7 @@ func TestSQLiteIndexFallbackSearch(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("expected one result, got %d: %#v", len(results), results)
 	}
-	if results[0].Path != "projects/orion.md" {
+	if results[0].Path != "projects/sample.md" {
 		t.Fatalf("unexpected fallback result: %#v", results[0])
 	}
 }
@@ -108,10 +108,10 @@ func TestSQLiteIndexTypesTargetLayoutObjects(t *testing.T) {
 		t.Fatalf("expected four indexed documents, got %d", info.Documents)
 	}
 
-	assertSearchResultType(t, info.Path, "monitor rollup", "ticket", "projects/orion/tickets/T-20260525-190700-b91c.md")
-	assertSearchResultType(t, info.Path, "health clarity", "goal", "projects/orion/goals/G-20260525-190533-a7f3.md")
-	assertSearchResultType(t, info.Path, "claim expiration", "event", "projects/orion/events/2026/05/E-20260525-191100-codex-4c9a.md")
-	assertSearchResultType(t, info.Path, "github.com/sunday-studio/orion", "project", "projects/orion/project.md")
+	assertSearchResultType(t, info.Path, "monitor rollup", "ticket", "projects/sample/tickets/T-20260525-190700-b91c.md")
+	assertSearchResultType(t, info.Path, "health clarity", "goal", "projects/sample/goals/G-20260525-190533-a7f3.md")
+	assertSearchResultType(t, info.Path, "claim expiration", "event", "projects/sample/events/2026/05/E-20260525-191100-codex-4c9a.md")
+	assertSearchResultType(t, info.Path, "github.com/sunday-studio/sample", "project", "projects/sample/project.md")
 }
 
 func TestOpenSQLiteIndexDetectsFallbackMetadata(t *testing.T) {
@@ -136,11 +136,11 @@ func writeSQLiteIndexFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "docs", "health.md"), "# Health\n\nAgent health needs clearer status search.\n")
-	mustWrite(t, filepath.Join(root, "projects", "orion.md"), `# Project: Orion
+	mustWrite(t, filepath.Join(root, "projects", "sample.md"), `# Project: Sample
 
 | Field | Value |
 |---|---|
-| ID | orion |
+| ID | sample |
 | Status | active |
 | Updated | 2026-05-25 |
 
@@ -168,27 +168,27 @@ Timeline search should find project history.
 func writeSQLiteTargetLayoutFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	mustWrite(t, filepath.Join(root, "projects", "orion", "project.md"), `# Project: Orion
+	mustWrite(t, filepath.Join(root, "projects", "sample", "project.md"), `# Project: Sample
 
 | Field | Value |
 |---|---|
-| Project Key | orion |
-| Display Name | Orion |
+| Project Key | sample |
+| Display Name | Sample |
 | Status | active |
 | Created | 2026-05-25 |
 | Updated | 2026-05-25 |
-| Remote | git@github.com:sunday-studio/orion.git |
+| Remote | git@github.com:sunday-studio/sample.git |
 
 ## Summary
 
-Tracks github.com/sunday-studio/orion agent operations.
+Tracks github.com/sunday-studio/sample agent operations.
 `)
-	mustWrite(t, filepath.Join(root, "projects", "orion", "goals", "G-20260525-190533-a7f3.md"), `# Goal: Improve Health Clarity
+	mustWrite(t, filepath.Join(root, "projects", "sample", "goals", "G-20260525-190533-a7f3.md"), `# Goal: Improve Health Clarity
 
 | Field | Value |
 |---|---|
 | Goal ID | G-20260525-190533-a7f3 |
-| Project | orion |
+| Project | sample |
 | Status | active |
 | Created | 2026-05-25T19:05:33Z |
 
@@ -196,12 +196,12 @@ Tracks github.com/sunday-studio/orion agent operations.
 
 Health clarity should explain agent state.
 `)
-	mustWrite(t, filepath.Join(root, "projects", "orion", "tickets", "T-20260525-190700-b91c.md"), `# Ticket: Fix Monitor Rollup
+	mustWrite(t, filepath.Join(root, "projects", "sample", "tickets", "T-20260525-190700-b91c.md"), `# Ticket: Fix Monitor Rollup
 
 | Field | Value |
 |---|---|
 | Ticket ID | T-20260525-190700-b91c |
-| Project | orion |
+| Project | sample |
 | Goal | G-20260525-190533-a7f3 |
 | Status | active |
 | Created | 2026-05-25T19:07:00Z |
@@ -210,14 +210,14 @@ Health clarity should explain agent state.
 
 Monitor rollup should separate agent availability from check health.
 `)
-	mustWrite(t, filepath.Join(root, "projects", "orion", "events", "2026", "05", "E-20260525-191100-codex-4c9a.md"), `# Event: ticket.claimed
+	mustWrite(t, filepath.Join(root, "projects", "sample", "events", "2026", "05", "E-20260525-191100-codex-4c9a.md"), `# Event: ticket.claimed
 
 | Field | Value |
 |---|---|
 | Event ID | E-20260525-191100-codex-4c9a |
 | Time | 2026-05-25T19:11:00Z |
 | Actor | codex |
-| Project | orion |
+| Project | sample |
 | Type | ticket.claimed |
 | Object | T-20260525-190700-b91c |
 

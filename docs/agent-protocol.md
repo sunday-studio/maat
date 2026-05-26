@@ -56,16 +56,16 @@ Typical start:
 
 ```sh
 matt sync
-matt project show orion
-matt ticket list --project orion --status active
+matt project show maat
+matt ticket list --project maat --status active
 matt ticket claim T-20260525-190700-b91c --agent codex --ttl 2h
 ```
 
 New work:
 
 ```sh
-matt goal create orion "Improve agent health clarity"
-matt ticket create orion --goal G-20260525-190533-a7f3 "Separate agent availability from monitor health"
+matt goal create maat "Improve agent handoff clarity"
+matt ticket create maat --goal G-20260525-190533-a7f3 "Separate project state from product examples"
 ```
 
 Progress:

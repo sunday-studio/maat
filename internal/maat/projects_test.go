@@ -12,12 +12,12 @@ func TestParseProjectFile(t *testing.T) {
 	if err := os.MkdirAll(projectDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(projectDir, "orion.md")
-	if err := os.WriteFile(path, []byte(`# Project: Orion
+	path := filepath.Join(projectDir, "sample.md")
+	if err := os.WriteFile(path, []byte(`# Project: Sample
 
 | Field | Value |
 |---|---|
-| ID | orion |
+| ID | sample |
 | Status | active |
 | Owner | agents |
 | Updated | 2026-05-25 |
@@ -56,7 +56,7 @@ Current state.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if project.ID != "orion" || project.Status != "active" || project.Title != "Orion" {
+	if project.ID != "sample" || project.Status != "active" || project.Title != "Sample" {
 		t.Fatalf("unexpected project: %#v", project)
 	}
 	if len(project.Goals) != 1 {

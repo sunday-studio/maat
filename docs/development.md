@@ -14,7 +14,7 @@ Useful commands:
 
 ```sh
 GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt projects --storage .
-GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt project show orion --storage .
+GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt project show maat --storage .
 GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt search "agent health" --storage .
 GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt index rebuild --storage .
 ```

@@ -64,7 +64,7 @@ Example commands:
 
 ```sh
 matt search "agent health"
-matt search --project orion "monitor rollup"
+matt search --project maat "agent protocol"
 matt search --type decision "sqlite"
 ```
 

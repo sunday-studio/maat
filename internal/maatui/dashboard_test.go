@@ -12,11 +12,11 @@ import (
 func TestDashboardFromLegacyProjectsCountsStatus(t *testing.T) {
 	dashboard := DashboardFromLegacyProjects([]maat.Project{
 		{
-			ID:      "orion",
-			Title:   "Orion",
+			ID:      "sample",
+			Title:   "Sample",
 			Status:  "active",
 			Updated: "2026-05-25",
-			Current: "Current Orion summary.",
+			Current: "Current Sample summary.",
 			Goals: []maat.Goal{
 				{
 					ID:     "G-001",
@@ -46,7 +46,7 @@ func TestDashboardFromLegacyProjectsCountsStatus(t *testing.T) {
 	if dashboard.Projects[0].OpenTickets != 1 || dashboard.Projects[0].DoneTickets != 1 {
 		t.Fatalf("project ticket counts = %+v", dashboard.Projects[0])
 	}
-	if dashboard.Projects[0].Summary != "Current Orion summary." {
+	if dashboard.Projects[0].Summary != "Current Sample summary." {
 		t.Fatalf("project summary = %q", dashboard.Projects[0].Summary)
 	}
 	if len(dashboard.Projects[0].GoalRows) != 2 || dashboard.Projects[0].GoalRows[0].Tickets != 2 {
@@ -60,8 +60,8 @@ func TestDashboardFromLegacyProjectsCountsStatus(t *testing.T) {
 func TestDashboardFromObjectProjectsIncludesTicketRows(t *testing.T) {
 	dashboard := DashboardFromObjectProjects([]maat.ObjectProject{
 		{
-			Key:         "orion",
-			DisplayName: "Orion",
+			Key:         "sample",
+			DisplayName: "Sample",
 			Status:      "active",
 			Goals: []maat.ObjectGoal{
 				{ID: "G-001", Status: "active", Title: "Improve monitor clarity"},
@@ -75,7 +75,7 @@ func TestDashboardFromObjectProjectsIncludesTicketRows(t *testing.T) {
 					ID:         "E-20260525-190700-codex-a111",
 					Time:       "2026-05-25T19:07:00+02:00",
 					Actor:      "codex",
-					ProjectKey: "orion",
+					ProjectKey: "sample",
 					Type:       "ticket.created",
 					ObjectID:   "T-001",
 					Summary:    "Created the status table ticket.",
@@ -91,7 +91,7 @@ func TestDashboardFromObjectProjectsIncludesTicketRows(t *testing.T) {
 	if len(project.TicketRows) != 2 || project.TicketRows[0].GoalID != "G-001" || project.TicketRows[1].GoalID != "" {
 		t.Fatalf("ticket rows = %+v", project.TicketRows)
 	}
-	if len(dashboard.Events) != 1 || dashboard.Events[0].ProjectName != "Orion" || dashboard.Events[0].Type != "ticket.created" {
+	if len(dashboard.Events) != 1 || dashboard.Events[0].ProjectName != "Sample" || dashboard.Events[0].Type != "ticket.created" {
 		t.Fatalf("event rows = %+v", dashboard.Events)
 	}
 }
@@ -134,11 +134,11 @@ func TestRenderProjectTable(t *testing.T) {
 
 func TestRenderSelectableProjectTableMarksSelectedProject(t *testing.T) {
 	got := RenderSelectableProjectTable([]ProjectRow{
-		{Key: "orion", DisplayName: "Orion", Status: "active"},
-		{Key: "aether", DisplayName: "Aether", Status: "waiting"},
+		{Key: "sample", DisplayName: "Sample", Status: "active"},
+		{Key: "second", DisplayName: "Second", Status: "waiting"},
 	}, 1)
 
-	for _, want := range []string{"> Aether", "  Orion"} {
+	for _, want := range []string{"> Second", "  Sample"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderSelectableProjectTable() missing %q in:\n%s", want, got)
 		}
@@ -147,8 +147,8 @@ func TestRenderSelectableProjectTableMarksSelectedProject(t *testing.T) {
 
 func TestRenderProjectDetailShowsSummaryGoalsAndTicketCounts(t *testing.T) {
 	got := RenderProjectDetail(ProjectRow{
-		Key:         "orion",
-		DisplayName: "Orion",
+		Key:         "sample",
+		DisplayName: "Sample",
 		Status:      "active",
 		Summary:     "Shipping the agent monitor.",
 		Tickets:     3,
@@ -160,7 +160,7 @@ func TestRenderProjectDetailShowsSummaryGoalsAndTicketCounts(t *testing.T) {
 		},
 	})
 
-	for _, want := range []string{"Project Detail", "Orion", "2 open / 1 done / 3 total", "Shipping the agent monitor.", "G-001", "Improve monitor clarity"} {
+	for _, want := range []string{"Project Detail", "Sample", "2 open / 1 done / 3 total", "Shipping the agent monitor.", "G-001", "Improve monitor clarity"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderProjectDetail() missing %q in:\n%s", want, got)
 		}
@@ -169,8 +169,8 @@ func TestRenderProjectDetailShowsSummaryGoalsAndTicketCounts(t *testing.T) {
 
 func TestRenderProjectTicketsShowsGoalAndStandaloneTickets(t *testing.T) {
 	got := RenderProjectTickets(ProjectRow{
-		Key:         "orion",
-		DisplayName: "Orion",
+		Key:         "sample",
+		DisplayName: "Sample",
 		Tickets:     2,
 		OpenTickets: 1,
 		DoneTickets: 1,
@@ -180,7 +180,7 @@ func TestRenderProjectTicketsShowsGoalAndStandaloneTickets(t *testing.T) {
 		},
 	})
 
-	for _, want := range []string{"Tickets", "Orion", "1 open / 1 done / 2 total", "T-001", "Add status table", "G-001", "T-002", "standalone"} {
+	for _, want := range []string{"Tickets", "Sample", "1 open / 1 done / 2 total", "T-001", "Add status table", "G-001", "T-002", "standalone"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderProjectTickets() missing %q in:\n%s", want, got)
 		}
@@ -190,8 +190,8 @@ func TestRenderProjectTicketsShowsGoalAndStandaloneTickets(t *testing.T) {
 func TestRenderDashboardCanShowTicketMode(t *testing.T) {
 	got := RenderDashboardWithSelectionAndMode(Dashboard{Projects: []ProjectRow{
 		{
-			Key:         "orion",
-			DisplayName: "Orion",
+			Key:         "sample",
+			DisplayName: "Sample",
 			Tickets:     1,
 			OpenTickets: 1,
 			TicketRows: []TicketRow{
@@ -213,14 +213,14 @@ func TestRenderTimelineShowsRecentEvents(t *testing.T) {
 			ID:          "E-older",
 			Time:        "2026-05-25T18:00:00+02:00",
 			Actor:       "claude",
-			ProjectName: "Aether",
+			ProjectName: "Second",
 			Type:        "ticket.commented",
 			ObjectID:    "T-010",
 			Summary:     "Added implementation notes.",
 		},
 	})
 
-	for _, want := range []string{"Timeline", "2026-05-25 18:00", "Aether", "ticket.commented", "T-010", "claude", "Added implementation notes"} {
+	for _, want := range []string{"Timeline", "2026-05-25 18:00", "Second", "ticket.commented", "T-010", "claude", "Added implementation notes"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderTimeline() missing %q in:\n%s", want, got)
 		}
@@ -229,12 +229,12 @@ func TestRenderTimelineShowsRecentEvents(t *testing.T) {
 
 func TestRenderDashboardCanShowTimelineMode(t *testing.T) {
 	got := RenderDashboardWithSelectionAndMode(Dashboard{
-		Projects: []ProjectRow{{Key: "orion", DisplayName: "Orion"}},
+		Projects: []ProjectRow{{Key: "sample", DisplayName: "Sample"}},
 		Events: []EventRow{
 			{
 				Time:        "2026-05-25T19:07:00+02:00",
 				Actor:       "codex",
-				ProjectName: "Orion",
+				ProjectName: "Sample",
 				Type:        "ticket.created",
 				ObjectID:    "T-001",
 			},
@@ -250,7 +250,7 @@ func TestRenderDashboardCanShowTimelineMode(t *testing.T) {
 
 func TestRenderDashboardShowsNavigationHelp(t *testing.T) {
 	got := RenderDashboardWithSelection(Dashboard{Projects: []ProjectRow{
-		{Key: "orion", DisplayName: "Orion", Status: "active"},
+		{Key: "sample", DisplayName: "Sample", Status: "active"},
 	}}, 0)
 
 	for _, want := range []string{"up/down or k/j", "tab/right to switch project/tickets/timeline", "left to go back", "q to quit"} {
@@ -262,8 +262,8 @@ func TestRenderDashboardShowsNavigationHelp(t *testing.T) {
 
 func TestModelSelectionMovesWithArrowKeys(t *testing.T) {
 	model := NewModel(Dashboard{Projects: []ProjectRow{
-		{Key: "orion"},
-		{Key: "aether"},
+		{Key: "sample"},
+		{Key: "second"},
 	}}, nil)
 
 	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyDown})
@@ -289,7 +289,7 @@ func TestModelSelectionMovesWithArrowKeys(t *testing.T) {
 }
 
 func TestModelTogglesDetailMode(t *testing.T) {
-	model := NewModel(Dashboard{Projects: []ProjectRow{{Key: "orion"}}}, nil)
+	model := NewModel(Dashboard{Projects: []ProjectRow{{Key: "sample"}}}, nil)
 
 	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyTab})
 	if cmd != nil {

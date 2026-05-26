@@ -26,34 +26,34 @@ func TestPlanLegacyMigrationReturnsTargetPaths(t *testing.T) {
 	}
 
 	project := plan.Projects[0]
-	if project.LegacyPath != "projects/orion.md" {
+	if project.LegacyPath != "projects/sample.md" {
 		t.Fatalf("unexpected legacy path: %q", project.LegacyPath)
 	}
-	if project.ProjectKey != "orion" {
+	if project.ProjectKey != "sample" {
 		t.Fatalf("unexpected project key: %q", project.ProjectKey)
 	}
-	if project.ProjectPath != "projects/orion/project.md" {
+	if project.ProjectPath != "projects/sample/project.md" {
 		t.Fatalf("unexpected project path: %q", project.ProjectPath)
 	}
 
 	wantGoals := []string{
-		"projects/orion/goals/G-001.md",
-		"projects/orion/goals/G-002.md",
+		"projects/sample/goals/G-001.md",
+		"projects/sample/goals/G-002.md",
 	}
 	if strings.Join(project.GoalPaths, "\n") != strings.Join(wantGoals, "\n") {
 		t.Fatalf("unexpected goal paths: %#v", project.GoalPaths)
 	}
 
 	wantTickets := []string{
-		"projects/orion/tickets/T-002.md",
-		"projects/orion/tickets/T-g-001-t-001.md",
-		"projects/orion/tickets/T-g-002-t-001.md",
+		"projects/sample/tickets/T-002.md",
+		"projects/sample/tickets/T-g-001-t-001.md",
+		"projects/sample/tickets/T-g-002-t-001.md",
 	}
 	if strings.Join(project.TicketPaths, "\n") != strings.Join(wantTickets, "\n") {
 		t.Fatalf("unexpected ticket paths: %#v", project.TicketPaths)
 	}
 
-	wantEvent := "projects/orion/events/2026/05/E-20260525-203000-codex-worker-4-orion-migrated.md"
+	wantEvent := "projects/sample/events/2026/05/E-20260525-203000-codex-worker-4-sample-migrated.md"
 	if len(project.EventPaths) != 1 || project.EventPaths[0] != wantEvent {
 		t.Fatalf("unexpected event paths: %#v", project.EventPaths)
 	}
@@ -65,7 +65,7 @@ func TestPlanLegacyMigrationReturnsTargetPaths(t *testing.T) {
 func TestApplyLegacyMigrationWritesTargetLayoutWithoutTouchingSource(t *testing.T) {
 	source := t.TempDir()
 	writeLegacyMigrationFixture(t, source)
-	legacyPath := filepath.Join(source, "projects", "orion.md")
+	legacyPath := filepath.Join(source, "projects", "sample.md")
 	before, err := os.ReadFile(legacyPath)
 	if err != nil {
 		t.Fatal(err)
@@ -97,7 +97,7 @@ func TestApplyLegacyMigrationWritesTargetLayoutWithoutTouchingSource(t *testing.
 		t.Fatalf("expected one migrated project, got %d", len(store.Projects))
 	}
 	project := store.Projects[0]
-	if project.Key != "orion" || project.DisplayName != "Orion" || project.Status != "active" {
+	if project.Key != "sample" || project.DisplayName != "Sample" || project.Status != "active" {
 		t.Fatalf("unexpected project: %#v", project)
 	}
 	if len(project.Goals) != 2 {
@@ -125,24 +125,24 @@ func TestApplyLegacyMigrationRefusesExistingTargetFile(t *testing.T) {
 	writeLegacyMigrationFixture(t, source)
 
 	destination := t.TempDir()
-	writeFile(t, filepath.Join(destination, "projects", "orion", "project.md"), "existing")
+	writeFile(t, filepath.Join(destination, "projects", "sample", "project.md"), "existing")
 
 	_, err := ApplyLegacyMigration(source, destination, MigrationOptions{})
 	if err == nil {
 		t.Fatal("expected migration to fail on existing target file")
 	}
-	if !strings.Contains(err.Error(), "projects/orion/project.md") {
+	if !strings.Contains(err.Error(), "projects/sample/project.md") {
 		t.Fatalf("expected target path in error, got %v", err)
 	}
 }
 
 func writeLegacyMigrationFixture(t *testing.T, root string) {
 	t.Helper()
-	writeFile(t, filepath.Join(root, "projects", "orion.md"), `# Project: Orion
+	writeFile(t, filepath.Join(root, "projects", "sample.md"), `# Project: Sample
 
 | Field | Value |
 |---|---|
-| ID | orion |
+| ID | sample |
 | Status | active |
 | Owner | agents |
 | Updated | 2026-05-25 |
@@ -150,7 +150,7 @@ func writeLegacyMigrationFixture(t *testing.T, root string) {
 
 ## Current
 
-Orion tracks distributed monitors and agent health.
+Sample tracks distributed monitors and agent health.
 
 ## Goals
 

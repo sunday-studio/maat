@@ -13,7 +13,7 @@ func TestLinkProjectCreatesProjectFromGitRemote(t *testing.T) {
 	store := t.TempDir()
 	source := t.TempDir()
 	initLinkGitRepo(t, source)
-	runLinkGit(t, source, "remote", "add", "origin", "git@github.com:sunday-studio/orion.git")
+	runLinkGit(t, source, "remote", "add", "origin", "git@github.com:sunday-studio/sample.git")
 
 	linked, err := LinkProject(context.Background(), LinkProjectInput{
 		Store:      store,
@@ -22,10 +22,10 @@ func TestLinkProjectCreatesProjectFromGitRemote(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !linked.Created || linked.ProjectKey != "orion" || linked.DisplayName != "Orion" {
+	if !linked.Created || linked.ProjectKey != "sample" || linked.DisplayName != "Sample" {
 		t.Fatalf("unexpected link result: %#v", linked)
 	}
-	if linked.Project.Identity["Remote"] != "git@github.com:sunday-studio/orion.git" {
+	if linked.Project.Identity["Remote"] != "git@github.com:sunday-studio/sample.git" {
 		t.Fatalf("expected remote identity, got %#v", linked.Project.Identity)
 	}
 	if linked.Project.Identity["Primary Repo"] != source {
@@ -84,8 +84,8 @@ func TestInferProjectForPathMatchesPrimaryRepo(t *testing.T) {
 	if _, err := LinkProject(context.Background(), LinkProjectInput{
 		Store:       store,
 		SourcePath:  source,
-		ProjectKey:  "orion",
-		DisplayName: "Orion",
+		ProjectKey:  "sample",
+		DisplayName: "Sample",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -94,8 +94,8 @@ func TestInferProjectForPathMatchesPrimaryRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if project.Key != "orion" {
-		t.Fatalf("expected orion, got %#v", project)
+	if project.Key != "sample" {
+		t.Fatalf("expected sample, got %#v", project)
 	}
 }
 
@@ -105,7 +105,7 @@ func TestInferProjectForPathMatchesRemote(t *testing.T) {
 	runSource := t.TempDir()
 	for _, source := range []string{linkedSource, runSource} {
 		initLinkGitRepo(t, source)
-		runLinkGit(t, source, "remote", "add", "origin", "git@github.com:sunday-studio/orion.git")
+		runLinkGit(t, source, "remote", "add", "origin", "git@github.com:sunday-studio/sample.git")
 	}
 	if _, err := LinkProject(context.Background(), LinkProjectInput{
 		Store:      store,
@@ -118,8 +118,8 @@ func TestInferProjectForPathMatchesRemote(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if project.Key != "orion" {
-		t.Fatalf("expected orion, got %#v", project)
+	if project.Key != "sample" {
+		t.Fatalf("expected sample, got %#v", project)
 	}
 }
 

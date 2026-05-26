@@ -2,7 +2,7 @@
 
 This repository is primarily for agents. Treat it as the source of truth for project state and history.
 
-These conventions are adapted from the nearby Orion and Aether repositories so agents can move between Sunday Studio projects without switching habits.
+These conventions define how agents should work inside Maat.
 
 ## Repository Map
 
@@ -78,7 +78,7 @@ Legacy project fields:
 
 Use stable IDs:
 
-- Projects: lowercase slugs, for example `orion`.
+- Projects: lowercase slugs, for example `maat`.
 - Early docs may use readable IDs like `G-001` and `T-001`.
 - Target storage should use collision-resistant IDs such as `G-20260525-190533-a7f3` and `T-20260525-190700-b91c`.
 - Decisions use stable IDs such as `D-20260525-short-slug`.
