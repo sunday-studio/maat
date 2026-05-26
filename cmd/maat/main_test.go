@@ -1377,8 +1377,11 @@ func TestAgentInitializeCommand(t *testing.T) {
 
 	for _, want := range []string{
 		"# Maat Agent Instructions",
+		"Maat binary: maat dev.",
 		"maat setup --storage " + store,
 		"maat initialize --project maat --storage " + store,
+		"## Next Steps",
+		"maat ticket list --project maat --storage " + store,
 		"maat project show maat --storage " + store,
 		"maat ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",
 		"Save the snippet below into `AGENTS.md`, `CLAUDE.md`, Cursor rules",
@@ -1403,6 +1406,9 @@ func TestInitializeCommandJSON(t *testing.T) {
 	}
 	if payload.ProjectKey != "maat" || payload.StoragePath != store || payload.LinkedProject.ProjectKey != "maat" {
 		t.Fatalf("unexpected initialize payload: %#v", payload)
+	}
+	if payload.Version.Version != "dev" {
+		t.Fatalf("expected initialize version context, got %#v", payload.Version)
 	}
 	if !strings.Contains(payload.Document, "# Maat Agent Instructions") || !strings.Contains(payload.Document, "maat initialize --project maat --storage "+store) {
 		t.Fatalf("unexpected initialize payload: %#v", payload)

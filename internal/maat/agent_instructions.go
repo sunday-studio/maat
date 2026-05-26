@@ -12,8 +12,9 @@ func agentInstructionsSnippetText() string {
 }
 
 type AgentSetupOptions struct {
-	ProjectKey  string
-	StoragePath string
+	ProjectKey    string
+	StoragePath   string
+	BinaryVersion string
 }
 
 // AgentSetupDocument returns a complete setup document for installing Maat into
@@ -27,12 +28,17 @@ func AgentSetupDocument(opts AgentSetupOptions) string {
 	if storage == "" {
 		storage = "/absolute/path/to/maat-state"
 	}
+	binaryVersion := strings.TrimSpace(opts.BinaryVersion)
+	if binaryVersion == "" {
+		binaryVersion = "run `maat version` to confirm the installed binary"
+	}
 
 	return fmt.Sprintf(`# Maat Agent Instructions
 
 Maat is the project memory. Markdown plus Git is the source of truth. SQLite is only a local search cache.
 
 This repo is registered as `+"`%[1]s`"+`.
+Maat binary: %[4]s.
 
 ## First Run
 
@@ -70,6 +76,15 @@ maat validate --storage %[2]s
 maat sync --storage %[2]s --message "status(%[1]s): update maat" --push
 `+"```"+`
 
+## Next Steps
+
+- Check project state: `+"`maat status --storage %[2]s`"+`;
+- List or inspect work: `+"`maat ticket list --project %[1]s --storage %[2]s`"+` and `+"`maat project show %[1]s --storage %[2]s`"+`;
+- Create structured work: `+"`maat goal create %[1]s \"<goal title>\" --outcome \"<outcome>\" --storage %[2]s`"+`;
+- Add a ticket: `+"`maat ticket create %[1]s \"<ticket title>\" --description \"<work>\" --acceptance \"<done condition>\" --storage %[2]s`"+`;
+- Finish with evidence: `+"`maat ticket complete <ticket-id> --project %[1]s --evidence \"<verification>\" --storage %[2]s`"+`;
+- Validate and share: `+"`maat validate --storage %[2]s`"+` then `+"`maat sync --storage %[2]s --status`"+`;
+
 ## Rules
 
 - Create or claim a ticket before material work.
@@ -82,5 +97,5 @@ maat sync --storage %[2]s --message "status(%[1]s): update maat" --push
 - Commit and push Maat storage changes.
 - Do not store primary project state outside Markdown.
 `,
-		project, storage, agentInstructionsSnippetText())
+		project, storage, agentInstructionsSnippetText(), binaryVersion)
 }

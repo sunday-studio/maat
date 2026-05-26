@@ -1416,6 +1416,7 @@ type initializeCommandResult struct {
 	LinkedProject  maat.LinkedProject `json:"linked_project"`
 	ProjectKey     string             `json:"project_key"`
 	StoragePath    string             `json:"storage_path"`
+	Version        version.Info       `json:"version"`
 	IndexRefreshed bool               `json:"index_refreshed"`
 	IndexWarning   string             `json:"index_warning,omitempty"`
 }
@@ -1456,15 +1457,18 @@ func agentInitializeCommand(args []string) error {
 		warnAutoSync(autoSyncWrite(store, linked.ProjectKey, "initialize.project"))
 	}
 
+	binaryVersion := version.Current()
 	document := maat.AgentSetupDocument(maat.AgentSetupOptions{
-		ProjectKey:  linked.ProjectKey,
-		StoragePath: store,
+		ProjectKey:    linked.ProjectKey,
+		StoragePath:   store,
+		BinaryVersion: binaryVersion.String(),
 	})
 	result := initializeCommandResult{
 		Document:       document,
 		LinkedProject:  linked,
 		ProjectKey:     linked.ProjectKey,
 		StoragePath:    store,
+		Version:        binaryVersion,
 		IndexRefreshed: refreshResult.Refreshed,
 		IndexWarning:   refreshResult.Warning,
 	}

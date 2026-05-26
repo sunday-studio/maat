@@ -29,12 +29,14 @@ func TestAgentInstructionsSnippet(t *testing.T) {
 
 func TestAgentSetupDocument(t *testing.T) {
 	document := AgentSetupDocument(AgentSetupOptions{
-		ProjectKey:  "maat",
-		StoragePath: "/tmp/maat-state",
+		ProjectKey:    "maat",
+		StoragePath:   "/tmp/maat-state",
+		BinaryVersion: "maat v1.2.3 (abc123, 2026-05-26)",
 	})
 
 	for _, want := range []string{
 		"# Maat Agent Instructions",
+		"Maat binary: maat v1.2.3 (abc123, 2026-05-26).",
 		"maat setup --storage /tmp/maat-state",
 		"maat initialize --project maat --storage /tmp/maat-state",
 		"Save the snippet below into `AGENTS.md`, `CLAUDE.md`, Cursor rules",
@@ -45,6 +47,10 @@ func TestAgentSetupDocument(t *testing.T) {
 		"--description",
 		"--acceptance",
 		"maat ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",
+		"## Next Steps",
+		"maat ticket list --project maat --storage /tmp/maat-state",
+		"maat ticket complete <ticket-id> --project maat --evidence \"<verification>\" --storage /tmp/maat-state",
+		"maat validate --storage /tmp/maat-state",
 	} {
 		if !strings.Contains(document, want) {
 			t.Fatalf("expected setup document to include %q, got %q", want, document)
