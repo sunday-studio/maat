@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -68,7 +69,7 @@ func run(args []string) error {
 		return indexCommand(args[1:])
 	case "projects":
 		filtered, jsonOut := splitJSONFlag(args[1:])
-		store, err := loadStore(filtered)
+		store, err := loadStoreForRead(filtered)
 		if err != nil {
 			return err
 		}
@@ -104,7 +105,7 @@ func run(args []string) error {
 		return ticketCommand(args[1:])
 	case "status":
 		filtered, jsonOut := splitJSONFlag(args[1:])
-		store, err := loadStore(filtered)
+		store, err := loadStoreForRead(filtered)
 		if err != nil {
 			return err
 		}
@@ -826,7 +827,7 @@ func printSyncDirty(label string, entries []maat.GitStatusEntry) {
 
 func validateCommand(args []string) error {
 	filtered, jsonOut := splitJSONFlag(args)
-	store, err := loadStore(filtered)
+	store, err := loadStoreForRead(filtered)
 	if err != nil {
 		return err
 	}
@@ -879,7 +880,7 @@ func migrateCommand(args []string) error {
 	switch args[0] {
 	case "plan":
 		filtered, jsonOut := splitJSONFlag(args[1:])
-		store, err := loadStore(filtered)
+		store, err := loadStoreForRead(filtered)
 		if err != nil {
 			return err
 		}
@@ -956,7 +957,7 @@ func projectShowCommand(args []string) error {
 	}
 	filtered, jsonOut := splitJSONFlag(args)
 	projectID := filtered[0]
-	store, err := loadStore(filtered[1:])
+	store, err := loadStoreForRead(filtered[1:])
 	if err != nil {
 		return err
 	}
@@ -1075,6 +1076,9 @@ func projectLinkCommand(args []string) error {
 		return err
 	}
 	warnIndexRefresh(refreshIndexesBestEffort(store))
+	if linked.Created {
+		warnAutoSync(autoSyncWrite(store, linked.ProjectKey, "project.linked"))
+	}
 	if agentUse {
 		return agentUpdate("project.linked", "ok", "project linked", linked)
 	}
@@ -1162,7 +1166,7 @@ type ticketView struct {
 
 func ticketListCommand(args []string) error {
 	filtered, jsonOut := splitJSONFlag(args)
-	store, rest, err := loadStoreAndRest(filtered)
+	store, rest, err := loadStoreAndRestForRead(filtered)
 	if err != nil {
 		return err
 	}
@@ -1203,7 +1207,7 @@ func ticketListCommand(args []string) error {
 
 func ticketShowCommand(args []string) error {
 	filtered, jsonOut := splitJSONFlag(args)
-	store, rest, err := loadStoreAndRest(filtered)
+	store, rest, err := loadStoreAndRestForRead(filtered)
 	if err != nil {
 		return err
 	}
@@ -1460,6 +1464,9 @@ func agentInitializeCommand(args []string) error {
 	progress("initialize.index", "refreshing indexes", nil)
 	refreshResult := refreshIndexesBestEffort(store)
 	warnIndexRefresh(refreshResult)
+	if linked.Created {
+		warnAutoSync(autoSyncWrite(store, linked.ProjectKey, "initialize.project"))
+	}
 
 	document := maat.AgentSetupDocument(maat.AgentSetupOptions{
 		ProjectKey:  linked.ProjectKey,
@@ -1499,7 +1506,7 @@ func searchCommand(args []string) error {
 		}
 		filtered = append(filtered, arg)
 	}
-	store, rest, err := loadStoreAndRest(filtered)
+	store, rest, err := loadStoreAndRestForRead(filtered)
 	if err != nil {
 		return err
 	}
@@ -1598,15 +1605,17 @@ func loadProjectListItems(store string) ([]projectListItem, error) {
 }
 
 type writeCommandResult struct {
-	Action         string `json:"action"`
-	ProjectKey     string `json:"project_key"`
-	GoalID         string `json:"goal_id,omitempty"`
-	TicketID       string `json:"ticket_id,omitempty"`
-	EventID        string `json:"event_id"`
-	Agent          string `json:"agent,omitempty"`
-	ExpiresAt      string `json:"expires_at,omitempty"`
-	IndexRefreshed bool   `json:"index_refreshed"`
-	IndexWarning   string `json:"index_warning,omitempty"`
+	Action          string           `json:"action"`
+	ProjectKey      string           `json:"project_key"`
+	GoalID          string           `json:"goal_id,omitempty"`
+	TicketID        string           `json:"ticket_id,omitempty"`
+	EventID         string           `json:"event_id"`
+	Agent           string           `json:"agent,omitempty"`
+	ExpiresAt       string           `json:"expires_at,omitempty"`
+	IndexRefreshed  bool             `json:"index_refreshed"`
+	IndexWarning    string           `json:"index_warning,omitempty"`
+	AutoSync        *autoSyncSummary `json:"auto_sync,omitempty"`
+	AutoSyncWarning string           `json:"auto_sync_warning,omitempty"`
 }
 
 func finishWrite(store, projectKey string, result writeCommandResult, jsonOut bool) error {
@@ -1619,6 +1628,10 @@ func finishWrite(store, projectKey string, result writeCommandResult, jsonOut bo
 	result.IndexRefreshed = refreshResult.Refreshed
 	result.IndexWarning = refreshResult.Warning
 	warnIndexRefresh(refreshResult)
+	syncResult := autoSyncWrite(store, projectKey, result.Action)
+	result.AutoSync = syncResult.Result
+	result.AutoSyncWarning = syncResult.Warning
+	warnAutoSync(syncResult)
 	if agentUse {
 		return agentUpdate(result.Action, "ok", result.Action, result)
 	}
@@ -1677,6 +1690,105 @@ func writeActionMessage(result writeCommandResult) string {
 	default:
 		return result.Action
 	}
+}
+
+type autoSyncSummary struct {
+	Repository      maat.GitRepoInfo      `json:"repository"`
+	Committed       bool                  `json:"committed"`
+	Pushed          bool                  `json:"pushed"`
+	CommitMessage   string                `json:"commit_message,omitempty"`
+	CommitPathspecs []string              `json:"commit_pathspecs,omitempty"`
+	DirtyAfterSync  []maat.GitStatusEntry `json:"dirty_after_sync,omitempty"`
+}
+
+type autoSyncResult struct {
+	Result  *autoSyncSummary
+	Warning string
+}
+
+func autoSyncWrite(store, projectKey, action string) autoSyncResult {
+	cfg, err := readConfig()
+	if err != nil || !cfg.AutoCommitAfterWrite {
+		return autoSyncResult{}
+	}
+	git := maat.GitSync{Store: store}
+	isRepository, err := git.IsRepository(context.Background())
+	if err != nil {
+		return autoSyncResult{Warning: fmt.Sprintf("auto-sync skipped after state write persisted: %v", err)}
+	}
+	if !isRepository {
+		return autoSyncResult{}
+	}
+	message := autoCommitMessage(projectKey, action)
+	progress("write.sync", "syncing storage repo", map[string]any{
+		"project": projectKey,
+		"push":    cfg.AutoPushAfterCommit,
+	})
+	result, err := maat.SyncStore(context.Background(), maat.StoreSyncOptions{
+		Store:        store,
+		Message:      message,
+		Pathspecs:    autoSyncPathspecs(projectKey),
+		Push:         cfg.AutoPushAfterCommit,
+		SkipIndex:    true,
+		SkipValidate: false,
+	})
+	summary := autoSyncSummary{
+		Repository:      result.Repository,
+		Committed:       result.Committed,
+		Pushed:          result.Pushed,
+		CommitMessage:   result.CommitMessage,
+		CommitPathspecs: result.CommitPathspecs,
+		DirtyAfterSync:  result.DirtyAfterSync,
+	}
+	if err != nil {
+		return autoSyncResult{
+			Result:  &summary,
+			Warning: fmt.Sprintf("auto-sync failed after state write persisted: %v", err),
+		}
+	}
+	return autoSyncResult{Result: &summary}
+}
+
+func autoCommitMessage(projectKey, action string) string {
+	projectKey = strings.TrimSpace(projectKey)
+	if projectKey == "" {
+		projectKey = "maat"
+	}
+	switch action {
+	case "goal.created":
+		return fmt.Sprintf("status(%s): create goal", projectKey)
+	case "ticket.created":
+		return fmt.Sprintf("status(%s): create ticket", projectKey)
+	case "ticket.claimed":
+		return fmt.Sprintf("status(%s): claim ticket", projectKey)
+	case "ticket.commented":
+		return fmt.Sprintf("status(%s): comment on ticket", projectKey)
+	case "ticket.completed":
+		return fmt.Sprintf("status(%s): complete ticket", projectKey)
+	case "project.linked", "initialize.project":
+		return fmt.Sprintf("status(%s): link project", projectKey)
+	default:
+		return fmt.Sprintf("status(%s): update maat", projectKey)
+	}
+}
+
+func autoSyncPathspecs(projectKey string) []string {
+	projectKey = strings.Trim(strings.TrimSpace(projectKey), "/")
+	pathspecs := []string{".maat"}
+	if projectKey != "" {
+		pathspecs = append(pathspecs, path.Join("projects", projectKey))
+	}
+	return pathspecs
+}
+
+func warnAutoSync(result autoSyncResult) {
+	if result.Warning == "" {
+		return
+	}
+	warn("write.sync", result.Warning, map[string]any{
+		"warning": result.Warning,
+		"result":  result.Result,
+	})
 }
 
 func refreshIndexes(store string) error {
@@ -2378,6 +2490,52 @@ func loadStore(args []string) (string, error) {
 		return "", fmt.Errorf("unexpected arguments: %s", strings.Join(rest, " "))
 	}
 	return store, nil
+}
+
+func loadStoreForRead(args []string) (string, error) {
+	store, rest, err := loadStoreAndRestForRead(args)
+	if err != nil {
+		return "", err
+	}
+	if len(rest) > 0 {
+		return "", fmt.Errorf("unexpected arguments: %s", strings.Join(rest, " "))
+	}
+	return store, nil
+}
+
+func loadStoreAndRestForRead(args []string) (string, []string, error) {
+	store, rest, err := loadStoreAndRest(args)
+	if err != nil {
+		return "", nil, err
+	}
+	autoPullBeforeRead(store)
+	return store, rest, nil
+}
+
+func autoPullBeforeRead(store string) {
+	cfg, err := readConfig()
+	if err != nil || !cfg.AutoPullBeforeRead {
+		return
+	}
+	git := maat.GitSync{Store: store}
+	isRepository, err := git.IsRepository(context.Background())
+	if err != nil {
+		warn("read.pull", fmt.Sprintf("auto-pull skipped before read: %v", err), map[string]any{
+			"storage": store,
+			"warning": err.Error(),
+		})
+		return
+	}
+	if !isRepository {
+		return
+	}
+	progress("read.pull", "pulling storage repo", map[string]string{"storage": store})
+	if err := git.PullRebase(context.Background()); err != nil {
+		warn("read.pull", fmt.Sprintf("auto-pull failed before read: %v", err), map[string]any{
+			"storage": store,
+			"warning": err.Error(),
+		})
+	}
 }
 
 func loadStoreAndRest(args []string) (string, []string, error) {

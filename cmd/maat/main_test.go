@@ -413,6 +413,91 @@ func TestSetupCommandRejectsInvalidStorage(t *testing.T) {
 	}
 }
 
+func TestReadCommandsAutoPullConfiguredGitStorage(t *testing.T) {
+	source := writeObjectCommandFixture(t)
+	initGitStore(t, source)
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	runGit(t, filepath.Dir(remote), "init", "--bare", "-b", "main", remote)
+	runGit(t, source, "remote", "add", "origin", remote)
+	runGit(t, source, "push", "-u", "origin", "main")
+
+	storeParent := t.TempDir()
+	store := filepath.Join(storeParent, "store")
+	runGit(t, storeParent, "clone", remote, store)
+	runGit(t, store, "config", "user.email", "maat@example.test")
+	runGit(t, store, "config", "user.name", "Maat Test")
+
+	writer := maat.NewWriteStore(source)
+	if _, err := writer.CreateProject(maat.CreateProjectInput{
+		Key:         "pulled",
+		DisplayName: "Pulled Project",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, source, "add", ".")
+	runGit(t, source, "commit", "-m", "status(pulled): add project")
+	runGit(t, source, "push")
+	writeCommandConfig(t, config{
+		StoragePath:          store,
+		DefaultActor:         "test",
+		AutoPullBeforeRead:   true,
+		AutoCommitAfterWrite: false,
+		AutoPushAfterCommit:  false,
+	})
+
+	output, err := captureRun("projects", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var projects []projectListItem
+	if err := json.Unmarshal([]byte(output), &projects); err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, project := range projects {
+		seen[project.ID] = true
+	}
+	if !seen["sample"] || !seen["pulled"] {
+		t.Fatalf("expected auto-pulled projects, got %#v", projects)
+	}
+}
+
+func TestReadAutoPullWarningEmitsAgentUpdate(t *testing.T) {
+	store := writeCommandFixture(t)
+	initGitStore(t, store)
+	writeCommandConfig(t, config{
+		StoragePath:          store,
+		DefaultActor:         "test",
+		AutoPullBeforeRead:   true,
+		AutoCommitAfterWrite: false,
+		AutoPushAfterCommit:  false,
+	})
+
+	output, err := captureRun("status", "--agent-use")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	var sawWarning, sawFinal bool
+	for _, line := range lines {
+		var update map[string]any
+		if err := json.Unmarshal([]byte(line), &update); err != nil {
+			t.Fatalf("invalid agent update %q: %v", line, err)
+		}
+		if update["step"] == "read.pull" && update["status"] == "warning" {
+			sawWarning = true
+		}
+		if update["step"] == "status.ready" && update["status"] == "ok" {
+			sawFinal = true
+		}
+	}
+	if !sawWarning || !sawFinal {
+		t.Fatalf("expected pull warning and final update, got %q", output)
+	}
+}
+
 func TestValidateCommand(t *testing.T) {
 	store := writeCommandFixture(t)
 
@@ -684,6 +769,93 @@ func TestGoalCreateCommandJSON(t *testing.T) {
 	}
 }
 
+func TestWriteCommandsAutoCommitConfiguredGitStorage(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := writeObjectCommandFixture(t)
+	initGitStore(t, store)
+	writeCommandConfig(t, config{
+		StoragePath:          store,
+		DefaultActor:         "codex",
+		AutoPullBeforeRead:   false,
+		AutoCommitAfterWrite: true,
+		AutoPushAfterCommit:  false,
+	})
+
+	output, err := captureRun("goal", "create", "sample", "Auto committed goal", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result writeCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.AutoSync == nil || !result.AutoSync.Committed || result.AutoSync.Pushed {
+		t.Fatalf("expected auto commit without push, got %#v", result.AutoSync)
+	}
+	if result.AutoSync.CommitMessage != "status(sample): create goal" {
+		t.Fatalf("unexpected auto commit message: %#v", result.AutoSync)
+	}
+	status := runGit(t, store, "status", "--porcelain=v1")
+	if strings.TrimSpace(status) != "" {
+		t.Fatalf("expected clean storage after auto commit, got %q", status)
+	}
+	log := strings.TrimSpace(runGit(t, store, "log", "-1", "--pretty=%s"))
+	if log != "status(sample): create goal" {
+		t.Fatalf("unexpected auto commit subject: %q", log)
+	}
+}
+
+func TestWriteCommandsAutoPushConfiguredGitStorage(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	source := writeObjectCommandFixture(t)
+	initGitStore(t, source)
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	runGit(t, filepath.Dir(remote), "init", "--bare", "-b", "main", remote)
+	runGit(t, source, "remote", "add", "origin", remote)
+	runGit(t, source, "push", "-u", "origin", "main")
+
+	storeParent := t.TempDir()
+	store := filepath.Join(storeParent, "store")
+	runGit(t, storeParent, "clone", remote, store)
+	runGit(t, store, "config", "user.email", "maat@example.test")
+	runGit(t, store, "config", "user.name", "Maat Test")
+	writeCommandConfig(t, config{
+		StoragePath:          store,
+		DefaultActor:         "codex",
+		AutoPullBeforeRead:   false,
+		AutoCommitAfterWrite: true,
+		AutoPushAfterCommit:  true,
+	})
+
+	output, err := captureRun("goal", "create", "sample", "Auto pushed goal", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result writeCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.AutoSync == nil || !result.AutoSync.Committed || !result.AutoSync.Pushed {
+		t.Fatalf("expected auto commit and push, got %#v", result.AutoSync)
+	}
+	runGit(t, source, "pull", "--rebase")
+	project, err := maat.LoadObjectProject(source, "sample")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawGoal bool
+	for _, goal := range project.Goals {
+		if goal.Title == "Auto pushed goal" {
+			sawGoal = true
+		}
+	}
+	if !sawGoal {
+		t.Fatalf("expected pushed goal in source checkout, got %#v", project.Goals)
+	}
+}
+
 func TestGoalCreateCommandTreatsIndexFailureAsWarning(t *testing.T) {
 	t.Setenv("MAAT_ACTOR", "codex")
 	store := writeObjectCommandFixture(t)
@@ -753,6 +925,49 @@ func TestGoalCreateAgentUseEmitsIndexWarning(t *testing.T) {
 	}
 	if !sawWarning || !sawFinal {
 		t.Fatalf("expected warning and final updates, got %q", output)
+	}
+}
+
+func TestGoalCreateAgentUseEmitsAutoSyncWarning(t *testing.T) {
+	t.Setenv("MAAT_ACTOR", "codex")
+	store := writeObjectCommandFixture(t)
+	runGit(t, store, "init", "-b", "main")
+	writeCommandConfig(t, config{
+		StoragePath:          store,
+		DefaultActor:         "codex",
+		AutoPullBeforeRead:   false,
+		AutoCommitAfterWrite: true,
+		AutoPushAfterCommit:  true,
+	})
+
+	output, err := captureRun("goal", "create", "sample", "Agent sync warning", "--storage", store, "--agent-use")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	var sawWarning, sawFinal bool
+	for _, line := range lines {
+		var update map[string]any
+		if err := json.Unmarshal([]byte(line), &update); err != nil {
+			t.Fatalf("invalid agent update %q: %v", line, err)
+		}
+		if update["step"] == "write.sync" && update["status"] == "warning" {
+			sawWarning = true
+		}
+		if update["step"] == "goal.created" && update["status"] == "ok" {
+			sawFinal = true
+			data, ok := update["data"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected final data object, got %#v", update["data"])
+			}
+			if data["auto_sync_warning"] == "" {
+				t.Fatalf("expected final update to report auto sync warning, got %#v", data)
+			}
+		}
+	}
+	if !sawWarning || !sawFinal {
+		t.Fatalf("expected auto sync warning and final updates, got %q", output)
 	}
 }
 
@@ -1324,6 +1539,15 @@ func runGit(t *testing.T, dir string, args ...string) string {
 		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, output)
 	}
 	return string(output)
+}
+
+func writeCommandConfig(t *testing.T, cfg config) {
+	t.Helper()
+	configFile := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("MAAT_CONFIG", configFile)
+	if _, err := persistConfig(cfg); err != nil {
+		t.Fatal(err)
+	}
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
