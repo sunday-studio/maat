@@ -25,30 +25,30 @@ Current bootstrap status:
 
 ## Phase 2: CLI Read Path
 
-- `matt init`
-- `matt storage link`
-- `matt index rebuild`
-- `matt projects`
-- `matt project show`
-- `matt status`
-- `matt search` with SQLite FTS
+- `maat init`
+- `maat storage link`
+- `maat index rebuild`
+- `maat projects`
+- `maat project show`
+- `maat status`
+- `maat search` with SQLite FTS
 
 Current bootstrap status:
 
-- `matt init` and `matt storage link` write local config
-- `matt index rebuild` writes `.maat/index.json` as a temporary rebuildable index
-- `matt projects`, `matt project show`, `matt status`, and direct Markdown `matt search` work
+- `maat init` and `maat storage link` write local config
+- `maat index rebuild` writes `.maat/index.json` as a temporary rebuildable index
+- `maat projects`, `maat project show`, `maat status`, and direct Markdown `maat search` work
 - SQLite FTS remains future work
 
 ## Phase 3: CLI Write Path
 
-- `matt project link`
-- `matt goal create`
-- `matt ticket create`
-- `matt ticket claim`
-- `matt ticket comment`
-- `matt ticket complete`
-- `matt sync`
+- `maat project link`
+- `maat goal create`
+- `maat ticket create`
+- `maat ticket claim`
+- `maat ticket comment`
+- `maat ticket complete`
+- `maat sync`
 
 Each write creates Markdown objects/events, validates, indexes, and commits.
 
@@ -65,7 +65,7 @@ The TUI should call the same core operations as the CLI.
 
 ## Phase 5: Local Web UI
 
-- Launch with `matt ui`.
+- Launch with `maat ui`.
 - Read from SQLite.
 - Use core operations for mutations.
 - Include projects, tickets, timeline, blocked/stale views, decisions, and search.
@@ -87,7 +87,7 @@ The TUI should call the same core operations as the CLI.
 
 The smallest useful build is:
 
-- installable `matt` binary
+- installable `maat` binary
 - storage link
 - index rebuild
 - project list/show

@@ -73,7 +73,7 @@ func TestApplyLegacyMigrationWritesTargetLayoutWithoutTouchingSource(t *testing.
 
 	destination := t.TempDir()
 	at := time.Date(2026, 5, 25, 20, 30, 0, 0, time.UTC)
-	plan, err := ApplyLegacyMigration(source, destination, MigrationOptions{At: at, Actor: "matt"})
+	plan, err := ApplyLegacyMigration(source, destination, MigrationOptions{At: at, Actor: "maat"})
 	if err != nil {
 		t.Fatal(err)
 	}

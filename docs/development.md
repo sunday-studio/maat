@@ -1,6 +1,6 @@
 # Development
 
-Maat is currently a Go CLI named `matt`.
+Maat is currently a Go CLI named `maat`.
 
 ## Run Locally
 
@@ -21,7 +21,7 @@ GOCACHE=/private/tmp/maat-go-cache go run ./cmd/matt index rebuild --storage /pa
 
 ## Install Locally
 
-Use the local installer when you need a `matt` binary on `PATH`:
+Use the local installer when you need a `maat` binary on `PATH`:
 
 ```sh
 scripts/install.sh
@@ -47,7 +47,7 @@ Use explicit metadata when testing release stamping:
 
 ```sh
 VERSION=v0.0.0-dev COMMIT=local DATE=2026-05-25T00:00:00Z make build
-dist/matt version
+dist/maat version
 ```
 
 Build release archives locally:
@@ -62,7 +62,7 @@ The release script builds macOS and Linux artifacts by default. Override targets
 TARGETS="darwin/arm64 linux/amd64" scripts/build-release.sh
 ```
 
-GitHub Actions runs the same test and release build path on `v*` tags and manual dispatch. It uploads artifacts only; it does not publish a release.
+GitHub Actions runs the same test and release build path on `v*` tags and manual dispatch. Tag builds publish the generated tarballs and checksum file to the matching GitHub Release; manual dispatch uploads artifacts only.
 
 ## Current Implementation Scope
 

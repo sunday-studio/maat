@@ -170,7 +170,7 @@ func normalizeMigrationOptions(options MigrationOptions) MigrationOptions {
 	}
 	options.Actor = strings.TrimSpace(options.Actor)
 	if options.Actor == "" {
-		options.Actor = "matt"
+		options.Actor = "maat"
 	}
 	return options
 }
@@ -312,7 +312,7 @@ func ticketKey(goalID string, index int, ticket Ticket) string {
 func migrationEventID(at time.Time, actor, projectKey string) string {
 	actor = NormalizeIDPart(actor)
 	if actor == "" {
-		actor = "matt"
+		actor = "maat"
 	}
 	return fmt.Sprintf("E-%s-%s-%s-migrated", at.Format("20060102-150405"), actor, projectKey)
 }

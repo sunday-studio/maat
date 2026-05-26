@@ -1,10 +1,10 @@
 #!/bin/sh
 set -eu
 
-binary_name="${MATT_BINARY_NAME:-matt}"
-install_dir="${MATT_INSTALL_DIR:-}"
-source_bin="${MATT_SOURCE_BIN:-}"
-color_mode="${MATT_COLOR:-auto}"
+binary_name="${MAAT_BINARY_NAME:-maat}"
+install_dir="${MAAT_INSTALL_DIR:-}"
+source_bin="${MAAT_SOURCE_BIN:-}"
+color_mode="${MAAT_COLOR:-auto}"
 
 script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd -P)
 repo_dir=$(CDPATH= cd "$script_dir/.." && pwd -P)
@@ -19,8 +19,8 @@ case "$color_mode" in
     fi
     ;;
   *)
-    printf 'matt install: unsupported MATT_COLOR value: %s\n' "$color_mode" >&2
-    printf 'Use MATT_COLOR=auto, MATT_COLOR=always, or MATT_COLOR=never.\n' >&2
+    printf 'maat install: unsupported MAAT_COLOR value: %s\n' "$color_mode" >&2
+    printf 'Use MAAT_COLOR=auto, MAAT_COLOR=always, or MAAT_COLOR=never.\n' >&2
     exit 1
     ;;
 esac
@@ -66,19 +66,19 @@ fail_line() {
 
 usage() {
   cat <<EOF
-Install the matt binary from this checkout.
+Install the maat binary from this checkout.
 
 Environment:
-  MATT_INSTALL_DIR   Install directory. Defaults to /usr/local/bin when writable,
+  MAAT_INSTALL_DIR   Install directory. Defaults to /usr/local/bin when writable,
                      otherwise \$HOME/.local/bin.
-  MATT_SOURCE_BIN    Explicit binary to install.
-  MATT_BINARY_NAME   Installed binary name. Defaults to matt.
-  MATT_COLOR         Progress color mode: auto, always, or never.
+  MAAT_SOURCE_BIN    Explicit binary to install.
+  MAAT_BINARY_NAME   Installed binary name. Defaults to maat.
+  MAAT_COLOR         Progress color mode: auto, always, or never.
 
 Examples:
   scripts/install.sh
-  MATT_INSTALL_DIR="\$HOME/.local/bin" scripts/install.sh
-  MATT_SOURCE_BIN="./dist/matt" scripts/install.sh
+  MAAT_INSTALL_DIR="\$HOME/.local/bin" scripts/install.sh
+  MAAT_SOURCE_BIN="./dist/maat" scripts/install.sh
 EOF
 }
 
@@ -103,7 +103,7 @@ fi
 resolve_source() {
   if [ -n "$source_bin" ]; then
     if [ ! -f "$source_bin" ]; then
-      fail_line "MATT_SOURCE_BIN does not exist: $source_bin"
+      fail_line "MAAT_SOURCE_BIN does not exist: $source_bin"
       exit 1
     fi
     source_path="$source_bin"
@@ -140,7 +140,7 @@ trap cleanup EXIT INT HUP TERM
 if [ -z "$source_path" ]; then
   if ! command -v go >/dev/null 2>&1; then
     fail_line "no prebuilt binary found and Go is not installed"
-    printf 'Place a binary at dist/%s or set MATT_SOURCE_BIN.\n' "$binary_name" >&2
+    printf 'Place a binary at dist/%s or set MAAT_SOURCE_BIN.\n' "$binary_name" >&2
     exit 1
   fi
 
@@ -162,7 +162,7 @@ mkdir -p "$install_dir"
 if [ ! -w "$install_dir" ]; then
   fail_line "install directory is not writable: $install_dir"
   printf 'Choose a writable directory, for example:\n' >&2
-  printf '  MATT_INSTALL_DIR="$HOME/.local/bin" scripts/install.sh\n' >&2
+  printf '  MAAT_INSTALL_DIR="$HOME/.local/bin" scripts/install.sh\n' >&2
   exit 1
 fi
 done_line "$install_dir is writable"

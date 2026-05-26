@@ -2,7 +2,7 @@
 
 Agents should use Maat as their shared project memory.
 
-The preferred path is through the `matt` CLI or future MCP tools. Direct Markdown edits are acceptable during early development, but they should follow the same object and event rules in `docs/storage-model.md`.
+The preferred path is through the `maat` CLI or future MCP tools. Direct Markdown edits are acceptable during early development, but they should follow the same object and event rules in `docs/storage-model.md`.
 
 Git plus Markdown is canonical. SQLite, TUI screens, and generated views are rebuildable.
 
@@ -11,8 +11,8 @@ Git plus Markdown is canonical. SQLite, TUI screens, and generated views are reb
 Before work:
 
 1. Sync or pull the Maat storage repo.
-2. Run `matt validate`.
-3. Query project state with `matt status`, `matt project show`, or `matt search`.
+2. Run `maat validate`.
+3. Query project state with `maat status`, `maat project show`, or `maat search`.
 4. Check active goals and open tickets.
 5. Claim or create a ticket when write commands are available.
 
@@ -27,7 +27,7 @@ After work:
 1. Complete or update the ticket.
 2. Attach evidence.
 3. Record decisions if the work changed direction.
-4. Run `matt validate`.
+4. Run `maat validate`.
 5. Sync and commit Maat changes.
 
 ## Current Agent Commands
@@ -35,15 +35,15 @@ After work:
 These commands are available now and are safe for agents to rely on:
 
 ```sh
-matt init [storage-path]
-matt storage link <storage-path>
-matt index rebuild [--storage <path>]
-matt status [--storage <path>] [--json]
-matt projects [--storage <path>] [--json]
-matt project show <project-id> [--storage <path>]
-matt validate [--storage <path>] [--json]
-matt search <query> [--storage <path>] [--json]
-matt tui [--storage <path>]
+maat init [storage-path]
+maat storage link <storage-path>
+maat index rebuild [--storage <path>]
+maat status [--storage <path>] [--json]
+maat projects [--storage <path>] [--json]
+maat project show <project-id> [--storage <path>]
+maat validate [--storage <path>] [--json]
+maat search <query> [--storage <path>] [--json]
+maat tui [--storage <path>]
 ```
 
 Use JSON output when another tool or agent needs to parse results.
@@ -55,46 +55,46 @@ These commands define the intended agent write protocol. Until they are wired in
 Typical start:
 
 ```sh
-matt sync
-matt project show maat
-matt ticket list --project maat --status active
-matt ticket claim T-20260525-190700-b91c --agent codex --ttl 2h
+maat sync
+maat project show maat
+maat ticket list --project maat --status active
+maat ticket claim T-20260525-190700-b91c --agent codex --ttl 2h
 ```
 
 New work:
 
 ```sh
-matt goal create maat "Improve agent handoff clarity"
-matt ticket create maat --goal G-20260525-190533-a7f3 "Separate project state from product examples"
+maat goal create maat "Improve agent handoff clarity"
+maat ticket create maat --goal G-20260525-190533-a7f3 "Separate project state from product examples"
 ```
 
 Progress:
 
 ```sh
-matt ticket comment T-20260525-190700-b91c "Status rollup combines monitor failures with agent liveness."
-matt ticket status T-20260525-190700-b91c active
+maat ticket comment T-20260525-190700-b91c "Status rollup combines monitor failures with agent liveness."
+maat ticket status T-20260525-190700-b91c active
 ```
 
 Completion:
 
 ```sh
-matt ticket complete T-20260525-190700-b91c --evidence "go test ./... passed"
-matt sync
+maat ticket complete T-20260525-190700-b91c --evidence "go test ./... passed"
+maat sync
 ```
 
 Migration and setup:
 
 ```sh
-matt project link
-matt migrate plan --storage <path>
-matt migrate apply --storage <path> --destination <path>
+maat project link
+maat migrate plan --storage <path>
+maat migrate apply --storage <path> --destination <path>
 ```
 
 Sync:
 
 ```sh
-matt sync
-matt sync --push
+maat sync
+maat sync --push
 ```
 
 ## Evidence Rules
@@ -152,7 +152,7 @@ When an agent sees conflicting state:
 This is the minimal snippet Maat should install into project repos. It is intentionally short enough to paste into an existing `AGENTS.md` without taking over the whole file:
 
 ```text
-Use Maat as the canonical project memory for this repo. Before material work, run `matt sync` if available, then inspect state with `matt status`, `matt project show <project>`, or `matt search <query>`. Create or claim a ticket before working. Record meaningful progress with ticket comments or events. When finished, complete the ticket with evidence, validate Maat, and sync. Do not mark work done without evidence.
+Use Maat as the canonical project memory for this repo. Before material work, run `maat sync` if available, then inspect state with `maat status`, `maat project show <project>`, or `maat search <query>`. Create or claim a ticket before working. Record meaningful progress with ticket comments or events. When finished, complete the ticket with evidence, validate Maat, and sync. Do not mark work done without evidence.
 ```
 
 ## Agent Setup Document
@@ -160,7 +160,7 @@ Use Maat as the canonical project memory for this repo. Before material work, ru
 Use this when handing Maat to a new agent, a hosted agent, or a skill/instruction system that needs the full operating protocol:
 
 ```sh
-matt initialize --project maat --storage /absolute/path/to/maat-state
+maat initialize --project maat --storage /absolute/path/to/maat-state
 ```
 
 The setup document explains how to link storage, tells the agent to save the Maat rule into `AGENTS.md` or the equivalent instruction surface it reads, and lists the commands to run before planning, during work, and when finishing with evidence.

@@ -35,7 +35,7 @@ func (info Info) String() string {
 		details = append(details, info.Date)
 	}
 	if len(details) == 0 {
-		return fmt.Sprintf("matt %s", info.Version)
+		return fmt.Sprintf("maat %s", info.Version)
 	}
-	return fmt.Sprintf("matt %s (%s)", info.Version, strings.Join(details, ", "))
+	return fmt.Sprintf("maat %s (%s)", info.Version, strings.Join(details, ", "))
 }

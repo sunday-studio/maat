@@ -90,7 +90,7 @@ func TestAgentUseRejectsJSONFlag(t *testing.T) {
 }
 
 func TestHumanOutputCanUseColor(t *testing.T) {
-	t.Setenv("MATT_COLOR", "always")
+	t.Setenv("MAAT_COLOR", "always")
 	store := writeCommandFixture(t)
 
 	output, err := captureRun("status", "--storage", store)
@@ -141,7 +141,7 @@ func TestVersionCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output, "matt dev") {
+	if !strings.Contains(output, "maat dev") {
 		t.Fatalf("unexpected version output: %q", output)
 	}
 
@@ -159,13 +159,13 @@ func TestVersionCommand(t *testing.T) {
 }
 
 func TestUpdateCommandInstallsSourceBinary(t *testing.T) {
-	source := filepath.Join(t.TempDir(), "matt-new")
+	source := filepath.Join(t.TempDir(), "maat-new")
 	if err := os.WriteFile(source, []byte("new binary\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	installDir := t.TempDir()
 
-	output, err := captureRun("update", "--source", source, "--install-dir", installDir, "--binary-name", "matt-test", "--json")
+	output, err := captureRun("update", "--source", source, "--install-dir", installDir, "--binary-name", "maat-test", "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestUpdateCommandInstallsSourceBinary(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatal(err)
 	}
-	target := filepath.Join(installDir, "matt-test")
+	target := filepath.Join(installDir, "maat-test")
 	if result.Action != "update.installed" || result.SourcePath != source || result.TargetPath != target {
 		t.Fatalf("unexpected update result: %#v", result)
 	}
@@ -196,8 +196,8 @@ func TestUpdateCommandInstallsSourceBinary(t *testing.T) {
 
 func TestUpdateCommandDownloadsLatestGitHubRelease(t *testing.T) {
 	installDir := t.TempDir()
-	assetName := fmt.Sprintf("matt-v9.9.9-%s-%s.tar.gz", runtime.GOOS, runtime.GOARCH)
-	archive := writeTestReleaseArchive(t, "matt-v9.9.9-"+runtime.GOOS+"-"+runtime.GOARCH, "release binary\n")
+	assetName := fmt.Sprintf("maat-v9.9.9-%s-%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+	archive := writeTestReleaseArchive(t, "maat-v9.9.9-"+runtime.GOOS+"-"+runtime.GOARCH, "release binary\n")
 	checksum := fmt.Sprintf("%x  %s\n", sha256.Sum256(archive), assetName)
 	oldURL := latestReleaseURL
 	oldVersion := version.Version
@@ -240,7 +240,7 @@ func TestUpdateCommandDownloadsLatestGitHubRelease(t *testing.T) {
 		updateHTTPClient = oldHTTPClient
 	}()
 
-	output, err := captureRun("update", "--install-dir", installDir, "--binary-name", "matt", "--json")
+	output, err := captureRun("update", "--install-dir", installDir, "--binary-name", "maat", "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +249,7 @@ func TestUpdateCommandDownloadsLatestGitHubRelease(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatal(err)
 	}
-	target := filepath.Join(installDir, "matt")
+	target := filepath.Join(installDir, "maat")
 	if result.Action != "update.installed" || result.LatestVersion != "v9.9.9" || result.AssetName != assetName || !result.ChecksumVerified || result.TargetPath != target {
 		t.Fatalf("unexpected release update result: %#v", result)
 	}
@@ -301,7 +301,7 @@ func TestUpdateCommandSkipsWhenAlreadyLatest(t *testing.T) {
 
 func TestUninstallCommandRemovesBinaryAndCanPurgeConfig(t *testing.T) {
 	installDir := t.TempDir()
-	target := filepath.Join(installDir, "matt-test")
+	target := filepath.Join(installDir, "maat-test")
 	if err := os.WriteFile(target, []byte("old binary\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestUninstallCommandRemovesBinaryAndCanPurgeConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	output, err := captureRun("uninstall", "--install-dir", installDir, "--binary-name", "matt-test", "--purge-config", "--json")
+	output, err := captureRun("uninstall", "--install-dir", installDir, "--binary-name", "maat-test", "--purge-config", "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,6 +328,48 @@ func TestUninstallCommandRemovesBinaryAndCanPurgeConfig(t *testing.T) {
 	}
 	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
 		t.Fatalf("expected config to be removed, got err=%v", err)
+	}
+}
+
+func TestSetupCommandWritesConfig(t *testing.T) {
+	store := t.TempDir()
+	runGit(t, store, "init", "-b", "main")
+	configFile := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("MAAT_CONFIG", configFile)
+	t.Setenv("MAAT_ACTOR", "test-agent")
+
+	output, err := captureRun("setup", "--storage", store, "--no-auto-push", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result setupCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Action != "setup.configured" || result.StoragePath != store || result.ConfigPath != configFile {
+		t.Fatalf("unexpected setup result: %#v", result)
+	}
+	if result.DefaultActor != "test-agent" || !result.AutoPullBeforeRead || !result.AutoCommitAfterWrite || result.AutoPushAfterCommit {
+		t.Fatalf("unexpected setup defaults: %#v", result)
+	}
+	cfg, err := readConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.StoragePath != store || cfg.DefaultActor != "test-agent" || !cfg.AutoPullBeforeRead || !cfg.AutoCommitAfterWrite || cfg.AutoPushAfterCommit {
+		t.Fatalf("unexpected persisted config: %#v", cfg)
+	}
+}
+
+func TestSetupCommandRejectsInvalidStorage(t *testing.T) {
+	if _, err := captureRun("setup", "--storage", "relative/path"); err == nil || !strings.Contains(err.Error(), "must be absolute") {
+		t.Fatalf("expected relative storage error, got %v", err)
+	}
+
+	store := t.TempDir()
+	if _, err := captureRun("setup", "--storage", store); err == nil || !strings.Contains(err.Error(), "must be a Git repository") {
+		t.Fatalf("expected non-git storage error, got %v", err)
 	}
 }
 
@@ -1000,9 +1042,9 @@ func TestAgentInitializeCommand(t *testing.T) {
 	for _, want := range []string{
 		"# Maat Agent Setup",
 		"Audience: any agent that can read files, run shell commands, and update Git",
-		"matt init " + store,
-		"matt project show maat --storage " + store,
-		"matt ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",
+		"maat init " + store,
+		"maat project show maat --storage " + store,
+		"maat ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",
 		"Codex: add it to the repo's `AGENTS.md`",
 		"Claude Code: add it to `CLAUDE.md`",
 		"Cursor or Cursor Cloud: add it to the repo's Cursor rules",
@@ -1022,12 +1064,62 @@ func TestInitializeCommandJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var payload map[string]string
+	var payload initializeCommandResult
 	if err := json.Unmarshal([]byte(output), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(payload["document"], "Audience: any agent") || !strings.Contains(payload["document"], "matt storage link "+store) {
+	if payload.ProjectKey != "maat" || payload.StoragePath != store || payload.LinkedProject.ProjectKey != "maat" {
 		t.Fatalf("unexpected initialize payload: %#v", payload)
+	}
+	if !strings.Contains(payload.Document, "Audience: any agent") || !strings.Contains(payload.Document, "maat storage link "+store) {
+		t.Fatalf("unexpected initialize payload: %#v", payload)
+	}
+}
+
+func TestInitializeCommandRegistersCurrentGitRepo(t *testing.T) {
+	store := t.TempDir()
+	source := t.TempDir()
+	if err := os.WriteFile(filepath.Join(source, "README.md"), []byte("# Sample\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	initGitStore(t, source)
+	runGit(t, source, "remote", "add", "origin", "git@github.com:sunday-studio/sample.git")
+	withWorkingDir(t, source)
+
+	output, err := captureRun("initialize", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload initializeCommandResult
+	if err := json.Unmarshal([]byte(output), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if !payload.LinkedProject.Created || payload.ProjectKey != "sample" || payload.LinkedProject.SourcePath == "" {
+		t.Fatalf("unexpected initialize link result: %#v", payload)
+	}
+	if payload.LinkedProject.RemoteURL != "git@github.com:sunday-studio/sample.git" {
+		t.Fatalf("expected remote in initialize payload, got %#v", payload.LinkedProject)
+	}
+	if !strings.Contains(payload.Document, "This repo is registered in Maat as `sample`.") || !strings.Contains(payload.Document, "maat project show sample --storage "+store) {
+		t.Fatalf("expected concrete project setup document, got %q", payload.Document)
+	}
+	project, err := maat.LoadObjectProject(store, "sample")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if project.Identity["Primary Repo"] != payload.LinkedProject.SourcePath || project.Identity["Remote"] != "git@github.com:sunday-studio/sample.git" {
+		t.Fatalf("unexpected registered project identity: %#v", project.Identity)
+	}
+
+	output, err = captureRun("initialize", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(output), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if !payload.LinkedProject.Existing || payload.LinkedProject.Created || payload.ProjectKey != "sample" {
+		t.Fatalf("expected idempotent initialize rerun, got %#v", payload)
 	}
 }
 
@@ -1134,6 +1226,22 @@ func captureRun(args ...string) (string, error) {
 		return "", readErr
 	}
 	return string(data), runErr
+}
+
+func withWorkingDir(t *testing.T, dir string) {
+	t.Helper()
+	old, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(old); err != nil {
+			t.Fatalf("restore working directory: %v", err)
+		}
+	})
 }
 
 func initGitStore(t *testing.T, store string) {

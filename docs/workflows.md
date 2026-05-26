@@ -12,11 +12,11 @@ Agents should:
 4. Rebuild or refresh the local index when possible.
 5. Commit and push according to policy.
 
-If the index refresh fails after the Markdown write, keep the write and warn. The agent should not retry the same write just because SQLite was busy; it can run `matt index rebuild` later.
+If the index refresh fails after the Markdown write, keep the write and warn. The agent should not retry the same write just because SQLite was busy; it can run `maat index rebuild` later.
 
 ## Start A New Project
 
-1. Run `matt project link` from the source repo or provide a path.
+1. Run `maat project link` from the source repo or provide a path.
 2. Create `state/projects/<project-key>/project.md`.
 3. Record repository metadata under `state/projects/<project-key>/repos/`.
 4. Create a `project.created` event file.

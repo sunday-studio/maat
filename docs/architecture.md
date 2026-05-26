@@ -6,7 +6,7 @@ The product has one durable source of truth and several disposable interfaces ar
 
 - Git plus Markdown is the source of truth.
 - SQLite is the local query and search index.
-- The `matt` binary provides CLI commands for agents and humans.
+- The `maat` binary provides CLI commands for agents and humans.
 - A Bubble Tea TUI provides an interactive terminal dashboard.
 - A local web UI provides a browsable dashboard.
 - Future MCP tools expose the same operations to agent systems.
@@ -39,7 +39,7 @@ flowchart TD
     end
 
     subgraph interfaces [Interfaces]
-        CLI[matt CLI]
+        CLI[maat CLI]
         TUI[Bubble Tea TUI]
         WEB[Local Web UI]
         MCP[MCP Server]
@@ -89,14 +89,14 @@ The store can live anywhere:
 The user links the binary to that store during setup:
 
 ```sh
-matt init
-matt storage link /absolute/path/to/maat-state
+maat init
+maat storage link /absolute/path/to/maat-state
 ```
 
 If the storage repo is cloned on a new machine, the user can run:
 
 ```sh
-matt index rebuild
+maat index rebuild
 ```
 
 and recover the fast local view.
@@ -131,15 +131,15 @@ The CLI is the primary write interface and the interface agents should prefer.
 Examples:
 
 ```sh
-matt status
-matt project link
-matt goal create maat "Ship first deploy"
-matt ticket create maat --goal G-20260525-190533-a7f3 "Verify install"
-matt ticket claim T-20260525-190700-b91c --ttl 2h
-matt ticket comment T-20260525-190700-b91c "Found failing deploy path."
-matt ticket complete T-20260525-190700-b91c --evidence "installer smoke passed"
-matt search "agent health"
-matt sync
+maat status
+maat project link
+maat goal create maat "Ship first deploy"
+maat ticket create maat --goal G-20260525-190533-a7f3 "Verify install"
+maat ticket claim T-20260525-190700-b91c --ttl 2h
+maat ticket comment T-20260525-190700-b91c "Found failing deploy path."
+maat ticket complete T-20260525-190700-b91c --evidence "installer smoke passed"
+maat search "agent health"
+maat sync
 ```
 
 ### TUI
@@ -163,7 +163,7 @@ See [CLI, TUI, And UI](./cli-tui-ui.md).
 The web UI is a local dashboard launched by:
 
 ```sh
-matt ui
+maat ui
 ```
 
 It reads from the same core library and SQLite index as the CLI. It should not invent a separate write path.
@@ -211,7 +211,7 @@ Maat tracks source repositories as project context.
 From inside a source repo:
 
 ```sh
-matt project link
+maat project link
 ```
 
 Maat should detect:

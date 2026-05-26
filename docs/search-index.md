@@ -32,12 +32,12 @@ This avoids turning one SQLite file into a shared write target for hundreds of a
 The index can always be rebuilt:
 
 ```sh
-matt index rebuild
+maat index rebuild
 ```
 
 Deleting the SQLite file must not lose user data.
 
-If a write succeeds but index rebuild fails, the command should treat the write as durable and report a warning. Human output should say that search or UI views may be stale until `matt index rebuild` runs. `--agent-use` should emit a structured warning update so agents can continue without repeating the state write.
+If a write succeeds but index rebuild fails, the command should treat the write as durable and report a warning. Human output should say that search or UI views may be stale until `maat index rebuild` runs. `--agent-use` should emit a structured warning update so agents can continue without repeating the state write.
 
 ## Suggested Tables
 
@@ -78,9 +78,9 @@ Search documents should include:
 Example commands:
 
 ```sh
-matt search "agent health"
-matt search --project maat "agent protocol"
-matt search --type decision "sqlite"
+maat search "agent health"
+maat search --project maat "agent protocol"
+maat search --type decision "sqlite"
 ```
 
 ## Semantic Search
@@ -135,5 +135,5 @@ Search results should return enough context for both humans and agents:
 For agent usage, JSON output should be available:
 
 ```sh
-matt search "sync passphrase" --json
+maat search "sync passphrase" --json
 ```

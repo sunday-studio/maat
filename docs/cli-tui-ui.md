@@ -11,54 +11,54 @@ All interfaces should use the same core operations.
 
 ## CLI
 
-The CLI binary is `matt`.
+The CLI binary is `maat`.
 
 It should be easy to install on a new machine, link to a Git-controlled storage directory, rebuild the local index, and start querying.
 
 ### Setup
 
 ```sh
-matt init
-matt storage link /absolute/path/to/maat-state
-matt index rebuild
+maat init
+maat storage link /absolute/path/to/maat-state
+maat index rebuild
 ```
 
 ### Project Commands
 
 ```sh
-matt projects
-matt project show maat
-matt project link
-matt project link /absolute/path/to/source-repo
-matt project link /absolute/path/to/source-repo --key maat --name "Maat"
-matt project status maat active
+maat projects
+maat project show maat
+maat project link
+maat project link /absolute/path/to/source-repo
+maat project link /absolute/path/to/source-repo --key maat --name "Maat"
+maat project status maat active
 ```
 
-`matt project link` should detect the current Git repository when run from inside a source repo.
+`maat project link` should detect the current Git repository when run from inside a source repo.
 
 ### Goal Commands
 
 ```sh
-matt goal create maat "Ship first deploy"
-matt goal create "Ship first deploy"
-matt goal list maat
-matt goal show G-20260525-190533-a7f3
-matt goal status G-20260525-190533-a7f3 done --evidence "all tickets complete"
+maat goal create maat "Ship first deploy"
+maat goal create "Ship first deploy"
+maat goal list maat
+maat goal show G-20260525-190533-a7f3
+maat goal status G-20260525-190533-a7f3 done --evidence "all tickets complete"
 ```
 
-When run from inside a repo linked with `matt project link`, create commands can infer the project key.
+When run from inside a repo linked with `maat project link`, create commands can infer the project key.
 
 ### Ticket Commands
 
 ```sh
-matt ticket create maat "Fix deploy doc link"
-matt ticket create maat --goal G-20260525-190533-a7f3 "Verify installer"
-matt ticket create "Fix deploy doc link"
-matt ticket show T-20260525-190700-b91c
-matt ticket claim T-20260525-190700-b91c --agent codex --ttl 2h
-matt ticket comment T-20260525-190700-b91c "Found issue in launchd path."
-matt ticket status T-20260525-190700-b91c waiting --reason "needs credentials"
-matt ticket complete T-20260525-190700-b91c --evidence "smoke test passed"
+maat ticket create maat "Fix deploy doc link"
+maat ticket create maat --goal G-20260525-190533-a7f3 "Verify installer"
+maat ticket create "Fix deploy doc link"
+maat ticket show T-20260525-190700-b91c
+maat ticket claim T-20260525-190700-b91c --agent codex --ttl 2h
+maat ticket comment T-20260525-190700-b91c "Found issue in launchd path."
+maat ticket status T-20260525-190700-b91c waiting --reason "needs credentials"
+maat ticket complete T-20260525-190700-b91c --evidence "smoke test passed"
 ```
 
 Tickets may stand alone or belong to a goal.
@@ -66,13 +66,13 @@ Tickets may stand alone or belong to a goal.
 ### Query Commands
 
 ```sh
-matt status
-matt active
-matt blocked
-matt stale
-matt timeline --today
-matt search "agent health"
-matt report daily
+maat status
+maat active
+maat blocked
+maat stale
+maat timeline --today
+maat search "agent health"
+maat report daily
 ```
 
 Most query commands should support:
@@ -85,7 +85,7 @@ Most query commands should support:
 
 ### Output Modes
 
-The default CLI output is for humans. It should use concise progress states such as `[run]`, `[ok]`, and `[warn]`, plus ANSI color when supported by the terminal. Color can be forced with `MATT_COLOR=always` or disabled with `MATT_COLOR=never` or `NO_COLOR=1`.
+The default CLI output is for humans. It should use concise progress states such as `[run]`, `[ok]`, and `[warn]`, plus ANSI color when supported by the terminal. Color can be forced with `MAAT_COLOR=always` or disabled with `MAAT_COLOR=never` or `NO_COLOR=1`.
 
 `--json` returns the command's final structured result and should not include progress text.
 
@@ -98,16 +98,16 @@ The default CLI output is for humans. It should use concise progress states such
 
 `--agent-use` cannot be combined with `--json`.
 
-When a write command updates Markdown successfully but the local search index cannot be refreshed, the command should not ask the agent to repeat the write. Human output should show a warning that the index is stale. `--agent-use` should emit a warning update with the index failure so the agent can run `matt index rebuild` later without duplicating project history.
+When a write command updates Markdown successfully but the local search index cannot be refreshed, the command should not ask the agent to repeat the write. Human output should show a warning that the index is stale. `--agent-use` should emit a warning update with the index failure so the agent can run `maat index rebuild` later without duplicating project history.
 
 ### Sync Commands
 
 ```sh
-matt sync
-matt pull
-matt push
-matt validate
-matt index rebuild
+maat sync
+maat pull
+maat push
+maat validate
+maat index rebuild
 ```
 
 The normal agent write path should validate and commit. Push can be opt-in or configured by policy.
@@ -119,7 +119,7 @@ Sync and index commands operate on the local checkout. SQLite is not a coordinat
 The TUI launches with:
 
 ```sh
-matt tui
+maat tui
 ```
 
 Use Charmbracelet Bubble Tea for the application model, Bubbles for common components, and Lip Gloss for styling.
@@ -155,7 +155,7 @@ The TUI should not become the only way to perform actions. Any TUI mutation shou
 The web UI launches with:
 
 ```sh
-matt ui
+maat ui
 ```
 
 The first version can be local-only.

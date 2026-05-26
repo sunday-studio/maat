@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -30,7 +31,7 @@ var updateHTTPClient = http.DefaultClient
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "matt: %v\n", err)
+		fmt.Fprintf(os.Stderr, "maat: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -58,6 +59,8 @@ func run(args []string) error {
 		return updateCommand(args[1:])
 	case "uninstall":
 		return uninstallCommand(args[1:])
+	case "setup":
+		return setupCommand(args[1:])
 	case "initialize":
 		return agentInitializeCommand(args[1:])
 	case "init":
@@ -140,42 +143,44 @@ func run(args []string) error {
 }
 
 func printHelp() {
-	fmt.Print(`matt - Git-backed project state for agents
+	fmt.Print(`maat - Git-backed project state for agents
 
 Usage:
-  matt <command> [flags]
+  maat <command> [flags]
 
 Common:
-  matt initialize [--project <project-key>] [--storage <path>] [--json]
-  matt status [--storage <path>] [--json]
-  matt projects [--storage <path>] [--json]
-  matt search <query> [--storage <path>] [--json]
-  matt sync [--storage <path>] [--message <msg>] [--push] [--status] [--json]
+  maat setup --storage <absolute-git-repo-path> [--actor <name>] [--json]
+  maat initialize [--project <project-key>] [--storage <path>] [--json]
+  maat status [--storage <path>] [--json]
+  maat projects [--storage <path>] [--json]
+  maat search <query> [--storage <path>] [--json]
+  maat sync [--storage <path>] [--message <msg>] [--push] [--status] [--json]
 
 Projects:
-  matt project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]
-  matt project show <project-id> [--storage <path>] [--json]
-  matt goal create [project-key] <title> [--storage <path>] [--json]
+  maat project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]
+  maat project show <project-id> [--storage <path>] [--json]
+  maat goal create [project-key] <title> [--storage <path>] [--json]
 
 Tickets:
-  matt ticket create [project-key] <title> [--goal <goal-id>] [--storage <path>] [--json]
-  matt ticket list [--project <project-key>] [--storage <path>] [--json]
-  matt ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]
-  matt ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
-  matt ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
-  matt ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]
+  maat ticket create [project-key] <title> [--goal <goal-id>] [--storage <path>] [--json]
+  maat ticket list [--project <project-key>] [--storage <path>] [--json]
+  maat ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]
+  maat ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
+  maat ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
+  maat ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]
 
 Setup and maintenance:
-  matt init [storage-path]
-  matt storage link <storage-path>
-  matt update [--source <path>] [--install-dir <path>] [--binary-name <name>] [--json]
-  matt uninstall [--install-dir <path>] [--binary-name <name>] [--purge-config] [--json]
-  matt index rebuild [--storage <path>]
-  matt validate [--storage <path>] [--json]
-  matt migrate plan [--storage <path>] [--json]
-  matt migrate apply --dest <path> [--storage <path>]
-  matt tui [--storage <path>]
-  matt version [--json]
+  maat setup --storage <absolute-git-repo-path> [--actor <name>] [--auto-pull|--no-auto-pull] [--auto-commit|--no-auto-commit] [--auto-push|--no-auto-push] [--json]
+  maat init [storage-path]
+  maat storage link <storage-path>
+  maat update [--source <path>] [--install-dir <path>] [--binary-name <name>] [--json]
+  maat uninstall [--install-dir <path>] [--binary-name <name>] [--purge-config] [--json]
+  maat index rebuild [--storage <path>]
+  maat validate [--storage <path>] [--json]
+  maat migrate plan [--storage <path>] [--json]
+  maat migrate apply --dest <path> [--storage <path>]
+  maat tui [--storage <path>]
+  maat version [--json]
 
 Global flags:
   --agent-use   emit newline-delimited JSON updates for agents
@@ -187,7 +192,7 @@ Markdown plus Git is the source of truth. The SQLite index is a rebuildable loca
 func versionCommand(args []string) error {
 	filtered, jsonOut := splitJSONFlag(args)
 	if len(filtered) > 0 {
-		return errors.New("usage: matt version [--json]")
+		return errors.New("usage: maat version [--json]")
 	}
 	info := version.Current()
 	if agentUse {
@@ -494,16 +499,111 @@ func initConfig(args []string) error {
 	return writeConfig(storagePath)
 }
 
+type setupCommandResult struct {
+	Action               string `json:"action"`
+	StoragePath          string `json:"storage_path"`
+	ConfigPath           string `json:"config_path"`
+	DefaultActor         string `json:"default_actor"`
+	AutoPullBeforeRead   bool   `json:"auto_pull_before_read"`
+	AutoCommitAfterWrite bool   `json:"auto_commit_after_write"`
+	AutoPushAfterCommit  bool   `json:"auto_push_after_commit"`
+}
+
+func setupCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	cfg := defaultConfig()
+	storagePath := ""
+	for i := 0; i < len(filtered); i++ {
+		switch filtered[i] {
+		case "--storage":
+			if i+1 >= len(filtered) {
+				return errors.New("--storage requires an absolute path")
+			}
+			storagePath = filtered[i+1]
+			i++
+		case "--actor":
+			if i+1 >= len(filtered) {
+				return errors.New("--actor requires a name")
+			}
+			cfg.DefaultActor = strings.TrimSpace(filtered[i+1])
+			if cfg.DefaultActor == "" {
+				return errors.New("--actor cannot be empty")
+			}
+			i++
+		case "--auto-pull":
+			cfg.AutoPullBeforeRead = true
+		case "--no-auto-pull":
+			cfg.AutoPullBeforeRead = false
+		case "--auto-commit":
+			cfg.AutoCommitAfterWrite = true
+		case "--no-auto-commit":
+			cfg.AutoCommitAfterWrite = false
+		case "--auto-push":
+			cfg.AutoPushAfterCommit = true
+		case "--no-auto-push":
+			cfg.AutoPushAfterCommit = false
+		default:
+			return fmt.Errorf("unexpected setup argument %q", filtered[i])
+		}
+	}
+	if storagePath == "" {
+		return errors.New("usage: maat setup --storage <absolute-git-repo-path> [--actor <name>] [--auto-pull|--no-auto-pull] [--auto-commit|--no-auto-commit] [--auto-push|--no-auto-push] [--json]")
+	}
+	if !filepath.IsAbs(storagePath) {
+		return fmt.Errorf("setup storage path must be absolute: %s", storagePath)
+	}
+	abs, err := filepath.Abs(storagePath)
+	if err != nil {
+		return err
+	}
+	if stat, err := os.Stat(abs); err != nil {
+		return err
+	} else if !stat.IsDir() {
+		return fmt.Errorf("%s is not a directory", abs)
+	}
+	if !isGitRepository(abs) {
+		return fmt.Errorf("setup storage path must be a Git repository: %s", abs)
+	}
+	cfg.StoragePath = abs
+	configFile, err := persistConfig(cfg)
+	if err != nil {
+		return err
+	}
+	result := setupCommandResult{
+		Action:               "setup.configured",
+		StoragePath:          cfg.StoragePath,
+		ConfigPath:           configFile,
+		DefaultActor:         cfg.DefaultActor,
+		AutoPullBeforeRead:   cfg.AutoPullBeforeRead,
+		AutoCommitAfterWrite: cfg.AutoCommitAfterWrite,
+		AutoPushAfterCommit:  cfg.AutoPushAfterCommit,
+	}
+	if agentUse {
+		return agentUpdate("setup.configured", "ok", "setup complete", result)
+	}
+	if jsonOut {
+		return writeJSON(result)
+	}
+	ok("setup.configured", "setup complete", nil)
+	printField("Storage", result.StoragePath)
+	printField("Config", result.ConfigPath)
+	printField("Actor", result.DefaultActor)
+	printField("Auto-pull before reads", formatBool(result.AutoPullBeforeRead))
+	printField("Auto-commit after writes", formatBool(result.AutoCommitAfterWrite))
+	printField("Auto-push after commits", formatBool(result.AutoPushAfterCommit))
+	return nil
+}
+
 func storageCommand(args []string) error {
 	if len(args) != 2 || args[0] != "link" {
-		return errors.New("usage: matt storage link <storage-path>")
+		return errors.New("usage: maat storage link <storage-path>")
 	}
 	return writeConfig(args[1])
 }
 
 func indexCommand(args []string) error {
 	if len(args) == 0 || args[0] != "rebuild" {
-		return errors.New("usage: matt index rebuild [--storage <path>]")
+		return errors.New("usage: maat index rebuild [--storage <path>]")
 	}
 	store, err := loadStore(args[1:])
 	if err != nil {
@@ -696,7 +796,7 @@ func validateCommand(args []string) error {
 
 func migrateCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: matt migrate plan [--storage <path>] [--json] or matt migrate apply --dest <path> [--storage <path>]")
+		return errors.New("usage: maat migrate plan [--storage <path>] [--json] or maat migrate apply --dest <path> [--storage <path>]")
 	}
 	switch args[0] {
 	case "plan":
@@ -760,7 +860,7 @@ func migrateCommand(args []string) error {
 
 func projectCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: matt project <show|link>")
+		return errors.New("usage: maat project <show|link>")
 	}
 	switch args[0] {
 	case "show":
@@ -774,7 +874,7 @@ func projectCommand(args []string) error {
 
 func projectShowCommand(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: matt project show <project-id> [--storage <path>] [--json]")
+		return errors.New("usage: maat project show <project-id> [--storage <path>] [--json]")
 	}
 	filtered, jsonOut := splitJSONFlag(args)
 	projectID := filtered[0]
@@ -880,7 +980,7 @@ func projectLinkCommand(args []string) error {
 		return err
 	}
 	if len(rest) > 1 {
-		return errors.New("usage: matt project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]")
+		return errors.New("usage: maat project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]")
 	}
 	sourcePath := "."
 	if len(rest) == 1 {
@@ -921,7 +1021,7 @@ func projectLinkCommand(args []string) error {
 
 func goalCommand(args []string) error {
 	if len(args) == 0 || args[0] != "create" {
-		return errors.New("usage: matt goal create <project-key> <title> [--storage <path>] [--json]")
+		return errors.New("usage: maat goal create <project-key> <title> [--storage <path>] [--json]")
 	}
 	filtered, jsonOut := splitJSONFlag(args[1:])
 	store, rest, err := loadStoreAndRest(filtered)
@@ -951,7 +1051,7 @@ func goalCommand(args []string) error {
 
 func ticketCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: matt ticket <create|list|show|claim|comment|complete>")
+		return errors.New("usage: maat ticket <create|list|show|claim|comment|complete>")
 	}
 	switch args[0] {
 	case "create":
@@ -993,7 +1093,7 @@ func ticketListCommand(args []string) error {
 		return err
 	}
 	if len(rest) != 0 {
-		return errors.New("usage: matt ticket list [--project <project-key>] [--storage <path>] [--json]")
+		return errors.New("usage: maat ticket list [--project <project-key>] [--storage <path>] [--json]")
 	}
 	if projectKey == "" {
 		if project, err := inferProjectFromWorkingDirectory(store); err == nil {
@@ -1034,7 +1134,7 @@ func ticketShowCommand(args []string) error {
 		return err
 	}
 	if len(rest) != 1 {
-		return errors.New("usage: matt ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]")
+		return errors.New("usage: maat ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]")
 	}
 	ticketID := rest[0]
 	projectKey, err = resolveReadableTicketProject(store, projectKey, ticketID)
@@ -1125,7 +1225,7 @@ func ticketClaimCommand(args []string) error {
 		return err
 	}
 	if len(rest) != 1 {
-		return errors.New("ticket id is required; usage: matt ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]")
+		return errors.New("ticket id is required; usage: maat ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]")
 	}
 	if agent == "" {
 		agent = defaultActor()
@@ -1176,7 +1276,7 @@ func ticketCommentCommand(args []string) error {
 		return err
 	}
 	if len(rest) != 2 {
-		return errors.New("ticket id and comment are required; usage: matt ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]")
+		return errors.New("ticket id and comment are required; usage: maat ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]")
 	}
 	ticketID := rest[0]
 	projectKey, err = resolveTicketProject(store, projectKey, ticketID)
@@ -1216,7 +1316,7 @@ func ticketCompleteCommand(args []string) error {
 		return err
 	}
 	if len(rest) != 1 {
-		return errors.New("ticket id is required; usage: matt ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]")
+		return errors.New("ticket id is required; usage: maat ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]")
 	}
 	ticketID := rest[0]
 	projectKey, err = resolveTicketProject(store, projectKey, ticketID)
@@ -1241,48 +1341,70 @@ func ticketCompleteCommand(args []string) error {
 	}, jsonOut)
 }
 
+type initializeCommandResult struct {
+	Document       string             `json:"document"`
+	LinkedProject  maat.LinkedProject `json:"linked_project"`
+	ProjectKey     string             `json:"project_key"`
+	StoragePath    string             `json:"storage_path"`
+	IndexRefreshed bool               `json:"index_refreshed"`
+	IndexWarning   string             `json:"index_warning,omitempty"`
+}
+
 func agentInitializeCommand(args []string) error {
-	jsonOut := false
+	filtered, jsonOut := splitJSONFlag(args)
+	store, rest, err := loadStoreAndRest(filtered)
+	if err != nil {
+		return err
+	}
 	projectKey := ""
-	store := ""
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--json":
-			jsonOut = true
+	for i := 0; i < len(rest); i++ {
+		switch rest[i] {
 		case "--project":
-			if i+1 >= len(args) {
+			if i+1 >= len(rest) {
 				return errors.New("--project requires a project key")
 			}
-			projectKey = args[i+1]
-			i++
-		case "--storage":
-			if i+1 >= len(args) {
-				return errors.New("--storage requires a path")
-			}
-			abs, err := filepath.Abs(args[i+1])
-			if err != nil {
-				return err
-			}
-			store = abs
+			projectKey = rest[i+1]
 			i++
 		default:
-			return fmt.Errorf("unexpected initialize argument %q", args[i])
+			return fmt.Errorf("unexpected initialize argument %q", rest[i])
 		}
 	}
-	if store == "" {
-		if cfg, err := readConfig(); err == nil && cfg.StoragePath != "" {
-			store = cfg.StoragePath
-		}
+
+	progress("initialize.project", "registering current repo", map[string]string{"storage": store})
+	linked, err := maat.LinkProject(context.Background(), maat.LinkProjectInput{
+		Store:      store,
+		SourcePath: ".",
+		ProjectKey: projectKey,
+	})
+	if err != nil {
+		return err
 	}
+	progress("initialize.index", "refreshing indexes", nil)
+	refreshResult := refreshIndexesBestEffort(store)
+	warnIndexRefresh(refreshResult)
+
 	document := maat.AgentSetupDocument(maat.AgentSetupOptions{
-		ProjectKey:  projectKey,
+		ProjectKey:  linked.ProjectKey,
 		StoragePath: store,
 	})
+	result := initializeCommandResult{
+		Document:       document,
+		LinkedProject:  linked,
+		ProjectKey:     linked.ProjectKey,
+		StoragePath:    store,
+		IndexRefreshed: refreshResult.Refreshed,
+		IndexWarning:   refreshResult.Warning,
+	}
 	if agentUse {
-		return agentUpdate("agent.initialize.ready", "ok", "agent setup document ready", map[string]string{"document": document})
+		return agentUpdate("initialize.ready", "ok", "agent setup document ready", result)
 	}
 	if jsonOut {
-		return writeJSON(map[string]string{"document": document})
+		return writeJSON(result)
+	}
+	if linked.Created {
+		ok("initialize.project", "registered project "+linked.ProjectKey, nil)
+	} else {
+		ok("initialize.project", "project "+linked.ProjectKey+" already registered", nil)
 	}
 	fmt.Println(document)
 	return nil
@@ -1304,7 +1426,7 @@ func searchCommand(args []string) error {
 		return err
 	}
 	if len(rest) == 0 {
-		return errors.New("usage: matt search <query> [--storage <path>] [--json]")
+		return errors.New("usage: maat search <query> [--storage <path>] [--json]")
 	}
 	query := strings.Join(rest, " ")
 	progress("search.index", "refreshing search index", map[string]string{"query": query})
@@ -1667,13 +1789,13 @@ func resolveCreateProjectAndTitle(store string, args []string, kind string) (str
 	case 1:
 		project, err := inferProjectFromWorkingDirectory(store)
 		if err != nil {
-			return "", "", fmt.Errorf("project key is required when not inside a linked project; usage: matt %s create <project-key> <title>: %w", kind, err)
+			return "", "", fmt.Errorf("project key is required when not inside a linked project; usage: maat %s create <project-key> <title>: %w", kind, err)
 		}
 		return project.Key, args[0], nil
 	case 2:
 		return args[0], args[1], nil
 	default:
-		return "", "", fmt.Errorf("project key and %s title are required; usage: matt %s create [project-key] <title> [--storage <path>] [--json]", kind, kind)
+		return "", "", fmt.Errorf("project key and %s title are required; usage: maat %s create [project-key] <title> [--storage <path>] [--json]", kind, kind)
 	}
 }
 
@@ -1711,7 +1833,17 @@ func consumeFlagValue(args []string, flag string, required bool) (string, []stri
 }
 
 func defaultActor() string {
-	for _, key := range []string{"MAAT_ACTOR", "USER", "USERNAME"} {
+	if value := strings.TrimSpace(os.Getenv("MAAT_ACTOR")); value != "" {
+		return value
+	}
+	if cfg, err := readConfig(); err == nil && strings.TrimSpace(cfg.DefaultActor) != "" {
+		return strings.TrimSpace(cfg.DefaultActor)
+	}
+	return defaultSystemActor()
+}
+
+func defaultSystemActor() string {
+	for _, key := range []string{"USER", "USERNAME"} {
 		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
 			return value
 		}
@@ -1748,7 +1880,7 @@ func splitDestinationFlag(args []string) ([]string, string, error) {
 		filtered = append(filtered, args[i])
 	}
 	if strings.TrimSpace(dest) == "" {
-		return nil, "", errors.New("usage: matt migrate apply --dest <path> [--storage <path>]")
+		return nil, "", errors.New("usage: maat migrate apply --dest <path> [--storage <path>]")
 	}
 	return filtered, dest, nil
 }
@@ -1819,14 +1951,14 @@ func printField(label, value string) {
 }
 
 func defaultBinaryName() string {
-	if name := strings.TrimSpace(os.Getenv("MATT_BINARY_NAME")); name != "" {
+	if name := strings.TrimSpace(os.Getenv("MAAT_BINARY_NAME")); name != "" {
 		return name
 	}
-	return "matt"
+	return "maat"
 }
 
 func defaultInstallDir() string {
-	if dir := strings.TrimSpace(os.Getenv("MATT_INSTALL_DIR")); dir != "" {
+	if dir := strings.TrimSpace(os.Getenv("MAAT_INSTALL_DIR")); dir != "" {
 		return dir
 	}
 	if info, err := os.Stat("/usr/local/bin"); err == nil && info.IsDir() && isWritableDir("/usr/local/bin") {
@@ -1849,7 +1981,7 @@ func defaultUpdateInstallDir(binaryName string) string {
 }
 
 func isWritableDir(path string) bool {
-	file, err := os.CreateTemp(path, ".matt-write-test-*")
+	file, err := os.CreateTemp(path, ".maat-write-test-*")
 	if err != nil {
 		return false
 	}
@@ -1920,7 +2052,7 @@ func downloadURL(url string) ([]byte, error) {
 		return nil, err
 	}
 	request.Header.Set("Accept", "application/octet-stream")
-	request.Header.Set("User-Agent", "matt-updater/"+version.Current().Version)
+	request.Header.Set("User-Agent", "maat-updater/"+version.Current().Version)
 	response, err := updateHTTPClient.Do(request)
 	if err != nil {
 		return nil, err
@@ -2143,7 +2275,7 @@ func color(text, code string) string {
 }
 
 func colorEnabled() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("MATT_COLOR"))) {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("MAAT_COLOR"))) {
 	case "always", "1", "true", "yes":
 		return true
 	case "never", "0", "false", "no":
@@ -2205,7 +2337,27 @@ func loadStoreAndRest(args []string) (string, []string, error) {
 }
 
 type config struct {
-	StoragePath string `json:"storage_path"`
+	StoragePath          string `json:"storage_path"`
+	DefaultActor         string `json:"default_actor"`
+	AutoPullBeforeRead   bool   `json:"auto_pull_before_read"`
+	AutoCommitAfterWrite bool   `json:"auto_commit_after_write"`
+	AutoPushAfterCommit  bool   `json:"auto_push_after_commit"`
+}
+
+func defaultConfig() config {
+	return config{
+		DefaultActor:         defaultSetupActor(),
+		AutoPullBeforeRead:   true,
+		AutoCommitAfterWrite: true,
+		AutoPushAfterCommit:  true,
+	}
+}
+
+func defaultSetupActor() string {
+	if value := strings.TrimSpace(os.Getenv("MAAT_ACTOR")); value != "" {
+		return value
+	}
+	return defaultSystemActor()
 }
 
 func writeConfig(storagePath string) error {
@@ -2218,18 +2370,10 @@ func writeConfig(storagePath string) error {
 	} else if !stat.IsDir() {
 		return fmt.Errorf("%s is not a directory", abs)
 	}
-	path, err := configPath()
+	cfg := defaultConfig()
+	cfg.StoragePath = abs
+	path, err := persistConfig(cfg)
 	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(config{StoragePath: abs}, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
 		return err
 	}
 	if agentUse {
@@ -2240,6 +2384,24 @@ func writeConfig(storagePath string) error {
 	}
 	fmt.Printf("linked storage: %s\n", abs)
 	return nil
+}
+
+func persistConfig(cfg config) (string, error) {
+	path, err := configPath()
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", err
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 func readConfig() (config, error) {
@@ -2256,6 +2418,19 @@ func readConfig() (config, error) {
 		return config{}, err
 	}
 	return cfg, nil
+}
+
+func isGitRepository(path string) bool {
+	command := exec.Command("git", "-C", path, "rev-parse", "--is-inside-work-tree")
+	output, err := command.Output()
+	return err == nil && strings.TrimSpace(string(output)) == "true"
+}
+
+func formatBool(value bool) string {
+	if value {
+		return "yes"
+	}
+	return "no"
 }
 
 func configPath() (string, error) {

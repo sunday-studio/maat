@@ -13,10 +13,10 @@ func TestAgentInstructionsSnippet(t *testing.T) {
 
 	required := []string{
 		"Use Maat as the canonical project memory",
-		"`matt sync`",
-		"`matt status`",
-		"`matt project show <project>`",
-		"`matt search <query>`",
+		"`maat sync`",
+		"`maat status`",
+		"`maat project show <project>`",
+		"`maat search <query>`",
 		"Create or claim a ticket",
 		"complete the ticket with evidence",
 		"Do not mark work done without evidence",
@@ -37,15 +37,16 @@ func TestAgentSetupDocument(t *testing.T) {
 	for _, want := range []string{
 		"# Maat Agent Setup",
 		"Audience: any agent that can read files, run shell commands, and update Git",
-		"matt init /tmp/maat-state",
-		"matt storage link /tmp/maat-state",
+		"maat init /tmp/maat-state",
+		"maat storage link /tmp/maat-state",
 		"Codex: add it to the repo's `AGENTS.md`",
 		"Claude Code: add it to `CLAUDE.md`",
 		"Cursor or Cursor Cloud: add it to the repo's Cursor rules",
 		"Do not rely on the human to manually update Maat state",
-		"matt project show maat --storage /tmp/maat-state",
-		"matt goal create maat",
-		"matt ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",
+		"This repo is registered in Maat as `maat`.",
+		"maat project show maat --storage /tmp/maat-state",
+		"maat goal create maat",
+		"maat ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",
 		"Treat index warnings as cache warnings",
 	} {
 		if !strings.Contains(document, want) {

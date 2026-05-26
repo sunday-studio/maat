@@ -58,7 +58,7 @@ Tasks:
 - Detect invalid status values.
 - Detect missing required fields.
 - Detect malformed object files.
-- Expose a validation API for future `matt validate`.
+- Expose a validation API for future `maat validate`.
 
 Initial owner:
 
@@ -78,7 +78,7 @@ Tasks:
 - Generate event file paths.
 - Render event Markdown from structured input.
 - Add tests for ID shape, event paths, and Markdown output.
-- Later: wire `matt goal create`, `matt ticket create`, `matt ticket comment`, and `matt ticket complete`.
+- Later: wire `maat goal create`, `maat ticket create`, `maat ticket comment`, and `maat ticket complete`.
 
 Initial owner:
 
@@ -94,12 +94,12 @@ Goal: make the binary useful for agents and humans.
 
 Tasks:
 
-- Add `matt validate`.
-- Wire SQLite-backed `matt search`.
-- Add `matt ticket create`.
-- Add `matt ticket comment`.
-- Add `matt ticket complete`.
-- Add `matt sync` with safe Git flow.
+- Add `maat validate`.
+- Wire SQLite-backed `maat search`.
+- Add `maat ticket create`.
+- Add `maat ticket comment`.
+- Add `maat ticket complete`.
+- Add `maat sync` with safe Git flow.
 - Add JSON output for query commands.
 
 Initial owner:
@@ -125,7 +125,7 @@ Goal: give the human a polished terminal dashboard.
 Tasks:
 
 - Add Bubble Tea dependencies.
-- Add `matt tui`.
+- Add `maat tui`.
 - Show projects, active tickets, blocked tickets, timeline, and search.
 - Keep mutations routed through the same core operations as the CLI.
 
@@ -148,7 +148,7 @@ Goal: provide a browser dashboard for browsing all project state.
 
 Tasks:
 
-- Add `matt ui`.
+- Add `maat ui`.
 - Serve a local dashboard.
 - Read from SQLite.
 - Use core operations for mutations.
@@ -242,7 +242,7 @@ Tasks:
 
 - Document current and next agent-facing commands.
 - Define the copy/paste snippet for external project `AGENTS.md` files.
-- Generate the full setup contract with `matt initialize`.
+- Generate the full setup contract with `maat initialize`.
 - Keep the snippet short enough that agents actually follow it.
 - Add tests that pin the command names and evidence rule.
 
@@ -253,7 +253,7 @@ Initial owner:
 Status:
 
 - Done in `7654ed2 docs(agent): define command protocol`.
-- Superseded the old snippet helper with `matt initialize`; no separate `matt agent` namespace is kept.
+- Superseded the old snippet helper with `maat initialize`; no separate `maat agent` namespace is kept.
 
 ## Group 12: README And Product Packaging
 
@@ -289,7 +289,7 @@ Initial owner:
 
 Status:
 
-- Done in this slice. Agent onboarding is handled by `matt initialize`.
+- Done in this slice. Agent onboarding is handled by `maat initialize`.
 
 ## Integration Rules
 

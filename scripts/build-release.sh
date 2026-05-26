@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-binary_name="${MATT_BINARY_NAME:-matt}"
+binary_name="${MAAT_BINARY_NAME:-maat}"
 dist_dir="${DIST_DIR:-dist}"
 version="${VERSION:-}"
 commit="${COMMIT:-}"

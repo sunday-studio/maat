@@ -10,11 +10,11 @@ Maat keeps durable state in a normal Git repository full of Markdown files. That
 
 This product repository ignores `state/`; keep real Maat state in a separate Git-controlled storage repo or in local ignored smoke data.
 
-The `matt` CLI builds local indexes from that Markdown for faster search and dashboard views:
+The `maat` CLI builds local indexes from that Markdown for faster search and dashboard views:
 
 - Markdown in Git is canonical.
 - `.maat/index.json` and `.maat/index.sqlite` are local, rebuildable caches.
-- Agents should write through `matt` instead of hand-editing files.
+- Agents should write through `maat` instead of hand-editing files.
 - Events are stored as small object files to reduce merge conflicts.
 
 For many-agent use, do not treat SQLite as the shared coordination layer. Each agent, process, or machine can keep its own local `.maat` cache and rebuild it from Markdown whenever needed. Coordination happens through Git commits, pulls, pushes, and append-only state files.
@@ -32,14 +32,14 @@ scripts/install.sh
 Update or remove a local install:
 
 ```sh
-matt update
-matt uninstall --install-dir "$HOME/.local/bin"
+maat update
+maat uninstall --install-dir "$HOME/.local/bin"
 ```
 
 Build directly:
 
 ```sh
-go build -o matt ./cmd/matt
+go build -o maat ./cmd/matt
 ```
 
 Run from source:
@@ -51,13 +51,13 @@ go run ./cmd/matt version
 Link your storage repo once:
 
 ```sh
-matt init /absolute/path/to/maat-state
+maat init /absolute/path/to/maat-state
 ```
 
 Or pass it explicitly:
 
 ```sh
-matt status --storage /absolute/path/to/maat-state
+maat status --storage /absolute/path/to/maat-state
 ```
 
 ## Core Workflows
@@ -65,52 +65,52 @@ matt status --storage /absolute/path/to/maat-state
 Set up and inspect:
 
 ```sh
-matt init /absolute/path/to/maat-state
-matt index rebuild
-matt validate
-matt status
-matt projects
-matt search "blocked deploy"
+maat init /absolute/path/to/maat-state
+maat index rebuild
+maat validate
+maat status
+maat projects
+maat search "blocked deploy"
 ```
 
 Link a source repo:
 
 ```sh
 cd /absolute/path/to/source-repo
-matt project link
-matt project show <project-key>
+maat project link
+maat project show <project-key>
 ```
 
 Create work:
 
 ```sh
-matt goal create <project-key> "Ship first deploy"
-matt ticket create <project-key> "Verify installer"
-matt ticket create <project-key> "Fix deploy docs" --goal <goal-id>
+maat goal create <project-key> "Ship first deploy"
+maat ticket create <project-key> "Verify installer"
+maat ticket create <project-key> "Fix deploy docs" --goal <goal-id>
 ```
 
 Work a ticket:
 
 ```sh
-matt ticket claim <ticket-id> --agent codex --ttl 2h
-matt ticket comment <ticket-id> "Found the failing path."
-matt ticket complete <ticket-id> --evidence "go test ./... passed"
+maat ticket claim <ticket-id> --agent codex --ttl 2h
+maat ticket comment <ticket-id> "Found the failing path."
+maat ticket complete <ticket-id> --evidence "go test ./... passed"
 ```
 
 Sync changes:
 
 ```sh
-matt sync --message "status(maat): complete installer ticket"
-matt sync --push
-matt sync --status --json
+maat sync --message "status(maat): complete installer ticket"
+maat sync --push
+maat sync --status --json
 ```
 
-Human output is colored when the terminal supports it. Set `MATT_COLOR=always` or `MATT_COLOR=never` to force color behavior.
+Human output is colored when the terminal supports it. Set `MAAT_COLOR=always` or `MAAT_COLOR=never` to force color behavior.
 
 Agents that need parseable progress should use `--agent-use` instead of scraping human output:
 
 ```sh
-matt sync --agent-use --storage /absolute/path/to/maat-state
+maat sync --agent-use --storage /absolute/path/to/maat-state
 ```
 
 `--agent-use` emits newline-delimited JSON updates and cannot be combined with `--json`.
@@ -118,25 +118,25 @@ matt sync --agent-use --storage /absolute/path/to/maat-state
 Migrate legacy flat project files into the object layout:
 
 ```sh
-matt migrate plan --json
-matt migrate apply --dest /tmp/maat-migrated
+maat migrate plan --json
+maat migrate apply --dest /tmp/maat-migrated
 ```
 
 ## Agent Workflow
 
 Agents should follow this loop:
 
-1. Run `matt sync` or otherwise pull the Maat storage repo.
-2. Inspect state with `matt status`, `matt project show`, or `matt search`.
+1. Run `maat sync` or otherwise pull the Maat storage repo.
+2. Inspect state with `maat status`, `maat project show`, or `maat search`.
 3. Create or claim a ticket before doing material work.
-4. Record meaningful progress with `matt ticket comment`.
+4. Record meaningful progress with `maat ticket comment`.
 5. Complete tickets only with evidence.
-6. Run `matt validate` and `matt sync`.
+6. Run `maat validate` and `maat sync`.
 
 Generate a full setup handoff for an agent with:
 
 ```sh
-matt initialize --project maat --storage /absolute/path/to/maat-state
+maat initialize --project maat --storage /absolute/path/to/maat-state
 ```
 
 ## TUI
@@ -144,7 +144,7 @@ matt initialize --project maat --storage /absolute/path/to/maat-state
 Launch the terminal dashboard:
 
 ```sh
-matt tui
+maat tui
 ```
 
 The TUI currently shows projects, status totals, project detail, and ticket lists. Search and timeline views are planned next.

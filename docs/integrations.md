@@ -8,7 +8,7 @@ Agents need only four capabilities:
 
 1. Read Markdown files.
 2. Create Markdown object and event files.
-3. Run `matt` commands when available.
+3. Run `maat` commands when available.
 4. Commit and sync with Git.
 
 No agent-specific database or API is required for the core system.
@@ -18,13 +18,13 @@ No agent-specific database or API is required for the core system.
 Install this into each project repo's `AGENTS.md` or equivalent agent instructions:
 
 ```text
-Use Maat as the canonical project memory for this repo. Before material work, run `matt sync` if available, then inspect state with `matt status`, `matt project show <project>`, or `matt search <query>`. Create or claim a ticket before working. Record meaningful progress with ticket comments or events. When finished, complete the ticket with evidence, validate Maat, and sync. Do not mark work done without evidence.
+Use Maat as the canonical project memory for this repo. Before material work, run `maat sync` if available, then inspect state with `maat status`, `maat project show <project>`, or `maat search <query>`. Create or claim a ticket before working. Record meaningful progress with ticket comments or events. When finished, complete the ticket with evidence, validate Maat, and sync. Do not mark work done without evidence.
 ```
 
 For a full agent onboarding document, run:
 
 ```sh
-matt initialize --project <project-key> --storage /absolute/path/to/maat-state
+maat initialize --project <project-key> --storage /absolute/path/to/maat-state
 ```
 
 Use it when an agent needs instructions for linking storage, saving the Maat rule into Codex, Claude Code, Cursor, cloud agent instructions, or a generic skill file, and following the Maat command loop.
@@ -34,28 +34,28 @@ Use it when an agent needs instructions for linking storage, saving the Maat rul
 Current commands suitable for integrations:
 
 ```sh
-matt init [storage-path]
-matt storage link <storage-path>
-matt index rebuild [--storage <path>]
-matt status [--storage <path>] [--json]
-matt projects [--storage <path>] [--json]
-matt project show <project-id> [--storage <path>]
-matt validate [--storage <path>] [--json]
-matt search <query> [--storage <path>] [--json]
-matt initialize [--project <project-key>] [--storage <path>] [--json]
-matt tui [--storage <path>]
+maat init [storage-path]
+maat storage link <storage-path>
+maat index rebuild [--storage <path>]
+maat status [--storage <path>] [--json]
+maat projects [--storage <path>] [--json]
+maat project show <project-id> [--storage <path>]
+maat validate [--storage <path>] [--json]
+maat search <query> [--storage <path>] [--json]
+maat initialize [--project <project-key>] [--storage <path>] [--json]
+maat tui [--storage <path>]
 ```
 
 Write commands available for integrations:
 
 ```sh
-matt project link
-matt goal create <project> <title>
-matt ticket create <project> [--goal <goal-id>] <title>
-matt ticket claim <project> <ticket-id> --agent <agent-id> --ttl <duration>
-matt ticket comment <project> <ticket-id> <comment>
-matt ticket complete <project> <ticket-id> --evidence <evidence>
-matt sync [--push]
+maat project link
+maat goal create <project> <title>
+maat ticket create <project> [--goal <goal-id>] <title>
+maat ticket claim <project> <ticket-id> --agent <agent-id> --ttl <duration>
+maat ticket comment <project> <ticket-id> <comment>
+maat ticket complete <project> <ticket-id> --evidence <evidence>
+maat sync [--push]
 ```
 
 ## Codex
@@ -64,14 +64,14 @@ Codex can use Maat directly:
 
 1. Open the Maat repo as a workspace.
 2. Read `AGENTS.md`.
-3. Prefer `matt` commands when the binary exists.
+3. Prefer `maat` commands when the binary exists.
 4. Otherwise create object and event files following the docs.
 5. Commit and push.
 
 Recommended instruction:
 
 ```text
-Before and after material work, update Maat according to AGENTS.md. Prefer the `matt` CLI. Use current read commands for discovery and validation. When write commands are unavailable, create target-layout object and event files directly. Create or claim a ticket before work, record useful progress, complete work only with evidence, and sync afterward.
+Before and after material work, update Maat according to AGENTS.md. Prefer the `maat` CLI. Use current read commands for discovery and validation. When write commands are unavailable, create target-layout object and event files directly. Create or claim a ticket before work, record useful progress, complete work only with evidence, and sync afterward.
 ```
 
 ## Claude
@@ -81,7 +81,7 @@ Claude-style agents can use the same contract when they have filesystem and Git 
 Recommended instruction:
 
 ```text
-Use the Maat repository as the canonical project tracker. Prefer the `matt` CLI. Use current read commands for discovery and validation. When write commands are unavailable, create target-layout object and event files directly. Create or claim a ticket before work, record useful progress, complete work only with evidence, and sync afterward.
+Use the Maat repository as the canonical project tracker. Prefer the `maat` CLI. Use current read commands for discovery and validation. When write commands are unavailable, create target-layout object and event files directly. Create or claim a ticket before work, record useful progress, complete work only with evidence, and sync afterward.
 ```
 
 ## Agents Without Git Push Access

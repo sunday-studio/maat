@@ -54,7 +54,7 @@ That cache is rebuildable from `state/` and should normally stay ignored:
 - product repos should ignore `.maat/`
 - local storage checkouts should ignore `.maat/` unless the storage repo deliberately chooses otherwise
 - agents should not commit `.maat/` as primary state
-- cache deletion should only require `matt index rebuild`
+- cache deletion should only require `maat index rebuild`
 
 For concurrency, each agent, process, or machine can have its own cache. Shared state is the Markdown files plus Git history, not a shared SQLite database.
 
