@@ -424,13 +424,19 @@ func uninstallCommand(args []string) error {
 		return err
 	}
 	targetPath := filepath.Join(absInstallDir, binaryName)
-	progress("uninstall.remove", "removing installed binary", map[string]string{"target": targetPath})
-	removed := true
-	if err := os.Remove(targetPath); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			removed = false
-		} else {
+	removed := false
+	if _, err := os.Lstat(targetPath); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
 			return err
+		}
+	} else {
+		progress("uninstall.remove", "removing installed binary", map[string]string{"target": targetPath})
+		if err := os.Remove(targetPath); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+		} else {
+			removed = true
 		}
 	}
 	result := installCommandResult{

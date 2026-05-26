@@ -342,6 +342,22 @@ func TestUninstallCommandRemovesBinaryAndCanPurgeConfig(t *testing.T) {
 	}
 }
 
+func TestUninstallCommandDoesNotReportRemovingMissingBinary(t *testing.T) {
+	installDir := t.TempDir()
+
+	output, err := captureRun("uninstall", "--install-dir", installDir, "--binary-name", "maat-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(output, "removing installed binary") {
+		t.Fatalf("missing binary output should not report removal progress: %q", output)
+	}
+	if !strings.Contains(output, "installed binary was not found") {
+		t.Fatalf("expected missing binary warning, got %q", output)
+	}
+}
+
 func TestSetupCommandWritesConfig(t *testing.T) {
 	store := t.TempDir()
 	runGit(t, store, "init", "-b", "main")
