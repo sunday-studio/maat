@@ -15,7 +15,6 @@ func AgentInstructionsSnippet() string {
 }
 
 type AgentSetupOptions struct {
-	Agent       string
 	ProjectKey  string
 	StoragePath string
 }
@@ -23,10 +22,6 @@ type AgentSetupOptions struct {
 // AgentSetupDocument returns a complete setup document for installing Maat into
 // an agent's normal instruction, skill, or memory system.
 func AgentSetupDocument(opts AgentSetupOptions) string {
-	agent := strings.TrimSpace(opts.Agent)
-	if agent == "" {
-		agent = "generic"
-	}
 	project := strings.TrimSpace(opts.ProjectKey)
 	if project == "" {
 		project = "<project-key>"
@@ -38,7 +33,7 @@ func AgentSetupDocument(opts AgentSetupOptions) string {
 
 	return fmt.Sprintf(`# Maat Agent Setup
 
-Audience: %[1]s agent
+Audience: any agent that can read files, run shell commands, and update Git
 
 Maat is the project memory for this work. Markdown plus Git is the source of truth. SQLite is only a local search cache.
 
@@ -55,17 +50,17 @@ matt version
 3. Link this machine or sandbox to that storage directory:
 
 `+"```sh"+`
-matt init %[3]s
+matt init %[2]s
 # or
-matt storage link %[3]s
+matt storage link %[2]s
 `+"```"+`
 
 4. Check the current state:
 
 `+"```sh"+`
-matt sync --storage %[3]s --status
-matt status --storage %[3]s
-matt projects --storage %[3]s
+matt sync --storage %[2]s --status
+matt status --storage %[2]s
+matt projects --storage %[2]s
 `+"```"+`
 
 ## Install Into The Agent
@@ -80,7 +75,7 @@ Put the Maat rule into the agent's normal instruction surface:
 Use this exact project-level snippet when the target file already has other instructions:
 
 `+"```text"+`
-%[4]s
+%[3]s
 `+"```"+`
 
 You can write the snippet directly with:
@@ -94,44 +89,44 @@ matt agent instructions --output AGENTS.md
 Before material work:
 
 `+"```sh"+`
-matt sync --storage %[3]s --status
-matt status --storage %[3]s
-matt project show %[2]s --storage %[3]s
-matt search "<query>" --storage %[3]s
+matt sync --storage %[2]s --status
+matt status --storage %[2]s
+matt project show %[1]s --storage %[2]s
+matt search "<query>" --storage %[2]s
 `+"```"+`
 
 If the project is not linked yet:
 
 `+"```sh"+`
-matt project link . --storage %[3]s --key %[2]s --name "<display-name>"
+matt project link . --storage %[2]s --key %[1]s --name "<display-name>"
 `+"```"+`
 
 When planning work:
 
 `+"```sh"+`
-matt goal create %[2]s "<goal title>" --storage %[3]s
-matt ticket create %[2]s "<ticket title>" --goal <goal-id> --storage %[3]s
+matt goal create %[1]s "<goal title>" --storage %[2]s
+matt ticket create %[1]s "<ticket title>" --goal <goal-id> --storage %[2]s
 `+"```"+`
 
 When starting work:
 
 `+"```sh"+`
-matt ticket claim <ticket-id> --project %[2]s --agent "%[1]s" --ttl 2h --storage %[3]s
+matt ticket claim <ticket-id> --project %[1]s --agent "<agent-id>" --ttl 2h --storage %[2]s
 `+"```"+`
 
 During work:
 
 `+"```sh"+`
-matt ticket comment <ticket-id> "short factual progress note" --project %[2]s --storage %[3]s
-matt search "<thing you need>" --storage %[3]s
+matt ticket comment <ticket-id> "short factual progress note" --project %[1]s --storage %[2]s
+matt search "<thing you need>" --storage %[2]s
 `+"```"+`
 
 When finished:
 
 `+"```sh"+`
-matt ticket complete <ticket-id> --project %[2]s --evidence "tests, commit, PR, or exact verification" --storage %[3]s
-matt validate --storage %[3]s
-matt sync --storage %[3]s --message "status(%[2]s): update maat" --push
+matt ticket complete <ticket-id> --project %[1]s --evidence "tests, commit, PR, or exact verification" --storage %[2]s
+matt validate --storage %[2]s
+matt sync --storage %[2]s --message "status(%[1]s): update maat" --push
 `+"```"+`
 
 ## Rules
@@ -144,5 +139,5 @@ matt sync --storage %[3]s --message "status(%[2]s): update maat" --push
 - Commit and push Maat storage changes when the storage repo is Git-controlled.
 - Do not store primary project state outside Markdown.
 `,
-		agent, project, storage, AgentInstructionsSnippet())
+		project, storage, AgentInstructionsSnippet())
 }

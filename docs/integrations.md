@@ -26,7 +26,7 @@ Use Maat as the canonical project memory for this repo. Before material work, ru
 For a full agent onboarding document, run:
 
 ```sh
-matt agent initialize --agent codex --project <project-key> --storage /absolute/path/to/maat-state
+matt agent initialize --project <project-key> --storage /absolute/path/to/maat-state
 ```
 
 `matt initialize` is a top-level alias for the same setup document. Use it when an agent needs instructions for linking storage, installing the Maat rule into Codex, Claude Code, cloud agent instructions, or a generic skill file, and following the Maat command loop.
@@ -44,8 +44,8 @@ matt projects [--storage <path>] [--json]
 matt project show <project-id> [--storage <path>]
 matt validate [--storage <path>] [--json]
 matt search <query> [--storage <path>] [--json]
-matt initialize [--agent <name>] [--project <project-key>] [--storage <path>] [--output <path>] [--json]
-matt agent initialize [--agent <name>] [--project <project-key>] [--storage <path>] [--output <path>] [--json]
+matt initialize [--project <project-key>] [--storage <path>] [--output <path>] [--json]
+matt agent initialize [--project <project-key>] [--storage <path>] [--output <path>] [--json]
 matt agent instructions [--json] [--output <path>]
 matt tui [--storage <path>]
 ```

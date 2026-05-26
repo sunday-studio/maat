@@ -134,7 +134,7 @@ Usage:
   matt <command> [flags]
 
 Common:
-  matt initialize [--agent <name>] [--project <project-key>] [--storage <path>] [--output <path>] [--json]
+  matt initialize [--project <project-key>] [--storage <path>] [--output <path>] [--json]
   matt status [--storage <path>] [--json]
   matt projects [--storage <path>] [--json]
   matt search <query> [--storage <path>] [--json]
@@ -160,7 +160,7 @@ Setup and maintenance:
   matt validate [--storage <path>] [--json]
   matt migrate plan [--storage <path>] [--json]
   matt migrate apply --dest <path> [--storage <path>]
-  matt agent initialize [--agent <name>] [--project <project-key>] [--storage <path>] [--output <path>] [--json]
+  matt agent initialize [--project <project-key>] [--storage <path>] [--output <path>] [--json]
   matt agent instructions [--json] [--output <path>]
   matt tui [--storage <path>]
   matt version [--json]
@@ -1000,7 +1000,6 @@ func agentInstructionsCommand(args []string) error {
 func agentInitializeCommand(args []string) error {
 	jsonOut := false
 	outputPath := ""
-	agentName := ""
 	projectKey := ""
 	store := ""
 	for i := 0; i < len(args); i++ {
@@ -1012,12 +1011,6 @@ func agentInitializeCommand(args []string) error {
 				return errors.New("--output requires a path")
 			}
 			outputPath = args[i+1]
-			i++
-		case "--agent":
-			if i+1 >= len(args) {
-				return errors.New("--agent requires a name")
-			}
-			agentName = args[i+1]
 			i++
 		case "--project":
 			if i+1 >= len(args) {
@@ -1045,7 +1038,6 @@ func agentInitializeCommand(args []string) error {
 		}
 	}
 	document := maat.AgentSetupDocument(maat.AgentSetupOptions{
-		Agent:       agentName,
 		ProjectKey:  projectKey,
 		StoragePath: store,
 	})

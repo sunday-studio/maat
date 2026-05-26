@@ -168,7 +168,7 @@ prints exactly this snippet. Use `matt agent instructions --output AGENTS.md` wh
 Use this when handing Maat to a new agent, a hosted agent, or a skill/instruction system that needs the full operating protocol:
 
 ```sh
-matt agent initialize --agent codex --project maat --storage /absolute/path/to/maat-state
+matt agent initialize --project maat --storage /absolute/path/to/maat-state
 matt initialize --output maat-agent-setup.md
 ```
 

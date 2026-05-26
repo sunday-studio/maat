@@ -135,7 +135,7 @@ matt agent instructions --output AGENTS.md
 Generate a full setup handoff for an agent with:
 
 ```sh
-matt initialize --agent codex --project maat --storage /absolute/path/to/maat-state
+matt initialize --project maat --storage /absolute/path/to/maat-state
 # or
 matt agent initialize --output maat-agent-setup.md
 ```

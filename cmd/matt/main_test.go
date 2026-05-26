@@ -856,17 +856,17 @@ func TestAgentInstructionsCommandJSONAndOutput(t *testing.T) {
 func TestAgentInitializeCommand(t *testing.T) {
 	store := t.TempDir()
 
-	output, err := captureRun("agent", "initialize", "--agent", "codex", "--project", "maat", "--storage", store)
+	output, err := captureRun("agent", "initialize", "--project", "maat", "--storage", store)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, want := range []string{
 		"# Maat Agent Setup",
-		"Audience: codex agent",
+		"Audience: any agent that can read files, run shell commands, and update Git",
 		"matt init " + store,
 		"matt project show maat --storage " + store,
-		"matt ticket claim <ticket-id> --project maat --agent \"codex\"",
+		"matt ticket claim <ticket-id> --project maat --agent \"<agent-id>\"",
 		"Codex: add it to the repo's `AGENTS.md`",
 		"Claude Code: add it to `CLAUDE.md`",
 	} {
@@ -880,7 +880,7 @@ func TestInitializeAliasCommandJSONAndOutput(t *testing.T) {
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "maat-agent-setup.md")
 
-	output, err := captureRun("initialize", "--agent", "claude", "--project", "maat", "--storage", store, "--json", "--output", path)
+	output, err := captureRun("initialize", "--project", "maat", "--storage", store, "--json", "--output", path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -889,15 +889,21 @@ func TestInitializeAliasCommandJSONAndOutput(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(payload["document"], "Audience: claude agent") || !strings.Contains(payload["document"], "matt storage link "+store) {
+	if !strings.Contains(payload["document"], "Audience: any agent") || !strings.Contains(payload["document"], "matt storage link "+store) {
 		t.Fatalf("unexpected initialize payload: %#v", payload)
 	}
 	written, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(written), "Audience: claude agent") || !strings.HasSuffix(string(written), "\n") {
+	if !strings.Contains(string(written), "Audience: any agent") || !strings.HasSuffix(string(written), "\n") {
 		t.Fatalf("unexpected written setup document: %q", string(written))
+	}
+}
+
+func TestAgentInitializeCommandRejectsAgentFlag(t *testing.T) {
+	if _, err := captureRun("agent", "initialize", "--agent", "codex"); err == nil || !strings.Contains(err.Error(), "unexpected agent initialize argument") {
+		t.Fatalf("expected --agent to be rejected, got %v", err)
 	}
 }
 
