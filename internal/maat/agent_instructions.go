@@ -80,7 +80,7 @@ After saving it, follow the command loop below. Do not rely on the human to manu
 
 ## Operating Loop
 
-This repo is registered in Maat as ` + "`%[1]s`" + `. Use that exact project key in all project-scoped commands.
+This repo is registered in Maat as `+"`%[1]s`"+`. Use that exact project key in all project-scoped commands.
 
 Before material work:
 
