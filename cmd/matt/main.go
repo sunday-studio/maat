@@ -1,13 +1,19 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -18,6 +24,9 @@ import (
 
 var agentUse bool
 var jsonUse bool
+
+var latestReleaseURL = "https://api.github.com/repos/sunday-studio/maat/releases/latest"
+var updateHTTPClient = http.DefaultClient
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -192,14 +201,30 @@ func versionCommand(args []string) error {
 }
 
 type installCommandResult struct {
-	Action       string `json:"action"`
-	BinaryName   string `json:"binary_name"`
-	InstallDir   string `json:"install_dir"`
-	TargetPath   string `json:"target_path"`
-	SourcePath   string `json:"source_path,omitempty"`
-	Removed      bool   `json:"removed,omitempty"`
-	ConfigPath   string `json:"config_path,omitempty"`
-	ConfigPurged bool   `json:"config_purged,omitempty"`
+	Action           string `json:"action"`
+	BinaryName       string `json:"binary_name"`
+	InstallDir       string `json:"install_dir"`
+	TargetPath       string `json:"target_path"`
+	SourcePath       string `json:"source_path,omitempty"`
+	CurrentVersion   string `json:"current_version,omitempty"`
+	LatestVersion    string `json:"latest_version,omitempty"`
+	AssetName        string `json:"asset_name,omitempty"`
+	AssetURL         string `json:"asset_url,omitempty"`
+	ChecksumVerified bool   `json:"checksum_verified,omitempty"`
+	Removed          bool   `json:"removed,omitempty"`
+	ConfigPath       string `json:"config_path,omitempty"`
+	ConfigPurged     bool   `json:"config_purged,omitempty"`
+}
+
+type githubRelease struct {
+	TagName string               `json:"tag_name"`
+	Name    string               `json:"name"`
+	Assets  []githubReleaseAsset `json:"assets"`
+}
+
+type githubReleaseAsset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
 }
 
 func updateCommand(args []string) error {
@@ -234,40 +259,96 @@ func updateCommand(args []string) error {
 	if binaryName == "" {
 		return errors.New("--binary-name cannot be empty")
 	}
-	if sourcePath == "" {
-		var err error
-		sourcePath, err = os.Executable()
-		if err != nil {
-			return err
-		}
-	}
-	absSource, err := filepath.Abs(sourcePath)
-	if err != nil {
-		return err
-	}
-	sourceInfo, err := os.Stat(absSource)
-	if err != nil {
-		return fmt.Errorf("read update source: %w", err)
-	}
-	if sourceInfo.IsDir() {
-		return fmt.Errorf("update source is a directory: %s", absSource)
-	}
 	if installDir == "" {
-		installDir = defaultInstallDir()
+		installDir = defaultUpdateInstallDir(binaryName)
 	}
 	absInstallDir, err := filepath.Abs(installDir)
 	if err != nil {
 		return err
 	}
 	targetPath := filepath.Join(absInstallDir, binaryName)
-	if samePath(absSource, targetPath) {
-		result := installCommandResult{
-			Action:     "update.skipped",
-			BinaryName: binaryName,
-			InstallDir: absInstallDir,
-			TargetPath: targetPath,
-			SourcePath: absSource,
+
+	var sourceInfo os.FileInfo
+	var absSource string
+	result := installCommandResult{
+		BinaryName:     binaryName,
+		InstallDir:     absInstallDir,
+		TargetPath:     targetPath,
+		CurrentVersion: version.Current().Version,
+	}
+
+	cleanupSource := func() {}
+	defer cleanupSource()
+	if sourcePath == "" {
+		progress("update.release", "checking latest GitHub release", map[string]string{"current_version": result.CurrentVersion})
+		release, err := fetchLatestRelease()
+		if err != nil {
+			return err
 		}
+		result.LatestVersion = release.TagName
+		if release.Name != "" && result.LatestVersion == "" {
+			result.LatestVersion = release.Name
+		}
+		if releaseIsCurrent(result.CurrentVersion, result.LatestVersion) {
+			result.Action = "update.current"
+			if agentUse {
+				return agentUpdate("update.ready", "ok", "already on latest version", result)
+			}
+			if jsonOut {
+				return writeJSON(result)
+			}
+			ok("update.ready", "already on latest version", nil)
+			printField("Version", result.CurrentVersion)
+			return nil
+		}
+		asset, ok := selectReleaseAsset(release, binaryName, runtime.GOOS, runtime.GOARCH)
+		if !ok {
+			return fmt.Errorf("no release asset found for %s/%s in %s", runtime.GOOS, runtime.GOARCH, result.LatestVersion)
+		}
+		result.AssetName = asset.Name
+		result.AssetURL = asset.BrowserDownloadURL
+		progress("update.download", "downloading release asset", map[string]string{"asset": asset.Name})
+		archiveData, err := downloadURL(asset.BrowserDownloadURL)
+		if err != nil {
+			return err
+		}
+		if checksumAsset, ok := selectChecksumAsset(release); ok {
+			checksums, err := downloadURL(checksumAsset.BrowserDownloadURL)
+			if err != nil {
+				return err
+			}
+			if err := verifyArchiveChecksum(archiveData, asset.Name, string(checksums)); err != nil {
+				return err
+			}
+			result.ChecksumVerified = true
+		}
+		tmpPath, err := materializeReleaseBinary(archiveData, asset.Name, binaryName)
+		if err != nil {
+			return err
+		}
+		absSource = tmpPath
+		cleanupSource = func() { _ = os.Remove(tmpPath) }
+		sourceInfo, err = os.Stat(absSource)
+		if err != nil {
+			return err
+		}
+	} else {
+		var err error
+		absSource, err = filepath.Abs(sourcePath)
+		if err != nil {
+			return err
+		}
+		sourceInfo, err = os.Stat(absSource)
+		if err != nil {
+			return fmt.Errorf("read update source: %w", err)
+		}
+		if sourceInfo.IsDir() {
+			return fmt.Errorf("update source is a directory: %s", absSource)
+		}
+	}
+	result.SourcePath = absSource
+	if samePath(absSource, targetPath) {
+		result.Action = "update.skipped"
 		if agentUse {
 			return agentUpdate("update.ready", "ok", "binary already installed at target path", result)
 		}
@@ -287,13 +368,7 @@ func updateCommand(args []string) error {
 	if err := installBinary(absSource, targetPath, sourceInfo.Mode().Perm()); err != nil {
 		return err
 	}
-	result := installCommandResult{
-		Action:     "update.installed",
-		BinaryName: binaryName,
-		InstallDir: absInstallDir,
-		TargetPath: targetPath,
-		SourcePath: absSource,
-	}
+	result.Action = "update.installed"
 	if agentUse {
 		return agentUpdate("update.ready", "ok", "binary updated", result)
 	}
@@ -302,8 +377,14 @@ func updateCommand(args []string) error {
 	}
 	ok("update.ready", "binary updated", nil)
 	printField("Binary", binaryName)
+	if result.LatestVersion != "" {
+		printField("Version", result.LatestVersion)
+	}
 	printField("Source", absSource)
 	printField("Target", targetPath)
+	if result.ChecksumVerified {
+		printField("Checksum", "verified")
+	}
 	if !dirOnPath(absInstallDir) {
 		warn("update.path", absInstallDir+" is not on PATH", nil)
 	}
@@ -1757,6 +1838,16 @@ func defaultInstallDir() string {
 	return "."
 }
 
+func defaultUpdateInstallDir(binaryName string) string {
+	if executable, err := os.Executable(); err == nil && filepath.Base(executable) == binaryName {
+		dir := filepath.Dir(executable)
+		if isWritableDir(dir) {
+			return dir
+		}
+	}
+	return defaultInstallDir()
+}
+
 func isWritableDir(path string) bool {
 	file, err := os.CreateTemp(path, ".matt-write-test-*")
 	if err != nil {
@@ -1806,6 +1897,180 @@ func installBinary(sourcePath, targetPath string, sourcePerm os.FileMode) error 
 	}
 	cleanup = false
 	return nil
+}
+
+func fetchLatestRelease() (githubRelease, error) {
+	data, err := downloadURL(latestReleaseURL)
+	if err != nil {
+		return githubRelease{}, err
+	}
+	var release githubRelease
+	if err := json.Unmarshal(data, &release); err != nil {
+		return githubRelease{}, err
+	}
+	if release.TagName == "" && release.Name == "" {
+		return githubRelease{}, errors.New("latest release response did not include a version")
+	}
+	return release, nil
+}
+
+func downloadURL(url string) ([]byte, error) {
+	request, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Accept", "application/octet-stream")
+	request.Header.Set("User-Agent", "matt-updater/"+version.Current().Version)
+	response, err := updateHTTPClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		body, _ := io.ReadAll(io.LimitReader(response.Body, 1024))
+		text := strings.TrimSpace(string(body))
+		if text != "" {
+			return nil, fmt.Errorf("download %s failed: %s: %s", url, response.Status, text)
+		}
+		return nil, fmt.Errorf("download %s failed: %s", url, response.Status)
+	}
+	return io.ReadAll(response.Body)
+}
+
+func releaseIsCurrent(current, latest string) bool {
+	current = normalizeVersion(current)
+	latest = normalizeVersion(latest)
+	if current == "" || latest == "" || current == "dev" || current == "unknown" {
+		return false
+	}
+	return current == latest
+}
+
+func normalizeVersion(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	value = strings.TrimPrefix(value, "refs/tags/")
+	value = strings.TrimPrefix(value, "v")
+	return value
+}
+
+func selectReleaseAsset(release githubRelease, binaryName, goos, goarch string) (githubReleaseAsset, bool) {
+	wantSuffix := goos + "-" + goarch + ".tar.gz"
+	for _, asset := range release.Assets {
+		name := strings.ToLower(asset.Name)
+		if strings.Contains(name, "checksum") {
+			continue
+		}
+		if strings.HasPrefix(name, strings.ToLower(binaryName)+"-") && strings.HasSuffix(name, wantSuffix) && asset.BrowserDownloadURL != "" {
+			return asset, true
+		}
+	}
+	return githubReleaseAsset{}, false
+}
+
+func selectChecksumAsset(release githubRelease) (githubReleaseAsset, bool) {
+	for _, asset := range release.Assets {
+		name := strings.ToLower(asset.Name)
+		if strings.Contains(name, "checksum") && strings.HasSuffix(name, ".txt") && asset.BrowserDownloadURL != "" {
+			return asset, true
+		}
+	}
+	return githubReleaseAsset{}, false
+}
+
+func verifyArchiveChecksum(data []byte, assetName, checksums string) error {
+	sum := fmt.Sprintf("%x", sha256.Sum256(data))
+	for _, line := range strings.Split(checksums, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		name := strings.TrimPrefix(fields[1], "*")
+		if filepath.Base(name) != assetName {
+			continue
+		}
+		if !strings.EqualFold(fields[0], sum) {
+			return fmt.Errorf("checksum mismatch for %s", assetName)
+		}
+		return nil
+	}
+	return fmt.Errorf("checksum for %s not found", assetName)
+}
+
+func materializeReleaseBinary(data []byte, assetName, binaryName string) (string, error) {
+	if strings.HasSuffix(strings.ToLower(assetName), ".tar.gz") || strings.HasSuffix(strings.ToLower(assetName), ".tgz") {
+		return extractBinaryFromTarGZ(data, binaryName)
+	}
+	tmp, err := os.CreateTemp("", binaryName+"-update-*")
+	if err != nil {
+		return "", err
+	}
+	path := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(path)
+		return "", err
+	}
+	if err := tmp.Chmod(0o755); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(path)
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	return path, nil
+}
+
+func extractBinaryFromTarGZ(data []byte, binaryName string) (string, error) {
+	gzipReader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+	defer gzipReader.Close()
+	tarReader := tar.NewReader(gzipReader)
+	for {
+		header, err := tarReader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		name := filepath.Base(header.Name)
+		if name != binaryName && !strings.HasPrefix(name, binaryName+"-") {
+			continue
+		}
+		tmp, err := os.CreateTemp("", binaryName+"-update-*")
+		if err != nil {
+			return "", err
+		}
+		path := tmp.Name()
+		if _, err := io.Copy(tmp, tarReader); err != nil {
+			_ = tmp.Close()
+			_ = os.Remove(path)
+			return "", err
+		}
+		mode := os.FileMode(header.Mode).Perm()
+		if mode == 0 {
+			mode = 0o755
+		}
+		mode |= 0o111
+		if err := tmp.Chmod(mode); err != nil {
+			_ = tmp.Close()
+			_ = os.Remove(path)
+			return "", err
+		}
+		if err := tmp.Close(); err != nil {
+			_ = os.Remove(path)
+			return "", err
+		}
+		return path, nil
+	}
+	return "", fmt.Errorf("archive did not contain %s binary", binaryName)
 }
 
 func samePath(left, right string) bool {

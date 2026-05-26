@@ -66,15 +66,21 @@ During install, the script prints step-by-step progress for selecting the target
 
 ## Update And Uninstall
 
-`matt update` installs a local binary into the install directory. This is intentionally offline: download or build the new binary first, then run that binary as the updater.
+`matt update` checks the current binary version, reads the latest GitHub release for `sunday-studio/maat`, downloads the matching archive for the current OS and CPU architecture, verifies the checksum when the release provides one, extracts the binary, and replaces the installed binary.
 
 ```sh
 matt update
+matt update --install-dir "$HOME/.local/bin"
+```
+
+Use a local source only for development or smoke testing:
+
+```sh
 matt update --source ./dist/matt --install-dir "$HOME/.local/bin"
 matt update --source /tmp/matt-new --install-dir /usr/local/bin --binary-name matt
 ```
 
-When `--source` is omitted, `matt update` uses the currently running executable. This is useful when running a freshly downloaded binary from `/tmp` and installing it over the older installed copy.
+When `--install-dir` is omitted, `matt update` tries to replace the currently running installed binary when that path is writable. Otherwise it uses the same default target as the installer.
 
 Remove the installed binary with:
 

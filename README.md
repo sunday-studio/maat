@@ -32,7 +32,7 @@ scripts/install.sh
 Update or remove a local install:
 
 ```sh
-matt update --source ./dist/matt --install-dir "$HOME/.local/bin"
+matt update
 matt uninstall --install-dir "$HOME/.local/bin"
 ```
 

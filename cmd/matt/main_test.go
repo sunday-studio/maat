@@ -1,15 +1,23 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/sunday-studio/maat/internal/maat"
+	"github.com/sunday-studio/maat/internal/version"
 )
 
 func TestStatusJSON(t *testing.T) {
@@ -183,6 +191,111 @@ func TestUpdateCommandInstallsSourceBinary(t *testing.T) {
 	}
 	if info.Mode()&0o111 == 0 {
 		t.Fatalf("expected installed binary to be executable, mode=%v", info.Mode())
+	}
+}
+
+func TestUpdateCommandDownloadsLatestGitHubRelease(t *testing.T) {
+	installDir := t.TempDir()
+	assetName := fmt.Sprintf("matt-v9.9.9-%s-%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+	archive := writeTestReleaseArchive(t, "matt-v9.9.9-"+runtime.GOOS+"-"+runtime.GOARCH, "release binary\n")
+	checksum := fmt.Sprintf("%x  %s\n", sha256.Sum256(archive), assetName)
+	oldURL := latestReleaseURL
+	oldVersion := version.Version
+	oldHTTPClient := updateHTTPClient
+	baseURL := "https://maat.test"
+	version.Version = "v1.0.0"
+	updateHTTPClient = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		switch request.URL.String() {
+		case baseURL + "/latest":
+			payload := map[string]any{
+				"tag_name": "v9.9.9",
+				"assets": []map[string]string{
+					{
+						"name":                 assetName,
+						"browser_download_url": baseURL + "/assets/" + assetName,
+					},
+					{
+						"name":                 "checksums-v9.9.9.txt",
+						"browser_download_url": baseURL + "/assets/checksums-v9.9.9.txt",
+					},
+				},
+			}
+			data, err := json.Marshal(payload)
+			if err != nil {
+				return nil, err
+			}
+			return testHTTPResponse(http.StatusOK, data), nil
+		case baseURL + "/assets/" + assetName:
+			return testHTTPResponse(http.StatusOK, archive), nil
+		case baseURL + "/assets/checksums-v9.9.9.txt":
+			return testHTTPResponse(http.StatusOK, []byte(checksum)), nil
+		default:
+			return testHTTPResponse(http.StatusNotFound, []byte("not found")), nil
+		}
+	})}
+	latestReleaseURL = baseURL + "/latest"
+	defer func() {
+		latestReleaseURL = oldURL
+		version.Version = oldVersion
+		updateHTTPClient = oldHTTPClient
+	}()
+
+	output, err := captureRun("update", "--install-dir", installDir, "--binary-name", "matt", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result installCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(installDir, "matt")
+	if result.Action != "update.installed" || result.LatestVersion != "v9.9.9" || result.AssetName != assetName || !result.ChecksumVerified || result.TargetPath != target {
+		t.Fatalf("unexpected release update result: %#v", result)
+	}
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "release binary\n" {
+		t.Fatalf("unexpected downloaded binary content: %q", string(data))
+	}
+}
+
+func TestUpdateCommandSkipsWhenAlreadyLatest(t *testing.T) {
+	installDir := t.TempDir()
+	oldURL := latestReleaseURL
+	oldVersion := version.Version
+	oldHTTPClient := updateHTTPClient
+	latestReleaseURL = "https://maat.test/latest"
+	version.Version = "v1.2.3"
+	updateHTTPClient = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		data, err := json.Marshal(map[string]any{
+			"tag_name": "v1.2.3",
+			"assets":   []map[string]string{},
+		})
+		if err != nil {
+			return nil, err
+		}
+		return testHTTPResponse(http.StatusOK, data), nil
+	})}
+	defer func() {
+		latestReleaseURL = oldURL
+		version.Version = oldVersion
+		updateHTTPClient = oldHTTPClient
+	}()
+
+	output, err := captureRun("update", "--install-dir", installDir, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result installCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Action != "update.current" || result.CurrentVersion != "v1.2.3" || result.LatestVersion != "v1.2.3" {
+		t.Fatalf("unexpected current update result: %#v", result)
 	}
 }
 
@@ -1041,6 +1154,47 @@ func runGit(t *testing.T, dir string, args ...string) string {
 		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, output)
 	}
 	return string(output)
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return fn(request)
+}
+
+func testHTTPResponse(status int, body []byte) *http.Response {
+	return &http.Response{
+		StatusCode: status,
+		Status:     fmt.Sprintf("%d %s", status, http.StatusText(status)),
+		Body:       io.NopCloser(bytes.NewReader(body)),
+		Header:     make(http.Header),
+	}
+}
+
+func writeTestReleaseArchive(t *testing.T, name, content string) []byte {
+	t.Helper()
+
+	var buffer bytes.Buffer
+	gzipWriter := gzip.NewWriter(&buffer)
+	tarWriter := tar.NewWriter(gzipWriter)
+	data := []byte(content)
+	if err := tarWriter.WriteHeader(&tar.Header{
+		Name: name,
+		Mode: 0o755,
+		Size: int64(len(data)),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tarWriter.Write(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buffer.Bytes()
 }
 
 func writeObjectCommandFixture(t *testing.T) string {
