@@ -48,7 +48,13 @@ Run from source:
 go run ./cmd/maat version
 ```
 
-Link your storage repo once:
+Link your storage repo once. For first-run human setup, run:
+
+```sh
+maat setup
+```
+
+The prompt asks for the storage Git repo, default actor, and whether Maat should auto-pull, auto-commit, and auto-push. Agents and scripts should keep using the non-interactive form:
 
 ```sh
 maat setup --storage /absolute/path/to/maat-state
@@ -65,7 +71,7 @@ maat status --storage /absolute/path/to/maat-state
 Set up and inspect:
 
 ```sh
-maat setup --storage /absolute/path/to/maat-state
+maat setup
 maat index rebuild
 maat validate
 maat status

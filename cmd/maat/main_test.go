@@ -338,7 +338,7 @@ func TestSetupCommandWritesConfig(t *testing.T) {
 	t.Setenv("MAAT_CONFIG", configFile)
 	t.Setenv("MAAT_ACTOR", "test-agent")
 
-	output, err := captureRun("setup", "--storage", store, "--no-auto-push", "--json")
+	output, err := captureRunWithInput("", "setup", "--storage", store, "--no-auto-push", "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,6 +359,46 @@ func TestSetupCommandWritesConfig(t *testing.T) {
 	}
 	if cfg.StoragePath != store || cfg.DefaultActor != "test-agent" || !cfg.AutoPullBeforeRead || !cfg.AutoCommitAfterWrite || cfg.AutoPushAfterCommit {
 		t.Fatalf("unexpected persisted config: %#v", cfg)
+	}
+}
+
+func TestSetupCommandPromptsWhenStorageOmitted(t *testing.T) {
+	store := t.TempDir()
+	runGit(t, store, "init", "-b", "main")
+	configFile := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("MAAT_CONFIG", configFile)
+	t.Setenv("MAAT_ACTOR", "prompt-agent")
+
+	input := strings.Join([]string{
+		store,
+		"",
+		"no",
+		"yes",
+		"n",
+		"",
+	}, "\n")
+	output, err := captureRunWithInput(input, "setup")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{"Storage repo path", "Default actor", "Auto-pull before reads", "Auto-commit after writes", "Auto-push after commits"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected prompt %q in output, got %q", want, output)
+		}
+	}
+	cfg, err := readConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.StoragePath != store || cfg.DefaultActor != "prompt-agent" || cfg.AutoPullBeforeRead || !cfg.AutoCommitAfterWrite || cfg.AutoPushAfterCommit {
+		t.Fatalf("unexpected prompted config: %#v", cfg)
+	}
+}
+
+func TestSetupCommandNoStorageRemainsNonInteractiveForJSON(t *testing.T) {
+	if _, err := captureRunWithInput("", "setup", "--json"); err == nil || !strings.Contains(err.Error(), "usage: maat setup") {
+		t.Fatalf("expected non-interactive json setup usage error, got %v", err)
 	}
 }
 
@@ -1208,20 +1248,42 @@ func TestSyncCommandJSON(t *testing.T) {
 }
 
 func captureRun(args ...string) (string, error) {
+	return captureRunWithInput("\n", args...)
+}
+
+func captureRunWithInput(input string, args ...string) (string, error) {
 	oldStdout := os.Stdout
-	reader, writer, err := os.Pipe()
+	oldStdin := os.Stdin
+	stdoutReader, stdoutWriter, err := os.Pipe()
 	if err != nil {
 		return "", err
 	}
-	os.Stdout = writer
+	stdinReader, stdinWriter, err := os.Pipe()
+	if err != nil {
+		stdoutReader.Close()
+		stdoutWriter.Close()
+		return "", err
+	}
+	if _, err := stdinWriter.WriteString(input); err != nil {
+		stdoutReader.Close()
+		stdoutWriter.Close()
+		stdinReader.Close()
+		stdinWriter.Close()
+		return "", err
+	}
+	stdinWriter.Close()
+	os.Stdout = stdoutWriter
+	os.Stdin = stdinReader
 	defer func() {
 		os.Stdout = oldStdout
+		os.Stdin = oldStdin
 	}()
 	runErr := run(args)
-	writer.Close()
+	stdoutWriter.Close()
+	stdinReader.Close()
 
-	data, readErr := io.ReadAll(reader)
-	reader.Close()
+	data, readErr := io.ReadAll(stdoutReader)
+	stdoutReader.Close()
 	if readErr != nil {
 		return "", readErr
 	}

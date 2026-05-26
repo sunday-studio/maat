@@ -13,11 +13,14 @@ GOCACHE=/private/tmp/maat-go-cache go run ./cmd/maat status --storage .
 Useful commands against a local or external Maat storage repo:
 
 ```sh
+GOCACHE=/private/tmp/maat-go-cache go run ./cmd/maat setup
 GOCACHE=/private/tmp/maat-go-cache go run ./cmd/maat projects --storage /path/to/maat-state
 GOCACHE=/private/tmp/maat-go-cache go run ./cmd/maat project show maat --storage /path/to/maat-state
 GOCACHE=/private/tmp/maat-go-cache go run ./cmd/maat search "agent health" --storage /path/to/maat-state
 GOCACHE=/private/tmp/maat-go-cache go run ./cmd/maat index rebuild --storage /path/to/maat-state
 ```
+
+Use `go run ./cmd/maat setup --storage /absolute/path/to/maat-state` in tests or agent scripts when setup must remain non-interactive.
 
 ## Install Locally
 

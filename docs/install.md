@@ -168,7 +168,21 @@ It can live anywhere, for example:
 ~/Desktop/vendor/sunday-studio/maat
 ```
 
-During the current implementation phase, pass it explicitly:
+For one-time human setup, run:
+
+```sh
+maat setup
+```
+
+The prompt records the storage Git repo path, default actor, and auto pull/commit/push choices. Press Enter to accept the shown defaults. The storage path must still be absolute and point at a Git repository.
+
+Agents and scripts should use the non-interactive form:
+
+```sh
+maat setup --storage /absolute/path/to/maat-state
+```
+
+You can also pass storage explicitly per command:
 
 ```sh
 maat status --storage /absolute/path/to/maat-state
@@ -176,7 +190,7 @@ maat projects --storage /absolute/path/to/maat-state
 maat search "blocked" --storage /absolute/path/to/maat-state
 ```
 
-The setup flow persists this path with `maat setup --storage <absolute-git-repo-path>`.
+Both setup forms persist the selected path for later commands.
 
 ## Local Paths
 
@@ -234,7 +248,7 @@ The installer ends with a `maat ready to use` banner and a short start-here comm
 ```sh
 maat version
 maat --help
-maat setup --storage /absolute/path/to/maat-state
+maat setup
 maat index rebuild --storage /absolute/path/to/maat-state
 maat status --storage /absolute/path/to/maat-state
 maat tui --storage /absolute/path/to/maat-state

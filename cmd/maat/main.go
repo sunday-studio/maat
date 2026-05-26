@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -145,7 +146,7 @@ Usage:
   maat <command> [flags]
 
 Common:
-  maat setup --storage <absolute-git-repo-path> [--actor <name>] [--json]
+  maat setup [--storage <absolute-git-repo-path>] [--actor <name>] [--json]
   maat initialize [--project <project-key>] [--storage <path>] [--json]
   maat status [--storage <path>] [--json]
   maat projects [--storage <path>] [--json]
@@ -166,7 +167,7 @@ Tickets:
   maat ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]
 
 Setup and maintenance:
-  maat setup --storage <absolute-git-repo-path> [--actor <name>] [--auto-pull|--no-auto-pull] [--auto-commit|--no-auto-commit] [--auto-push|--no-auto-push] [--json]
+  maat setup [--storage <absolute-git-repo-path>] [--actor <name>] [--auto-pull|--no-auto-pull] [--auto-commit|--no-auto-commit] [--auto-push|--no-auto-push] [--json]
   maat update [--source <path>] [--install-dir <path>] [--binary-name <name>] [--json]
   maat uninstall [--install-dir <path>] [--binary-name <name>] [--purge-config] [--json]
   maat index rebuild [--storage <path>]
@@ -493,6 +494,7 @@ func setupCommand(args []string) error {
 	filtered, jsonOut := splitJSONFlag(args)
 	cfg := defaultConfig()
 	storagePath := ""
+	storageProvided := false
 	for i := 0; i < len(filtered); i++ {
 		switch filtered[i] {
 		case "--storage":
@@ -500,6 +502,7 @@ func setupCommand(args []string) error {
 				return errors.New("--storage requires an absolute path")
 			}
 			storagePath = filtered[i+1]
+			storageProvided = true
 			i++
 		case "--actor":
 			if i+1 >= len(filtered) {
@@ -527,22 +530,16 @@ func setupCommand(args []string) error {
 		}
 	}
 	if storagePath == "" {
-		return errors.New("usage: maat setup --storage <absolute-git-repo-path> [--actor <name>] [--auto-pull|--no-auto-pull] [--auto-commit|--no-auto-commit] [--auto-push|--no-auto-push] [--json]")
+		if storageProvided || jsonOut || agentUse || len(filtered) > 0 {
+			return errors.New("usage: maat setup [--storage <absolute-git-repo-path>] [--actor <name>] [--auto-pull|--no-auto-pull] [--auto-commit|--no-auto-commit] [--auto-push|--no-auto-push] [--json]")
+		}
+		if err := promptSetup(&cfg, &storagePath); err != nil {
+			return err
+		}
 	}
-	if !filepath.IsAbs(storagePath) {
-		return fmt.Errorf("setup storage path must be absolute: %s", storagePath)
-	}
-	abs, err := filepath.Abs(storagePath)
+	abs, err := validateSetupStoragePath(storagePath)
 	if err != nil {
 		return err
-	}
-	if stat, err := os.Stat(abs); err != nil {
-		return err
-	} else if !stat.IsDir() {
-		return fmt.Errorf("%s is not a directory", abs)
-	}
-	if !isGitRepository(abs) {
-		return fmt.Errorf("setup storage path must be a Git repository: %s", abs)
 	}
 	cfg.StoragePath = abs
 	configFile, err := persistConfig(cfg)
@@ -572,6 +569,114 @@ func setupCommand(args []string) error {
 	printField("Auto-commit after writes", formatBool(result.AutoCommitAfterWrite))
 	printField("Auto-push after commits", formatBool(result.AutoPushAfterCommit))
 	return nil
+}
+
+func promptSetup(cfg *config, storagePath *string) error {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Maat setup")
+	path, err := promptString(reader, "Storage repo path", defaultSetupStoragePath())
+	if err != nil {
+		return err
+	}
+	actor, err := promptString(reader, "Default actor", cfg.DefaultActor)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(actor) == "" {
+		return errors.New("default actor cannot be empty")
+	}
+	autoPull, err := promptBool(reader, "Auto-pull before reads", cfg.AutoPullBeforeRead)
+	if err != nil {
+		return err
+	}
+	autoCommit, err := promptBool(reader, "Auto-commit after writes", cfg.AutoCommitAfterWrite)
+	if err != nil {
+		return err
+	}
+	autoPush, err := promptBool(reader, "Auto-push after commits", cfg.AutoPushAfterCommit)
+	if err != nil {
+		return err
+	}
+	*storagePath = path
+	cfg.DefaultActor = strings.TrimSpace(actor)
+	cfg.AutoPullBeforeRead = autoPull
+	cfg.AutoCommitAfterWrite = autoCommit
+	cfg.AutoPushAfterCommit = autoPush
+	return nil
+}
+
+func promptString(reader *bufio.Reader, label, defaultValue string) (string, error) {
+	if defaultValue != "" {
+		fmt.Printf("%s [%s]: ", label, defaultValue)
+	} else {
+		fmt.Printf("%s: ", label)
+	}
+	value, err := readPromptLine(reader)
+	if err != nil {
+		return "", err
+	}
+	if value == "" {
+		value = defaultValue
+	}
+	if strings.TrimSpace(value) == "" {
+		return "", fmt.Errorf("%s is required", strings.ToLower(label))
+	}
+	return strings.TrimSpace(value), nil
+}
+
+func promptBool(reader *bufio.Reader, label string, defaultValue bool) (bool, error) {
+	defaultPrompt := "y/N"
+	if defaultValue {
+		defaultPrompt = "Y/n"
+	}
+	for {
+		fmt.Printf("%s [%s]: ", label, defaultPrompt)
+		value, err := readPromptLine(reader)
+		if err != nil {
+			return false, err
+		}
+		if value == "" {
+			return defaultValue, nil
+		}
+		switch strings.ToLower(value) {
+		case "y", "yes", "true", "1":
+			return true, nil
+		case "n", "no", "false", "0":
+			return false, nil
+		default:
+			fmt.Println("Please answer yes or no.")
+		}
+	}
+}
+
+func readPromptLine(reader *bufio.Reader) (string, error) {
+	value, err := reader.ReadString('\n')
+	if err != nil {
+		if errors.Is(err, io.EOF) && value != "" {
+			return strings.TrimSpace(value), nil
+		}
+		return "", err
+	}
+	return strings.TrimSpace(value), nil
+}
+
+func validateSetupStoragePath(storagePath string) (string, error) {
+	if !filepath.IsAbs(storagePath) {
+		return "", fmt.Errorf("setup storage path must be absolute: %s", storagePath)
+	}
+	abs, err := filepath.Abs(storagePath)
+	if err != nil {
+		return "", err
+	}
+	if stat, err := os.Stat(abs); err != nil {
+		return "", err
+	} else if !stat.IsDir() {
+		return "", fmt.Errorf("%s is not a directory", abs)
+	}
+	if !isGitRepository(abs) {
+		return "", fmt.Errorf("setup storage path must be a Git repository: %s", abs)
+	}
+	return abs, nil
 }
 
 func indexCommand(args []string) error {
@@ -2324,6 +2429,16 @@ func defaultConfig() config {
 		AutoCommitAfterWrite: true,
 		AutoPushAfterCommit:  true,
 	}
+}
+
+func defaultSetupStoragePath() string {
+	if cfg, err := readConfig(); err == nil && strings.TrimSpace(cfg.StoragePath) != "" {
+		return strings.TrimSpace(cfg.StoragePath)
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		return cwd
+	}
+	return ""
 }
 
 func defaultSetupActor() string {
