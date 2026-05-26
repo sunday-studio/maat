@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -56,7 +57,7 @@ func run(args []string) error {
 			return err
 		}
 		progress("projects.load", "loading projects", map[string]string{"storage": store})
-		projects, err := maat.LoadProjects(store)
+		projects, err := loadProjectListItems(store)
 		if err != nil {
 			return err
 		}
@@ -70,8 +71,13 @@ func run(args []string) error {
 			return writeJSON(projects)
 		}
 		ok("projects.loaded", fmt.Sprintf("loaded %d projects", len(projects)), nil)
+		if len(projects) == 0 {
+			fmt.Println("No projects found.")
+			return nil
+		}
+		fmt.Printf("%-18s %-9s %-8s %s\n", "Project", "Status", "Layout", "Title")
 		for _, project := range projects {
-			fmt.Printf("%-12s %-9s %s\n", project.ID, colorStatus(project.Status), project.Title)
+			fmt.Printf("%-18s %-9s %-8s %s\n", project.ID, colorStatus(project.Status), project.Layout, project.Title)
 		}
 		return nil
 	case "project":
@@ -99,9 +105,10 @@ func run(args []string) error {
 			return writeJSON(summary)
 		}
 		ok("status.ready", "status ready", nil)
-		fmt.Printf("Projects: %s\n", colorNumber(summary.Projects))
-		fmt.Printf("Goals:    %s active, %s done, %s total\n", colorNumber(summary.ActiveGoals), colorNumber(summary.DoneGoals), colorNumber(summary.Goals))
-		fmt.Printf("Tickets:  %s open, %s done, %s total\n", colorNumber(summary.OpenTickets), colorNumber(summary.DoneTickets), colorNumber(summary.Tickets))
+		fmt.Println("Maat status")
+		printField("Projects", colorNumber(summary.Projects))
+		printField("Goals", fmt.Sprintf("%s active, %s done, %s total", colorNumber(summary.ActiveGoals), colorNumber(summary.DoneGoals), colorNumber(summary.Goals)))
+		printField("Tickets", fmt.Sprintf("%s open, %s done, %s total", colorNumber(summary.OpenTickets), colorNumber(summary.DoneTickets), colorNumber(summary.Tickets)))
 		return nil
 	case "validate":
 		return validateCommand(args[1:])
@@ -119,36 +126,45 @@ func run(args []string) error {
 }
 
 func printHelp() {
-	fmt.Print(`matt is the Maat CLI.
+	fmt.Print(`matt - Git-backed project state for agents
 
 Usage:
-  matt init [storage-path]
-  matt version [--json]
-  matt storage link <storage-path>
-  matt index rebuild [--storage <path>]
+  matt <command> [flags]
+
+Common:
+  matt status [--storage <path>] [--json]
   matt projects [--storage <path>] [--json]
-  matt project show <project-id> [--storage <path>] [--json]
+  matt search <query> [--storage <path>] [--json]
+  matt sync [--storage <path>] [--message <msg>] [--push] [--status] [--json]
+
+Projects:
   matt project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]
+  matt project show <project-id> [--storage <path>] [--json]
   matt goal create [project-key] <title> [--storage <path>] [--json]
+
+Tickets:
   matt ticket create [project-key] <title> [--goal <goal-id>] [--storage <path>] [--json]
   matt ticket list [--project <project-key>] [--storage <path>] [--json]
   matt ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]
   matt ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
   matt ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
   matt ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]
-  matt agent instructions [--json] [--output <path>]
-  matt status [--storage <path>] [--json]
+
+Setup and maintenance:
+  matt init [storage-path]
+  matt storage link <storage-path>
+  matt index rebuild [--storage <path>]
   matt validate [--storage <path>] [--json]
-  matt sync [--storage <path>] [--message <msg>] [--push] [--status] [--json]
   matt migrate plan [--storage <path>] [--json]
   matt migrate apply --dest <path> [--storage <path>]
-  matt search <query> [--storage <path>] [--json]
+  matt agent instructions [--json] [--output <path>]
   matt tui [--storage <path>]
+  matt version [--json]
 
 Global flags:
-  --agent-use   emit newline-delimited JSON progress updates instead of human prose
+  --agent-use   emit newline-delimited JSON updates for agents
 
-Git plus Markdown remains the source of truth. The local index is rebuildable.
+Markdown plus Git is the source of truth. The SQLite index is a rebuildable local cache.
 `)
 }
 
@@ -591,15 +607,18 @@ func projectLinkCommand(args []string) error {
 	if jsonOut {
 		return writeJSON(linked)
 	}
+	message := "linked project " + linked.ProjectKey
 	if linked.Created {
-		fmt.Printf("linked project %s\n", linked.ProjectKey)
+		ok("project.linked", message, nil)
 	} else {
-		fmt.Printf("project %s already linked\n", linked.ProjectKey)
+		message = "project " + linked.ProjectKey + " already linked"
+		ok("project.linked", message, nil)
 	}
-	fmt.Printf("name %s\n", linked.DisplayName)
-	fmt.Printf("source %s\n", linked.SourcePath)
+	printField("Project", linked.ProjectKey)
+	printField("Name", linked.DisplayName)
+	printField("Source", linked.SourcePath)
 	if linked.RemoteURL != "" {
-		fmt.Printf("remote %s\n", linked.RemoteURL)
+		printField("Remote", linked.RemoteURL)
 	}
 	return nil
 }
@@ -1021,6 +1040,57 @@ func searchWithSQLite(store, query string) ([]maat.SearchResult, error) {
 	return maat.Search(store, query)
 }
 
+type projectListItem struct {
+	ID      string `json:"id"`
+	Key     string `json:"key"`
+	Title   string `json:"title"`
+	Status  string `json:"status"`
+	Updated string `json:"updated,omitempty"`
+	Path    string `json:"path"`
+	Layout  string `json:"layout"`
+}
+
+func loadProjectListItems(store string) ([]projectListItem, error) {
+	legacyProjects, err := maat.LoadProjects(store)
+	if err != nil {
+		return nil, err
+	}
+	objectProjects, err := maat.LoadObjectProjects(store)
+	if err != nil {
+		return nil, err
+	}
+	projects := make([]projectListItem, 0, len(legacyProjects)+len(objectProjects))
+	for _, project := range legacyProjects {
+		projects = append(projects, projectListItem{
+			ID:      project.ID,
+			Key:     project.ID,
+			Title:   project.Title,
+			Status:  project.Status,
+			Updated: project.Updated,
+			Path:    project.Path,
+			Layout:  "legacy",
+		})
+	}
+	for _, project := range objectProjects {
+		projects = append(projects, projectListItem{
+			ID:      project.Key,
+			Key:     project.Key,
+			Title:   project.DisplayName,
+			Status:  project.Status,
+			Updated: project.Updated,
+			Path:    project.Path,
+			Layout:  "object",
+		})
+	}
+	sort.Slice(projects, func(i, j int) bool {
+		if projects[i].ID == projects[j].ID {
+			return projects[i].Layout < projects[j].Layout
+		}
+		return projects[i].ID < projects[j].ID
+	})
+	return projects, nil
+}
+
 type writeCommandResult struct {
 	Action         string `json:"action"`
 	ProjectKey     string `json:"project_key"`
@@ -1054,35 +1124,52 @@ func finishWrite(store, projectKey string, result writeCommandResult, jsonOut bo
 }
 
 func printWriteResult(result writeCommandResult) {
-	ok(result.Action, result.Action, nil)
+	ok(result.Action, writeActionMessage(result), nil)
 	switch result.Action {
 	case "goal.created":
-		fmt.Printf("created goal %s\n", result.GoalID)
-		fmt.Printf("project %s\n", result.ProjectKey)
+		printField("Goal", result.GoalID)
+		printField("Project", result.ProjectKey)
 	case "ticket.created":
-		fmt.Printf("created ticket %s\n", result.TicketID)
-		fmt.Printf("project %s\n", result.ProjectKey)
+		printField("Ticket", result.TicketID)
+		printField("Project", result.ProjectKey)
 		if result.GoalID != "" {
-			fmt.Printf("goal %s\n", result.GoalID)
+			printField("Goal", result.GoalID)
 		}
 	case "ticket.claimed":
-		fmt.Printf("claimed ticket %s\n", result.TicketID)
-		fmt.Printf("project %s\n", result.ProjectKey)
-		fmt.Printf("agent %s\n", result.Agent)
-		fmt.Printf("expires %s\n", result.ExpiresAt)
+		printField("Ticket", result.TicketID)
+		printField("Project", result.ProjectKey)
+		printField("Agent", result.Agent)
+		printField("Expires", result.ExpiresAt)
 	case "ticket.commented":
-		fmt.Printf("commented on ticket %s\n", result.TicketID)
-		fmt.Printf("project %s\n", result.ProjectKey)
+		printField("Ticket", result.TicketID)
+		printField("Project", result.ProjectKey)
 	case "ticket.completed":
-		fmt.Printf("completed ticket %s\n", result.TicketID)
-		fmt.Printf("project %s\n", result.ProjectKey)
+		printField("Ticket", result.TicketID)
+		printField("Project", result.ProjectKey)
 	default:
-		fmt.Printf("%s\n", result.Action)
-		fmt.Printf("project %s\n", result.ProjectKey)
+		printField("Action", result.Action)
+		printField("Project", result.ProjectKey)
 	}
-	fmt.Printf("event %s\n", result.EventID)
+	printField("Event", result.EventID)
 	if result.IndexWarning != "" {
-		fmt.Printf("index warning %s\n", result.IndexWarning)
+		printField("Index", result.IndexWarning)
+	}
+}
+
+func writeActionMessage(result writeCommandResult) string {
+	switch result.Action {
+	case "goal.created":
+		return "created goal"
+	case "ticket.created":
+		return "created ticket"
+	case "ticket.claimed":
+		return "claimed ticket"
+	case "ticket.commented":
+		return "commented on ticket"
+	case "ticket.completed":
+		return "completed ticket"
+	default:
+		return result.Action
 	}
 }
 
@@ -1416,6 +1503,13 @@ func warn(step, message string, data any) {
 		return
 	}
 	fmt.Printf("%s %s\n", color("[warn]", "33"), message)
+}
+
+func printField(label, value string) {
+	if strings.TrimSpace(value) == "" {
+		return
+	}
+	fmt.Printf("%-10s %s\n", label+":", value)
 }
 
 func agentUpdate(step, status, message string, data any) error {

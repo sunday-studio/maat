@@ -1,6 +1,9 @@
 package version
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 var (
 	// Version, Commit, and Date are set by release builds with -ldflags.
@@ -24,5 +27,15 @@ func Current() Info {
 }
 
 func (info Info) String() string {
-	return fmt.Sprintf("matt %s (%s, %s)", info.Version, info.Commit, info.Date)
+	details := make([]string, 0, 2)
+	if info.Commit != "" && info.Commit != "unknown" {
+		details = append(details, info.Commit)
+	}
+	if info.Date != "" && info.Date != "unknown" {
+		details = append(details, info.Date)
+	}
+	if len(details) == 0 {
+		return fmt.Sprintf("matt %s", info.Version)
+	}
+	return fmt.Sprintf("matt %s (%s)", info.Version, strings.Join(details, ", "))
 }

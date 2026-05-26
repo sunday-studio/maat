@@ -29,6 +29,33 @@ func TestStatusJSON(t *testing.T) {
 	}
 }
 
+func TestStatusJSONIncludesObjectProjects(t *testing.T) {
+	store := writeObjectCommandFixture(t)
+	goalID := createCommandGoal(t, store)
+	writer := maat.NewWriteStore(store)
+	if _, _, err := writer.CreateTicket(maat.CreateTicketInput{
+		ProjectKey: "sample",
+		GoalID:     goalID,
+		Title:      "Object status ticket",
+		Actor:      "test",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	output, err := captureRun("status", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var summary maat.StatusSummary
+	if err := json.Unmarshal([]byte(output), &summary); err != nil {
+		t.Fatal(err)
+	}
+	if summary.Projects != 1 || summary.Goals != 1 || summary.ActiveGoals != 1 || summary.Tickets != 1 || summary.OpenTickets != 1 {
+		t.Fatalf("unexpected object summary: %#v", summary)
+	}
+}
+
 func TestStatusAgentUseOutputsJSONUpdates(t *testing.T) {
 	store := writeCommandFixture(t)
 
@@ -81,6 +108,23 @@ func TestProjectsJSON(t *testing.T) {
 	}
 	if len(projects) != 1 || projects[0].ID != "sample" || projects[0].Title != "Sample" {
 		t.Fatalf("unexpected projects: %#v", projects)
+	}
+}
+
+func TestProjectsJSONIncludesObjectProjects(t *testing.T) {
+	store := writeObjectCommandFixture(t)
+
+	output, err := captureRun("projects", "--json", "--storage", store)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var projects []projectListItem
+	if err := json.Unmarshal([]byte(output), &projects); err != nil {
+		t.Fatal(err)
+	}
+	if len(projects) != 1 || projects[0].ID != "sample" || projects[0].Title != "Sample" || projects[0].Layout != "object" {
+		t.Fatalf("unexpected object projects: %#v", projects)
 	}
 }
 
@@ -227,7 +271,7 @@ func TestProjectLinkCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output, "linked project sample") || !strings.Contains(output, "remote git@github.com:sunday-studio/sample.git") {
+	if !strings.Contains(output, "linked project sample") || !strings.Contains(output, "Remote:") || !strings.Contains(output, "git@github.com:sunday-studio/sample.git") {
 		t.Fatalf("unexpected output: %q", output)
 	}
 
@@ -334,7 +378,7 @@ func TestGoalCreateCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output, "created goal") || !strings.Contains(output, "event") {
+	if !strings.Contains(output, "created goal") || !strings.Contains(output, "Event:") {
 		t.Fatalf("unexpected output: %q", output)
 	}
 
@@ -485,7 +529,7 @@ func TestTicketCreateCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output, "created ticket") || !strings.Contains(output, "event") {
+	if !strings.Contains(output, "created ticket") || !strings.Contains(output, "Event:") {
 		t.Fatalf("unexpected output: %q", output)
 	}
 

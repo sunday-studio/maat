@@ -151,8 +151,12 @@ func Status(store string) (StatusSummary, error) {
 	if err != nil {
 		return StatusSummary{}, err
 	}
+	objectProjects, err := LoadObjectProjects(store)
+	if err != nil {
+		return StatusSummary{}, err
+	}
 	var summary StatusSummary
-	summary.Projects = len(projects)
+	summary.Projects = len(projects) + len(objectProjects)
 	for _, project := range projects {
 		for _, blocker := range project.Blockers {
 			if blocker != "" && strings.ToLower(blocker) != "none." && strings.ToLower(blocker) != "none" {
@@ -179,6 +183,25 @@ func Status(store string) (StatusSummary, error) {
 				} else {
 					summary.OpenTickets++
 				}
+			}
+		}
+	}
+	for _, project := range objectProjects {
+		for _, goal := range project.Goals {
+			summary.Goals++
+			switch goal.Status {
+			case "done":
+				summary.DoneGoals++
+			case "active":
+				summary.ActiveGoals++
+			}
+		}
+		for _, ticket := range project.Tickets {
+			summary.Tickets++
+			if ticket.Status == "done" {
+				summary.DoneTickets++
+			} else {
+				summary.OpenTickets++
 			}
 		}
 	}
