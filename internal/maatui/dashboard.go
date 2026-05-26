@@ -248,7 +248,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) View() string {
 	if m.err != nil && len(m.dashboard.Projects) == 0 {
-		return errorStyle.Render(fmt.Sprintf("Maat TUI failed: %v", m.err)) + "\n\n" + mutedStyle.Render("Press q to quit.") + "\n"
+		return RenderDashboardError(m.err, m.storage)
 	}
 	filtered := FilterDashboard(m.dashboard, m.filters)
 	selected := selectedIndexByKey(filtered.Projects, selectedProject(m.dashboard.Projects, m.selected).Key, m.selected)
@@ -706,6 +706,13 @@ func RenderDashboardWithFilters(dashboard Dashboard, selected int, mode DetailMo
 		b.WriteString(RenderFilterBar(filters, editingFilter))
 		b.WriteString("\n\n")
 	}
+	if len(dashboard.Projects) == 0 {
+		b.WriteString(RenderEmptyDashboard(filters))
+		b.WriteString("\n\n")
+		b.WriteString(mutedStyle.Render("Use / query, s state, o owner, p project, c clear, r reload, q quit."))
+		b.WriteString("\n")
+		return b.String()
+	}
 	b.WriteString(RenderSelectableProjectTable(dashboard.Projects, selected))
 	b.WriteString("\n\n")
 	project := selectedProject(dashboard.Projects, selected)
@@ -745,6 +752,34 @@ func RenderFilterBar(filters DashboardFilters, editing bool) string {
 		parts = append(parts, "none")
 	}
 	return mutedStyle.Render("Filters: " + strings.Join(parts, " | ") + "  (c clear)")
+}
+
+func RenderEmptyDashboard(filters DashboardFilters) string {
+	if filtersActive(filters) {
+		return strings.Join([]string{
+			headerStyle.Render("No Matching Projects"),
+			"No projects or tickets match the active filters.",
+			"Press c to clear filters, / to edit the query, or r to reload storage.",
+		}, "\n")
+	}
+	return strings.Join([]string{
+		headerStyle.Render("No Projects"),
+		"No Maat projects were found in this storage directory.",
+		"Run maat project create, check the configured storage path, or press r to reload.",
+	}, "\n")
+}
+
+func RenderDashboardError(err error, storage string) string {
+	lines := []string{
+		errorStyle.Render(fmt.Sprintf("Maat TUI failed: %v", err)),
+		"",
+		"Check the storage path, run maat validate, or press r after fixing the issue.",
+	}
+	if strings.TrimSpace(storage) != "" {
+		lines = append(lines, "Storage: "+storage)
+	}
+	lines = append(lines, "", mutedStyle.Render("Press q to quit."))
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func RenderSummary(summary maat.StatusSummary) string {
@@ -809,7 +844,7 @@ func RenderProjectDetail(project ProjectRow) string {
 	b.WriteString(headerStyle.Render("Goals"))
 	b.WriteString("\n")
 	if len(project.GoalRows) == 0 {
-		b.WriteString(mutedStyle.Render("No goals recorded."))
+		b.WriteString(mutedStyle.Render("No goals recorded. Create one with maat goal create or switch to tickets/timeline."))
 		return b.String()
 	}
 	for index, goal := range project.GoalRows {
@@ -850,7 +885,7 @@ func RenderProjectTicketBoardWithSelection(project ProjectRow, width int, select
 	b.WriteString(fmt.Sprintf("%s  %s  %d open / %d done / %d total\n", titleStyle.Render(name), emptyFallback(project.Status, "status unknown"), project.OpenTickets, project.DoneTickets, project.Tickets))
 	b.WriteString("\n")
 	if len(project.TicketRows) == 0 {
-		b.WriteString(mutedStyle.Render("No tickets recorded."))
+		b.WriteString(mutedStyle.Render("No tickets recorded. Create one with maat ticket create, adjust filters, or press r to reload."))
 		return b.String()
 	}
 	selected = clampSelection(selected, len(project.TicketRows))
@@ -1339,7 +1374,7 @@ func RenderTimeline(events []EventRow) string {
 	b.WriteString(headerStyle.Render("Timeline"))
 	b.WriteString("\n")
 	if len(events) == 0 {
-		b.WriteString(mutedStyle.Render("No events recorded."))
+		b.WriteString(mutedStyle.Render("No events recorded. Create, claim, comment, or complete work to build the timeline."))
 		return b.String()
 	}
 	for index, event := range events {

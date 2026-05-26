@@ -469,6 +469,26 @@ func TestRenderDashboardShowsActiveFilters(t *testing.T) {
 	}
 }
 
+func TestRenderDashboardShowsActionableFilteredEmptyState(t *testing.T) {
+	got := RenderDashboardWithFilters(Dashboard{}, 0, DetailModeTickets, 96, 0, false, DashboardFilters{Query: "missing"}, false)
+
+	for _, want := range []string{"No Matching Projects", "active filters", "Press c to clear filters", "/ to edit the query", "r to reload"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderDashboardWithFilters() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderDashboardErrorTellsUserWhatToDo(t *testing.T) {
+	got := RenderDashboardError(errors.New("storage unavailable"), "/tmp/maat-state")
+
+	for _, want := range []string{"Maat TUI failed", "storage unavailable", "Check the storage path", "maat validate", "Storage: /tmp/maat-state", "Press q to quit"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderDashboardError() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
 func TestRenderTimelineShowsRecentEvents(t *testing.T) {
 	got := RenderTimeline([]EventRow{
 		{
@@ -542,7 +562,7 @@ func TestModelFiltersTicketsWithoutLosingSelectedProject(t *testing.T) {
 		t.Fatalf("status filter = %q, want open", got.filters.Status)
 	}
 	view := got.View()
-	if !strings.Contains(view, "No projects found.") || !strings.Contains(view, "Filters:") {
+	if !strings.Contains(view, "No Matching Projects") || !strings.Contains(view, "Filters:") {
 		t.Fatalf("filtered view should show empty filtered state:\n%s", view)
 	}
 
