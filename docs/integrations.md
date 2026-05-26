@@ -48,12 +48,14 @@ maat tui [--storage <path>]
 Write commands available for integrations:
 
 ```sh
-maat project link
-maat goal create <project> <title>
-maat ticket create <project> [--goal <goal-id>] <title>
-maat ticket claim <project> <ticket-id> --agent <agent-id> --ttl <duration>
-maat ticket comment <project> <ticket-id> <comment>
-maat ticket complete <project> <ticket-id> --evidence <evidence>
+maat project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]
+maat goal create [project-key] <title> [--storage <path>] [--json]
+maat ticket create [project-key] <title> [--goal <goal-id>] [--storage <path>] [--json]
+maat ticket list [--project <project-key>] [--storage <path>] [--json]
+maat ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]
+maat ticket claim <ticket-id> [--agent <agent-id>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
+maat ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
+maat ticket complete <ticket-id> --evidence <evidence> [--project <project-key>] [--storage <path>] [--json]
 maat sync [--push]
 ```
 

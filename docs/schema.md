@@ -141,7 +141,10 @@ Required shape:
 | Project | <project-key> |
 | Type | ticket.completed |
 | Object | T-20260525-190700-b91c |
-| Summary | Marked T-001 complete after verification. |
+
+## Summary
+
+Marked T-20260525-190700-b91c complete after verification.
 
 ## Evidence
 

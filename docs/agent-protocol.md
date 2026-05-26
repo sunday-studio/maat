@@ -42,42 +42,50 @@ maat projects [--storage <path>] [--json]
 maat project show <project-id> [--storage <path>]
 maat validate [--storage <path>] [--json]
 maat search <query> [--storage <path>] [--json]
+maat project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]
+maat goal create [project-key] <title> [--storage <path>] [--json]
+maat ticket create [project-key] <title> [--goal <goal-id>] [--storage <path>] [--json]
+maat ticket list [--project <project-key>] [--storage <path>] [--json]
+maat ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]
+maat ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
+maat ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
+maat ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]
+maat sync [--storage <path>] [--message <msg>] [--push] [--status] [--json]
 maat tui [--storage <path>]
 ```
 
 Use JSON output when another tool or agent needs to parse results.
 
-## Next Write Commands
+## Write Command Flow
 
-These commands define the intended agent write protocol.
+These commands define the current agent write protocol.
 
 Typical start:
 
 ```sh
 maat sync
 maat project show maat
-maat ticket list --project maat --status active
-maat ticket claim T-20260525-190700-b91c --agent codex --ttl 2h
+maat ticket list --project maat
+maat ticket claim T-20260525-190700-b91c --project maat --agent codex --ttl 2h
 ```
 
 New work:
 
 ```sh
 maat goal create maat "Improve agent handoff clarity"
-maat ticket create maat --goal G-20260525-190533-a7f3 "Separate project state from product examples"
+maat ticket create maat "Separate project state from product examples" --goal G-20260525-190533-a7f3
 ```
 
 Progress:
 
 ```sh
-maat ticket comment T-20260525-190700-b91c "Status rollup combines monitor failures with agent liveness."
-maat ticket status T-20260525-190700-b91c active
+maat ticket comment T-20260525-190700-b91c "Status rollup combines monitor failures with agent liveness." --project maat
 ```
 
 Completion:
 
 ```sh
-maat ticket complete T-20260525-190700-b91c --evidence "go test ./... passed"
+maat ticket complete T-20260525-190700-b91c --evidence "go test ./... passed" --project maat
 maat sync
 ```
 
@@ -86,7 +94,13 @@ Migration and setup:
 ```sh
 maat project link
 maat migrate plan --storage <path>
-maat migrate apply --storage <path> --destination <path>
+maat migrate apply --storage <path> --dest <path>
+```
+
+Future status update command:
+
+```sh
+maat ticket status T-20260525-190700-b91c active
 ```
 
 Sync:

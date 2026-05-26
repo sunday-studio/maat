@@ -30,47 +30,78 @@ maat project show maat
 maat project link
 maat project link /absolute/path/to/source-repo
 maat project link /absolute/path/to/source-repo --key maat --name "Maat"
-maat project status maat active
 ```
 
 `maat project link` should detect the current Git repository when run from inside a source repo.
 
+Future project commands:
+
+```sh
+maat project status maat active
+```
+
 ### Goal Commands
+
+Current goal commands:
 
 ```sh
 maat goal create maat "Ship first deploy"
 maat goal create "Ship first deploy"
+```
+
+When run from inside a repo linked with `maat project link`, create commands can infer the project key.
+
+Future goal commands:
+
+```sh
 maat goal list maat
 maat goal show G-20260525-190533-a7f3
 maat goal status G-20260525-190533-a7f3 done --evidence "all tickets complete"
 ```
 
-When run from inside a repo linked with `maat project link`, create commands can infer the project key.
-
 ### Ticket Commands
+
+Current ticket commands:
 
 ```sh
 maat ticket create maat "Fix deploy doc link"
-maat ticket create maat --goal G-20260525-190533-a7f3 "Verify installer"
+maat ticket create maat "Verify installer" --goal G-20260525-190533-a7f3
 maat ticket create "Fix deploy doc link"
+maat ticket list --project maat
 maat ticket show T-20260525-190700-b91c
-maat ticket claim T-20260525-190700-b91c --agent codex --ttl 2h
-maat ticket comment T-20260525-190700-b91c "Found issue in launchd path."
-maat ticket status T-20260525-190700-b91c waiting --reason "needs credentials"
-maat ticket complete T-20260525-190700-b91c --evidence "smoke test passed"
+maat ticket claim T-20260525-190700-b91c --project maat --agent codex --ttl 2h
+maat ticket comment T-20260525-190700-b91c "Found issue in launchd path." --project maat
+maat ticket complete T-20260525-190700-b91c --evidence "smoke test passed" --project maat
 ```
 
 Tickets may stand alone or belong to a goal.
 
+Future ticket commands:
+
+```sh
+maat ticket status T-20260525-190700-b91c waiting --reason "needs credentials"
+```
+
 ### Query Commands
+
+Current query commands:
 
 ```sh
 maat status
+maat projects
+maat project show maat
+maat ticket list --project maat
+maat ticket show T-20260525-190700-b91c --project maat
+maat search "agent health"
+```
+
+Future query commands:
+
+```sh
 maat active
 maat blocked
 maat stale
 maat timeline --today
-maat search "agent health"
 maat report daily
 ```
 
@@ -103,10 +134,16 @@ When a write command updates Markdown successfully but the local search index ca
 
 ```sh
 maat sync
-maat pull
-maat push
+maat sync --push
 maat validate
 maat index rebuild
+```
+
+Future sync shorthands:
+
+```sh
+maat pull
+maat push
 ```
 
 The normal agent write path should validate and commit. Push can be opt-in or configured by policy.

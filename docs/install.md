@@ -248,7 +248,7 @@ The installer ends with a `maat ready to use` banner and a short start-here comm
 ```sh
 maat version
 maat --help
-maat setup
+maat setup --storage /absolute/path/to/maat-state
 maat index rebuild --storage /absolute/path/to/maat-state
 maat status --storage /absolute/path/to/maat-state
 maat tui --storage /absolute/path/to/maat-state
@@ -263,7 +263,7 @@ maat projects --storage /absolute/path/to/maat-state
 maat index rebuild --storage /absolute/path/to/maat-state
 ```
 
-When the TUI lands, the expected command will be:
+Launch the TUI with:
 
 ```sh
 maat tui
@@ -279,7 +279,7 @@ maat ui
 
 1. Clone the Maat storage repo.
 2. Install `maat`.
-3. Link or pass the storage path.
+3. Save or pass the storage path.
 4. Rebuild the local index.
 5. Query from the CLI, TUI, or UI.
 
@@ -288,6 +288,7 @@ Current commands:
 ```sh
 git clone <storage-remote> /absolute/path/to/maat-state
 scripts/install.sh
+maat setup --storage /absolute/path/to/maat-state
 maat index rebuild --storage /absolute/path/to/maat-state
 maat status --storage /absolute/path/to/maat-state
 ```

@@ -194,9 +194,9 @@ printf '\n'
 printf '%sStart with:%s\n' "$bold" "$reset"
 printf '  %s version\n' "$binary_name"
 printf '  %s --help\n' "$binary_name"
-printf '  %s init /absolute/path/to/maat-state\n' "$binary_name"
+printf '  %s setup --storage /absolute/path/to/maat-state\n' "$binary_name"
 printf '  %s index rebuild --storage /absolute/path/to/maat-state\n' "$binary_name"
 printf '  %s status --storage /absolute/path/to/maat-state\n' "$binary_name"
 printf '  %s tui --storage /absolute/path/to/maat-state\n' "$binary_name"
 printf '\n'
-printf '%sTip:%s run %s init once to save the storage path, then omit --storage.\n' "$dim" "$reset" "$binary_name"
+printf '%sTip:%s run %s setup --storage once to save the storage path, then omit --storage.\n' "$dim" "$reset" "$binary_name"

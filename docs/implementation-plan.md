@@ -19,9 +19,9 @@ This plan keeps implementation small while preserving the target architecture.
 Current bootstrap status:
 
 - legacy flat project parsing exists for `state/projects/*.md`
-- known status validation exists for project and goal state
-- status totals can be computed from parsed projects
-- target object layout parsing remains future work
+- target object layout parsing exists for `state/projects/<project-key>/`
+- validation checks required fields, known statuses, timestamps, duplicate IDs, object links, malformed tables, and event paths
+- status totals can be computed from legacy and object-layout projects
 
 ## Phase 2: CLI Read Path
 
