@@ -65,7 +65,7 @@ The release script builds macOS and Linux artifacts by default. Override targets
 TARGETS="darwin/arm64 linux/amd64" scripts/build-release.sh
 ```
 
-GitHub Actions runs the same test and release build path on `v*` tags and manual dispatch. Tag builds publish the generated tarballs and checksum file to the matching GitHub Release; manual dispatch uploads artifacts only.
+GitHub Actions runs the same test and release build path on `v*` tags and manual dispatch. Tag builds publish the generated tarballs and checksum file to the matching GitHub Release and mark it as the latest release; manual dispatch uploads artifacts only.
 
 ## Current Implementation Scope
 

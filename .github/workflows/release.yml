@@ -50,5 +50,6 @@ jobs:
           artifactErrorsFailBuild: true
           artifacts: "dist/*.tar.gz,dist/checksums-*.txt"
           generateReleaseNotes: true
+          makeLatest: true
           replacesArtifacts: true
           token: ${{ secrets.GITHUB_TOKEN }}

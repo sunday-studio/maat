@@ -212,4 +212,4 @@ maat-<version>-linux-arm64.tar.gz
 checksums-<version>.txt
 ```
 
-GitHub Actions builds these artifacts on `v*` tag pushes. Manual workflow dispatch uploads artifacts for inspection without publishing a release.
+GitHub Actions builds these artifacts on `v*` tag pushes and marks tag-published releases as latest. Manual workflow dispatch uploads artifacts for inspection without publishing a release.
