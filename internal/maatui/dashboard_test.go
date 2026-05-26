@@ -237,6 +237,52 @@ func TestRenderProjectTicketBoardStacksAtNarrowWidth(t *testing.T) {
 	}
 }
 
+func TestRenderProjectTicketBoardMarksSelectedTicket(t *testing.T) {
+	got := RenderProjectTicketBoardWithSelection(ProjectRow{
+		Key:         "sample",
+		DisplayName: "Sample",
+		Tickets:     2,
+		OpenTickets: 2,
+		TicketRows: []TicketRow{
+			{ID: "T-001", Title: "First ticket", Status: "active"},
+			{ID: "T-002", Title: "Second ticket", Status: "active"},
+		},
+	}, 96, 1, true)
+
+	for _, want := range []string{"> T-002", "- T-001"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderProjectTicketBoardWithSelection() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderProjectTicketBoardKeepsSelectedTicketVisible(t *testing.T) {
+	tickets := []TicketRow{
+		{ID: "T-001", Title: "Ticket 1", Status: "active"},
+		{ID: "T-002", Title: "Ticket 2", Status: "active"},
+		{ID: "T-003", Title: "Ticket 3", Status: "active"},
+		{ID: "T-004", Title: "Ticket 4", Status: "active"},
+		{ID: "T-005", Title: "Ticket 5", Status: "active"},
+		{ID: "T-006", Title: "Ticket 6", Status: "active"},
+		{ID: "T-007", Title: "Ticket 7", Status: "active"},
+		{ID: "T-008", Title: "Ticket 8", Status: "active"},
+	}
+	got := RenderProjectTicketBoardWithSelection(ProjectRow{
+		Key:        "sample",
+		Tickets:    len(tickets),
+		TicketRows: tickets,
+	}, 96, 7, true)
+
+	for _, want := range []string{"> T-008", "+ 2 earlier"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderProjectTicketBoardWithSelection() missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "T-001") {
+		t.Fatalf("selected ticket window did not advance:\n%s", got)
+	}
+}
+
 func TestRenderDashboardCanShowTicketMode(t *testing.T) {
 	got := RenderDashboardWithSelectionAndMode(Dashboard{Projects: []ProjectRow{
 		{
@@ -303,7 +349,7 @@ func TestRenderDashboardShowsNavigationHelp(t *testing.T) {
 		{Key: "sample", DisplayName: "Sample", Status: "active"},
 	}}, 0)
 
-	for _, want := range []string{"up/down or k/j", "tab/right to switch project/tickets/timeline", "left to go back", "q to quit"} {
+	for _, want := range []string{"up/down or k/j", "tab/right to switch project/tickets/timeline", "enter to select tickets", "backspace for projects", "q to quit"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderDashboardWithSelection() missing %q in:\n%s", want, got)
 		}
@@ -366,6 +412,84 @@ func TestModelTogglesDetailMode(t *testing.T) {
 	got = updated.(Model)
 	if got.mode != DetailModeTimeline {
 		t.Fatalf("mode after left = %v, want timeline", got.mode)
+	}
+}
+
+func TestModelMovesTicketSelectionWhenTicketPaneFocused(t *testing.T) {
+	model := NewModel(Dashboard{Projects: []ProjectRow{
+		{
+			Key: "sample",
+			TicketRows: []TicketRow{
+				{ID: "T-001", Title: "First"},
+				{ID: "T-002", Title: "Second"},
+			},
+		},
+		{
+			Key: "second",
+			TicketRows: []TicketRow{
+				{ID: "T-010", Title: "Other"},
+			},
+		},
+	}}, nil)
+	model.mode = DetailModeTickets
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		t.Fatalf("enter command = %v, want nil", cmd)
+	}
+	got := updated.(Model)
+	if !got.ticketFocus {
+		t.Fatal("enter should focus ticket selection")
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyDown})
+	got = updated.(Model)
+	if got.selected != 0 || got.selectedTicket != 1 {
+		t.Fatalf("down with ticket focus selected project=%d ticket=%d, want project 0 ticket 1", got.selected, got.selectedTicket)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	got = updated.(Model)
+	if got.ticketFocus {
+		t.Fatal("backspace should return focus to projects")
+	}
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyDown})
+	got = updated.(Model)
+	if got.selected != 1 || got.selectedTicket != 0 {
+		t.Fatalf("down with project focus selected project=%d ticket=%d, want project 1 ticket 0", got.selected, got.selectedTicket)
+	}
+}
+
+func TestModelRefreshPreservesSelectedTicketByID(t *testing.T) {
+	model := NewLiveModel("/tmp/maat-state", Dashboard{Projects: []ProjectRow{
+		{
+			Key: "sample",
+			TicketRows: []TicketRow{
+				{ID: "T-001", Title: "First"},
+				{ID: "T-002", Title: "Second"},
+			},
+		},
+	}}, nil)
+	model.mode = DetailModeTickets
+	model.ticketFocus = true
+	model.selectedTicket = 1
+
+	updated, _ := model.Update(dashboardLoadedMsg{dashboard: Dashboard{Projects: []ProjectRow{
+		{
+			Key: "sample",
+			TicketRows: []TicketRow{
+				{ID: "T-000", Title: "New"},
+				{ID: "T-002", Title: "Second reloaded"},
+				{ID: "T-003", Title: "Third"},
+			},
+		},
+	}}})
+	got := updated.(Model)
+	if got.selectedTicket != 1 || got.dashboard.Projects[0].TicketRows[got.selectedTicket].Title != "Second reloaded" {
+		t.Fatalf("refresh did not preserve selected ticket: selectedTicket=%d tickets=%+v", got.selectedTicket, got.dashboard.Projects[0].TicketRows)
+	}
+	if !got.ticketFocus {
+		t.Fatal("refresh should keep ticket focus when selected project still has tickets")
 	}
 }
 

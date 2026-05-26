@@ -75,6 +75,8 @@ type Model struct {
 	activeRefreshID int
 	width           int
 	selected        int
+	selectedTicket  int
+	ticketFocus     bool
 	mode            DetailMode
 	storage         string
 	load            dashboardLoader
@@ -168,13 +170,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c", "esc":
 			return m, tea.Quit
 		case "up", "k":
-			m.selected = clampSelection(m.selected-1, len(m.dashboard.Projects))
+			m = m.moveSelection(-1)
 		case "down", "j":
-			m.selected = clampSelection(m.selected+1, len(m.dashboard.Projects))
+			m = m.moveSelection(1)
 		case "tab", "right", "l":
 			m.mode = nextDetailMode(m.mode)
+			m.ticketFocus = false
 		case "left", "h":
 			m.mode = previousDetailMode(m.mode)
+			m.ticketFocus = false
+		case "enter":
+			if m.mode == DetailModeTickets && len(selectedProject(m.dashboard.Projects, m.selected).TicketRows) > 0 {
+				m.ticketFocus = true
+				m.selectedTicket = clampSelection(m.selectedTicket, len(selectedProject(m.dashboard.Projects, m.selected).TicketRows))
+			}
+		case "backspace":
+			m.ticketFocus = false
 		case "r":
 			return m.startDashboardReload(false)
 		}
@@ -195,7 +206,7 @@ func (m Model) View() string {
 	if m.err != nil && len(m.dashboard.Projects) == 0 {
 		return errorStyle.Render(fmt.Sprintf("Maat TUI failed: %v", m.err)) + "\n\n" + mutedStyle.Render("Press q to quit.") + "\n"
 	}
-	view := RenderDashboardWithSelectionModeAndWidth(m.dashboard, m.selected, m.mode, m.width)
+	view := RenderDashboardWithState(m.dashboard, m.selected, m.mode, m.width, m.selectedTicket, m.ticketFocus)
 	if m.refreshing {
 		view += mutedStyle.Render("Refreshing...")
 		view += "\n"
@@ -260,13 +271,36 @@ func (m Model) withLoadedDashboard(msg dashboardLoadedMsg) Model {
 		return m
 	}
 	selectedKey := ""
+	selectedTicketID := ""
 	if len(m.dashboard.Projects) > 0 {
-		selectedKey = selectedProject(m.dashboard.Projects, m.selected).Key
+		project := selectedProject(m.dashboard.Projects, m.selected)
+		selectedKey = project.Key
+		selectedTicketID = selectedTicket(project.TicketRows, m.selectedTicket).ID
 	}
 	m.dashboard = msg.dashboard
 	m.err = nil
 	m.refreshErr = msg.warning
 	m.selected = selectedIndexByKey(m.dashboard.Projects, selectedKey, m.selected)
+	project := selectedProject(m.dashboard.Projects, m.selected)
+	m.selectedTicket = selectedTicketIndexByID(project.TicketRows, selectedTicketID, m.selectedTicket)
+	if len(project.TicketRows) == 0 || m.mode != DetailModeTickets {
+		m.ticketFocus = false
+	}
+	return m
+}
+
+func (m Model) moveSelection(delta int) Model {
+	if m.mode == DetailModeTickets && m.ticketFocus {
+		project := selectedProject(m.dashboard.Projects, m.selected)
+		m.selectedTicket = clampSelection(m.selectedTicket+delta, len(project.TicketRows))
+		return m
+	}
+	m.selected = clampSelection(m.selected+delta, len(m.dashboard.Projects))
+	project := selectedProject(m.dashboard.Projects, m.selected)
+	m.selectedTicket = clampSelection(m.selectedTicket, len(project.TicketRows))
+	if len(project.TicketRows) == 0 {
+		m.ticketFocus = false
+	}
 	return m
 }
 
@@ -417,6 +451,10 @@ func RenderDashboardWithSelectionAndMode(dashboard Dashboard, selected int, mode
 }
 
 func RenderDashboardWithSelectionModeAndWidth(dashboard Dashboard, selected int, mode DetailMode, width int) string {
+	return RenderDashboardWithState(dashboard, selected, mode, width, -1, false)
+}
+
+func RenderDashboardWithState(dashboard Dashboard, selected int, mode DetailMode, width int, selectedTicket int, ticketFocus bool) string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Maat"))
 	b.WriteString("\n")
@@ -429,14 +467,14 @@ func RenderDashboardWithSelectionModeAndWidth(dashboard Dashboard, selected int,
 	project := selectedProject(dashboard.Projects, selected)
 	switch mode {
 	case DetailModeTickets:
-		b.WriteString(RenderProjectTicketBoard(project, width))
+		b.WriteString(RenderProjectTicketBoardWithSelection(project, width, selectedTicket, ticketFocus))
 	case DetailModeTimeline:
 		b.WriteString(RenderTimeline(dashboard.Events))
 	default:
 		b.WriteString(RenderProjectDetail(project))
 	}
 	b.WriteString("\n\n")
-	b.WriteString(mutedStyle.Render("Use up/down or k/j to select, tab/right to switch project/tickets/timeline, left to go back, r to reload, q to quit."))
+	b.WriteString(mutedStyle.Render("Use up/down or k/j to select, tab/right to switch project/tickets/timeline, enter to select tickets, backspace for projects, r to reload, q to quit."))
 	b.WriteString("\n")
 	return b.String()
 }
@@ -525,6 +563,10 @@ func RenderProjectTickets(project ProjectRow) string {
 }
 
 func RenderProjectTicketBoard(project ProjectRow, width int) string {
+	return RenderProjectTicketBoardWithSelection(project, width, -1, false)
+}
+
+func RenderProjectTicketBoardWithSelection(project ProjectRow, width int, selected int, focused bool) string {
 	if project.Key == "" && project.DisplayName == "" {
 		return mutedStyle.Render("Select a project to see tickets.")
 	}
@@ -543,15 +585,20 @@ func RenderProjectTicketBoard(project ProjectRow, width int) string {
 		b.WriteString(mutedStyle.Render("No tickets recorded."))
 		return b.String()
 	}
+	selected = clampSelection(selected, len(project.TicketRows))
+	selectedID := ""
+	if focused {
+		selectedID = selectedTicket(project.TicketRows, selected).ID
+	}
 	columns := ticketBoardColumns(project.TicketRows)
 	if width <= 0 {
 		width = 140
 	}
 	if width < 72 {
-		b.WriteString(renderStackedTicketBoard(columns, 56))
+		b.WriteString(renderStackedTicketBoard(columns, 56, selectedID))
 		return strings.TrimRight(b.String(), "\n")
 	}
-	b.WriteString(renderColumnTicketBoard(columns, width))
+	b.WriteString(renderColumnTicketBoard(columns, width, selectedID))
 	return strings.TrimRight(b.String(), "\n")
 }
 
@@ -580,7 +627,7 @@ func ticketBoardColumns(tickets []TicketRow) []ticketBoardColumn {
 	return columns
 }
 
-func renderColumnTicketBoard(columns []ticketBoardColumn, width int) string {
+func renderColumnTicketBoard(columns []ticketBoardColumn, width int, selectedID string) string {
 	gap := "  "
 	columnWidth := (width - len(gap)*(len(columns)-1)) / len(columns)
 	if columnWidth > 44 {
@@ -592,7 +639,7 @@ func renderColumnTicketBoard(columns []ticketBoardColumn, width int) string {
 	renderedColumns := make([][]string, 0, len(columns))
 	maxLines := 0
 	for _, column := range columns {
-		lines := renderTicketColumnLines(column, columnWidth, 6)
+		lines := renderTicketColumnLines(column, columnWidth, 6, selectedID)
 		renderedColumns = append(renderedColumns, lines)
 		if len(lines) > maxLines {
 			maxLines = len(lines)
@@ -616,13 +663,13 @@ func renderColumnTicketBoard(columns []ticketBoardColumn, width int) string {
 	return b.String()
 }
 
-func renderStackedTicketBoard(columns []ticketBoardColumn, width int) string {
+func renderStackedTicketBoard(columns []ticketBoardColumn, width int, selectedID string) string {
 	var b strings.Builder
 	for index, column := range columns {
 		if index > 0 {
 			b.WriteString("\n")
 		}
-		lines := renderTicketColumnLines(column, width, 5)
+		lines := renderTicketColumnLines(column, width, 5, selectedID)
 		for _, line := range lines {
 			b.WriteString(line)
 			b.WriteString("\n")
@@ -631,23 +678,42 @@ func renderStackedTicketBoard(columns []ticketBoardColumn, width int) string {
 	return b.String()
 }
 
-func renderTicketColumnLines(column ticketBoardColumn, width int, limit int) []string {
+func renderTicketColumnLines(column ticketBoardColumn, width int, limit int, selectedID string) []string {
 	lines := []string{column.Style.Render(fmt.Sprintf("%s (%d)", column.Title, len(column.Tickets)))}
 	if len(column.Tickets) == 0 {
 		lines = append(lines, mutedStyle.Render("No tickets"))
 		return lines
 	}
-	for index, ticket := range column.Tickets {
-		if index >= limit {
-			lines = append(lines, mutedStyle.Render(fmt.Sprintf("+ %d more", len(column.Tickets)-index)))
-			break
-		}
-		lines = append(lines, renderTicketCard(ticket, width))
+	start := visibleTicketStart(column.Tickets, limit, selectedID)
+	if start > 0 {
+		lines = append(lines, mutedStyle.Render(fmt.Sprintf("+ %d earlier", start)))
+	}
+	end := start + limit
+	if end > len(column.Tickets) {
+		end = len(column.Tickets)
+	}
+	for _, ticket := range column.Tickets[start:end] {
+		lines = append(lines, renderTicketCard(ticket, width, selectedID != "" && ticket.ID == selectedID))
+	}
+	if end < len(column.Tickets) {
+		lines = append(lines, mutedStyle.Render(fmt.Sprintf("+ %d more", len(column.Tickets)-end)))
 	}
 	return lines
 }
 
-func renderTicketCard(ticket TicketRow, width int) string {
+func visibleTicketStart(tickets []TicketRow, limit int, selectedID string) int {
+	if limit <= 0 || selectedID == "" {
+		return 0
+	}
+	for index, ticket := range tickets {
+		if ticket.ID == selectedID && index >= limit {
+			return index - limit + 1
+		}
+	}
+	return 0
+}
+
+func renderTicketCard(ticket TicketRow, width int, selected bool) string {
 	label := ticket.ID
 	if label == "" {
 		label = "ticket"
@@ -661,7 +727,11 @@ func renderTicketCard(ticket TicketRow, width int) string {
 	if titleLimit < 12 {
 		titleLimit = 12
 	}
-	return fmt.Sprintf("- %s [%s] %s (%s)", label, status, truncate(ticket.Title, titleLimit), goal)
+	prefix := "-"
+	if selected {
+		prefix = ">"
+	}
+	return fmt.Sprintf("%s %s [%s] %s (%s)", prefix, label, status, truncate(ticket.Title, titleLimit), goal)
 }
 
 func ticketBoardStatus(status string) string {
@@ -738,6 +808,13 @@ func selectedProject(projects []ProjectRow, selected int) ProjectRow {
 	return projects[clampSelection(selected, len(projects))]
 }
 
+func selectedTicket(tickets []TicketRow, selected int) TicketRow {
+	if len(tickets) == 0 {
+		return TicketRow{}
+	}
+	return tickets[clampSelection(selected, len(tickets))]
+}
+
 func selectedIndexByKey(projects []ProjectRow, key string, fallback int) int {
 	if key != "" {
 		for index, project := range projects {
@@ -747,6 +824,17 @@ func selectedIndexByKey(projects []ProjectRow, key string, fallback int) int {
 		}
 	}
 	return clampSelection(fallback, len(projects))
+}
+
+func selectedTicketIndexByID(tickets []TicketRow, id string, fallback int) int {
+	if id != "" {
+		for index, ticket := range tickets {
+			if ticket.ID == id {
+				return index
+			}
+		}
+	}
+	return clampSelection(fallback, len(tickets))
 }
 
 func nextDetailMode(mode DetailMode) DetailMode {
