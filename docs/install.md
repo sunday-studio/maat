@@ -109,6 +109,15 @@ maat projects --storage "$HOME/maat-state"
 maat search "blocked" --storage "$HOME/maat-state"
 ```
 
+Check storage setup when commands cannot find or write state:
+
+```sh
+maat setup doctor
+maat setup doctor --storage "$HOME/maat-state" --fix
+```
+
+The doctor reports missing config, path permissions, Git repository status, upstream tracking, validation issues, and rebuildable index health. `--fix` only performs conservative local repairs, such as creating config from an explicit storage path or rebuilding `.maat` indexes. It does not initialize Git, add remotes, delete project history, or rewrite events.
+
 ## Start Using Maat
 
 Register a project from inside that project repo:

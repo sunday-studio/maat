@@ -146,6 +146,7 @@ Usage:
 
 Common:
   maat setup [--storage <absolute-git-repo-path>] [--actor <name>] [--json]
+  maat setup doctor [--storage <path>] [--fix] [--json]
   maat initialize [--project <project-key>] [--storage <path>] [--json]
   maat status [--storage <path>] [--json]
   maat projects [--storage <path>] [--json]
@@ -167,6 +168,7 @@ Tickets:
 
 Setup and maintenance:
   maat setup [--storage <absolute-git-repo-path>] [--actor <name>] [--auto-pull|--no-auto-pull] [--auto-commit|--no-auto-commit] [--auto-push|--no-auto-push] [--json]
+  maat setup doctor [--storage <path>] [--fix] [--json]
   maat update [--source <path>] [--install-dir <path>] [--binary-name <name>] [--json]
   maat uninstall [--install-dir <path>] [--binary-name <name>] [--purge-config] [--json]
   maat index rebuild [--storage <path>]
@@ -541,8 +543,32 @@ type setupCommandResult struct {
 	AutoPushAfterCommit  bool   `json:"auto_push_after_commit"`
 }
 
+type setupDoctorResult struct {
+	Action      string             `json:"action"`
+	OK          bool               `json:"ok"`
+	Fixed       bool               `json:"fixed"`
+	Fix         bool               `json:"fix"`
+	ConfigPath  string             `json:"config_path"`
+	StoragePath string             `json:"storage_path,omitempty"`
+	Checks      []setupDoctorCheck `json:"checks"`
+}
+
+type setupDoctorCheck struct {
+	ID               string `json:"id"`
+	Status           string `json:"status"`
+	Message          string `json:"message"`
+	Path             string `json:"path,omitempty"`
+	CanFix           bool   `json:"can_fix,omitempty"`
+	Fixed            bool   `json:"fixed,omitempty"`
+	RequiresApproval bool   `json:"requires_approval,omitempty"`
+	Suggestion       string `json:"suggestion,omitempty"`
+}
+
 func setupCommand(args []string) error {
 	filtered, jsonOut := splitJSONFlag(args)
+	if len(filtered) > 0 && filtered[0] == "doctor" {
+		return setupDoctorCommand(filtered[1:], jsonOut)
+	}
 	cfg := defaultConfig()
 	storagePath := ""
 	storageProvided := false
@@ -621,6 +647,440 @@ func setupCommand(args []string) error {
 	printField("Auto-commit after writes", formatBool(result.AutoCommitAfterWrite))
 	printField("Auto-push after commits", formatBool(result.AutoPushAfterCommit))
 	return nil
+}
+
+func setupDoctorCommand(args []string, jsonOut bool) error {
+	storagePath := ""
+	fix := false
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--storage":
+			if i+1 >= len(args) {
+				return errors.New("--storage requires a path")
+			}
+			storagePath = args[i+1]
+			i++
+		case "--fix":
+			fix = true
+		default:
+			return fmt.Errorf("unexpected setup doctor argument %q", args[i])
+		}
+	}
+
+	result, err := runSetupDoctor(storagePath, fix)
+	if err != nil {
+		return err
+	}
+	if agentUse {
+		status := "ok"
+		message := "setup healthy"
+		if !result.OK {
+			status = "warning"
+			message = "setup needs attention"
+		}
+		return agentUpdate("setup.doctor", status, message, result)
+	}
+	if jsonOut {
+		return writeJSON(result)
+	}
+	printSetupDoctorResult(result)
+	return nil
+}
+
+func runSetupDoctor(storageArg string, fix bool) (setupDoctorResult, error) {
+	configFile, err := configPath()
+	if err != nil {
+		return setupDoctorResult{}, err
+	}
+	result := setupDoctorResult{
+		Action:     "setup.doctor",
+		Fix:        fix,
+		ConfigPath: configFile,
+	}
+
+	cfg, configErr := readConfig()
+	configMissing := errors.Is(configErr, os.ErrNotExist)
+	configReadable := configErr == nil
+	if configReadable {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:      "config",
+			Status:  "ok",
+			Message: "config file is readable",
+			Path:    configFile,
+		})
+	} else if configMissing {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:         "config",
+			Status:     "warning",
+			Message:    "config file is missing",
+			Path:       configFile,
+			CanFix:     strings.TrimSpace(storageArg) != "",
+			Suggestion: "run maat setup --storage <absolute-git-repo-path>, or run maat setup doctor --storage <path> --fix",
+		})
+		cfg = defaultConfig()
+	} else {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:         "config",
+			Status:     "error",
+			Message:    "config file could not be read: " + configErr.Error(),
+			Path:       configFile,
+			Suggestion: "inspect permissions or repair the JSON config manually",
+		})
+		cfg = defaultConfig()
+	}
+
+	storagePath := strings.TrimSpace(storageArg)
+	storageProvided := storagePath != ""
+	if storagePath == "" && configReadable {
+		storagePath = strings.TrimSpace(cfg.StoragePath)
+	}
+	if storagePath == "" {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:         "storage_configured",
+			Status:     "error",
+			Message:    "no storage path is configured",
+			CanFix:     false,
+			Suggestion: "run maat setup --storage <absolute-git-repo-path>",
+		})
+		finalizeSetupDoctorResult(&result)
+		return result, nil
+	}
+
+	abs, err := filepath.Abs(storagePath)
+	if err != nil {
+		return setupDoctorResult{}, err
+	}
+	result.StoragePath = abs
+
+	storageOK, storageWritable := inspectSetupDoctorStorage(&result, abs)
+	repoOK := false
+	if storageOK {
+		repoOK = inspectSetupDoctorGit(&result, abs)
+		inspectSetupDoctorValidation(&result, abs)
+		if storageWritable {
+			inspectSetupDoctorIndexes(&result, abs, fix)
+		}
+	}
+
+	if configMissing && fix && storageProvided && storageOK && repoOK {
+		repaired := defaultConfig()
+		repaired.StoragePath = abs
+		preserveInstalledBinaryConfig(&repaired)
+		if path, err := persistConfig(repaired); err != nil {
+			result.Checks = append(result.Checks, setupDoctorCheck{
+				ID:         "config_repair",
+				Status:     "error",
+				Message:    "config file could not be written: " + err.Error(),
+				Path:       configFile,
+				Suggestion: "check config directory permissions",
+			})
+		} else {
+			result.ConfigPath = path
+			markSetupDoctorCheckFixed(&result, "config", "config file was created")
+		}
+	}
+
+	finalizeSetupDoctorResult(&result)
+	return result, nil
+}
+
+func inspectSetupDoctorStorage(result *setupDoctorResult, storagePath string) (bool, bool) {
+	info, err := os.Stat(storagePath)
+	if err != nil {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:         "storage_path",
+			Status:     "error",
+			Message:    "storage path does not exist: " + err.Error(),
+			Path:       storagePath,
+			Suggestion: "create or clone a Git-backed Maat storage repo, then run maat setup --storage <path>",
+		})
+		return false, false
+	}
+	if !info.IsDir() {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:         "storage_path",
+			Status:     "error",
+			Message:    "storage path is not a directory",
+			Path:       storagePath,
+			Suggestion: "choose a directory that contains the Maat storage repo",
+		})
+		return false, false
+	}
+	result.Checks = append(result.Checks, setupDoctorCheck{
+		ID:      "storage_path",
+		Status:  "ok",
+		Message: "storage path exists",
+		Path:    storagePath,
+	})
+	if err := checkWritableDirectory(storagePath); err != nil {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:         "storage_writable",
+			Status:     "error",
+			Message:    "storage path is not writable: " + err.Error(),
+			Path:       storagePath,
+			Suggestion: "fix directory ownership or permissions before running write commands",
+		})
+		return true, false
+	}
+	result.Checks = append(result.Checks, setupDoctorCheck{
+		ID:      "storage_writable",
+		Status:  "ok",
+		Message: "storage path is writable",
+		Path:    storagePath,
+	})
+	return true, true
+}
+
+func inspectSetupDoctorGit(result *setupDoctorResult, storagePath string) bool {
+	git := maat.GitSync{Store: storagePath}
+	repo, err := git.Info(context.Background())
+	if err != nil {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:         "git_repository",
+			Status:     "error",
+			Message:    "git repository could not be inspected: " + err.Error(),
+			Path:       storagePath,
+			Suggestion: "run git status in the storage repo and resolve the reported Git error",
+		})
+		return false
+	}
+	if !repo.IsRepository {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:               "git_repository",
+			Status:           "warning",
+			Message:          "storage path is not a Git repository",
+			Path:             storagePath,
+			RequiresApproval: true,
+			Suggestion:       "run git -C " + storagePath + " init after confirming this is the intended storage repo",
+		})
+		return false
+	}
+	result.Checks = append(result.Checks, setupDoctorCheck{
+		ID:      "git_repository",
+		Status:  "ok",
+		Message: "storage path is a Git repository",
+		Path:    storagePath,
+	})
+	if strings.TrimSpace(repo.RemoteURL) == "" {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:               "git_upstream",
+			Status:           "warning",
+			Message:          "storage repo has no origin remote",
+			Path:             storagePath,
+			RequiresApproval: true,
+			Suggestion:       "run git -C " + storagePath + " remote add origin <url>, then push with -u",
+		})
+		return true
+	}
+	upstream, err := gitBranchUpstream(storagePath)
+	if err != nil {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:               "git_upstream",
+			Status:           "warning",
+			Message:          "current branch has no upstream tracking branch",
+			Path:             storagePath,
+			RequiresApproval: true,
+			Suggestion:       "run git -C " + storagePath + " push -u origin " + repo.Branch + " after confirming the remote",
+		})
+		return true
+	}
+	result.Checks = append(result.Checks, setupDoctorCheck{
+		ID:      "git_upstream",
+		Status:  "ok",
+		Message: "current branch tracks " + upstream,
+		Path:    storagePath,
+	})
+	return true
+}
+
+func inspectSetupDoctorValidation(result *setupDoctorResult, storagePath string) {
+	report, err := maat.ValidateStore(storagePath)
+	if err != nil {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:         "validation",
+			Status:     "error",
+			Message:    "storage validation failed to run: " + err.Error(),
+			Path:       storagePath,
+			Suggestion: "inspect storage files and rerun maat validate",
+		})
+		return
+	}
+	if !report.OK() {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:         "validation",
+			Status:     "error",
+			Message:    fmt.Sprintf("storage has %d validation issues", len(report.Issues)),
+			Path:       storagePath,
+			Suggestion: "run maat validate --storage " + storagePath + " and fix the reported Markdown issues",
+		})
+		return
+	}
+	result.Checks = append(result.Checks, setupDoctorCheck{
+		ID:      "validation",
+		Status:  "ok",
+		Message: fmt.Sprintf("storage validates with %d files", report.Files),
+		Path:    storagePath,
+	})
+}
+
+func inspectSetupDoctorIndexes(result *setupDoctorResult, storagePath string, fix bool) {
+	stale, message := setupDoctorIndexesStale(storagePath)
+	if !stale {
+		result.Checks = append(result.Checks, setupDoctorCheck{
+			ID:      "indexes",
+			Status:  "ok",
+			Message: message,
+			Path:    filepath.Join(storagePath, ".maat"),
+		})
+		return
+	}
+	check := setupDoctorCheck{
+		ID:         "indexes",
+		Status:     "warning",
+		Message:    message,
+		Path:       filepath.Join(storagePath, ".maat"),
+		CanFix:     true,
+		Suggestion: "run maat index rebuild --storage " + storagePath + ", or run maat setup doctor --storage " + storagePath + " --fix",
+	}
+	if fix {
+		idx, err := maat.BuildIndex(storagePath)
+		if err != nil {
+			check.Status = "error"
+			check.Message = "index rebuild failed while reading storage: " + err.Error()
+		} else if _, err := maat.WriteIndex(storagePath, idx); err != nil {
+			check.Status = "error"
+			check.Message = "json index rebuild failed: " + err.Error()
+		} else if _, err := maat.RebuildSQLiteIndex(storagePath); err != nil {
+			check.Status = "error"
+			check.Message = "sqlite index rebuild failed: " + err.Error()
+		} else {
+			check.Status = "fixed"
+			check.Fixed = true
+			check.Message = "indexes were rebuilt"
+			check.Suggestion = ""
+		}
+	}
+	result.Checks = append(result.Checks, check)
+}
+
+func setupDoctorIndexesStale(storagePath string) (bool, string) {
+	jsonIndex := filepath.Join(storagePath, ".maat", "index.json")
+	sqliteIndex := filepath.Join(storagePath, ".maat", "index.sqlite")
+	jsonInfo, jsonErr := os.Stat(jsonIndex)
+	sqliteInfo, sqliteErr := os.Stat(sqliteIndex)
+	if jsonErr != nil || sqliteErr != nil {
+		return true, "one or more rebuildable indexes are missing"
+	}
+	latest, err := latestMarkdownModTime(storagePath)
+	if err != nil {
+		return true, "could not inspect Markdown files for index freshness: " + err.Error()
+	}
+	if latest.After(jsonInfo.ModTime()) || latest.After(sqliteInfo.ModTime()) {
+		return true, "one or more rebuildable indexes are stale"
+	}
+	return false, "rebuildable indexes are present and current"
+}
+
+func latestMarkdownModTime(storagePath string) (time.Time, error) {
+	var latest time.Time
+	err := filepath.WalkDir(storagePath, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			switch entry.Name() {
+			case ".git", ".maat":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.EqualFold(filepath.Ext(path), ".md") {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if info.ModTime().After(latest) {
+			latest = info.ModTime()
+		}
+		return nil
+	})
+	return latest, err
+}
+
+func checkWritableDirectory(dir string) error {
+	file, err := os.CreateTemp(dir, ".maat-doctor-*")
+	if err != nil {
+		return err
+	}
+	name := file.Name()
+	closeErr := file.Close()
+	removeErr := os.Remove(name)
+	if closeErr != nil {
+		return closeErr
+	}
+	return removeErr
+}
+
+func gitBranchUpstream(storagePath string) (string, error) {
+	command := exec.Command("git", "-C", storagePath, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+	output, err := command.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func markSetupDoctorCheckFixed(result *setupDoctorResult, id, message string) {
+	for i := range result.Checks {
+		if result.Checks[i].ID == id {
+			result.Checks[i].Status = "fixed"
+			result.Checks[i].Message = message
+			result.Checks[i].Fixed = true
+			result.Checks[i].CanFix = false
+			result.Checks[i].Suggestion = ""
+			return
+		}
+	}
+}
+
+func finalizeSetupDoctorResult(result *setupDoctorResult) {
+	result.OK = true
+	for _, check := range result.Checks {
+		if check.Fixed {
+			result.Fixed = true
+		}
+		if check.Status != "ok" && check.Status != "fixed" {
+			result.OK = false
+		}
+	}
+}
+
+func printSetupDoctorResult(result setupDoctorResult) {
+	if result.OK {
+		ok("setup.doctor", "setup healthy", nil)
+	} else {
+		warn("setup.doctor", "setup needs attention", nil)
+	}
+	printField("Config", result.ConfigPath)
+	if result.StoragePath != "" {
+		printField("Storage", result.StoragePath)
+	}
+	printField("Fix mode", formatBool(result.Fix))
+	for _, check := range result.Checks {
+		line := fmt.Sprintf("[%s] %s: %s", check.Status, check.ID, check.Message)
+		fmt.Println(line)
+		if check.RequiresApproval {
+			fmt.Println("  requires approval")
+		}
+		if check.CanFix && !check.Fixed {
+			fmt.Println("  can fix with --fix")
+		}
+		if check.Suggestion != "" {
+			fmt.Println("  " + check.Suggestion)
+		}
+	}
 }
 
 func promptSetup(cfg *config, storagePath *string) error {

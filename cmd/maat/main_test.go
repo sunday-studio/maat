@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sunday-studio/maat/internal/maat"
 	"github.com/sunday-studio/maat/internal/version"
@@ -526,6 +527,119 @@ func TestSetupCommandRejectsInvalidStorage(t *testing.T) {
 	store := t.TempDir()
 	if _, err := captureRun("setup", "--storage", store); err == nil || !strings.Contains(err.Error(), "must be a Git repository") {
 		t.Fatalf("expected non-git storage error, got %v", err)
+	}
+}
+
+func TestSetupDoctorFixesMissingConfigWithExplicitStorage(t *testing.T) {
+	store := writeObjectCommandFixture(t)
+	initGitStore(t, store)
+	addGitUpstream(t, store)
+	configFile := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("MAAT_CONFIG", configFile)
+
+	output, err := captureRun("setup", "doctor", "--storage", store, "--fix", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result setupDoctorResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || !result.Fixed || result.StoragePath != store {
+		t.Fatalf("unexpected doctor result: %#v", result)
+	}
+	configCheck := findSetupDoctorCheck(t, result, "config")
+	if configCheck.Status != "fixed" || !configCheck.Fixed {
+		t.Fatalf("expected fixed config check, got %#v", configCheck)
+	}
+	cfg, err := readConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.StoragePath != store {
+		t.Fatalf("expected doctor to write storage config, got %#v", cfg)
+	}
+}
+
+func TestSetupDoctorReportsMissingUpstreamApproval(t *testing.T) {
+	store := writeObjectCommandFixture(t)
+	initGitStore(t, store)
+	writeCommandConfig(t, config{
+		StoragePath:          store,
+		DefaultActor:         "test",
+		AutoPullBeforeRead:   true,
+		AutoCommitAfterWrite: true,
+		AutoPushAfterCommit:  true,
+	})
+
+	output, err := captureRun("setup", "doctor", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result setupDoctorResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.OK {
+		t.Fatalf("expected doctor to require attention, got %#v", result)
+	}
+	upstreamCheck := findSetupDoctorCheck(t, result, "git_upstream")
+	if !upstreamCheck.RequiresApproval || upstreamCheck.Status != "warning" {
+		t.Fatalf("expected missing upstream to require approval, got %#v", upstreamCheck)
+	}
+	if remotes := strings.TrimSpace(runGit(t, store, "remote")); remotes != "" {
+		t.Fatalf("doctor should not add remotes automatically, got %q", remotes)
+	}
+}
+
+func TestSetupDoctorFixRebuildsStaleIndexes(t *testing.T) {
+	store := writeObjectCommandFixture(t)
+	initGitStore(t, store)
+	addGitUpstream(t, store)
+	writeCommandConfig(t, config{
+		StoragePath:          store,
+		DefaultActor:         "test",
+		AutoPullBeforeRead:   true,
+		AutoCommitAfterWrite: true,
+		AutoPushAfterCommit:  true,
+	})
+	idx, err := maat.BuildIndex(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := maat.WriteIndex(store, idx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := maat.RebuildSQLiteIndex(store); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-2 * time.Hour)
+	for _, path := range []string{
+		filepath.Join(store, ".maat", "index.json"),
+		filepath.Join(store, ".maat", "index.sqlite"),
+	} {
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	output, err := captureRun("setup", "doctor", "--fix", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result setupDoctorResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || !result.Fixed {
+		t.Fatalf("unexpected doctor result: %#v", result)
+	}
+	indexCheck := findSetupDoctorCheck(t, result, "indexes")
+	if indexCheck.Status != "fixed" || !indexCheck.Fixed {
+		t.Fatalf("expected stale indexes to be rebuilt, got %#v", indexCheck)
 	}
 }
 
@@ -1614,6 +1728,14 @@ func initGitStore(t *testing.T, store string) {
 	runGit(t, store, "commit", "-m", "test: seed store")
 }
 
+func addGitUpstream(t *testing.T, store string) {
+	t.Helper()
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	runGit(t, filepath.Dir(remote), "init", "--bare", "-b", "main", remote)
+	runGit(t, store, "remote", "add", "origin", remote)
+	runGit(t, store, "push", "-u", "origin", "main")
+}
+
 func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	command := exec.Command("git", args...)
@@ -1623,6 +1745,17 @@ func runGit(t *testing.T, dir string, args ...string) string {
 		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, output)
 	}
 	return string(output)
+}
+
+func findSetupDoctorCheck(t *testing.T, result setupDoctorResult, id string) setupDoctorCheck {
+	t.Helper()
+	for _, check := range result.Checks {
+		if check.ID == id {
+			return check
+		}
+	}
+	t.Fatalf("missing setup doctor check %q in %#v", id, result.Checks)
+	return setupDoctorCheck{}
 }
 
 func writeCommandConfig(t *testing.T, cfg config) {
