@@ -25,6 +25,7 @@ type ProjectRow struct {
 	Updated     string
 	GoalRows    []GoalRow
 	TicketRows  []TicketRow
+	EventRows   []EventRow
 }
 
 type GoalRow struct {
@@ -35,10 +36,16 @@ type GoalRow struct {
 }
 
 type TicketRow struct {
-	ID     string
-	Title  string
-	Status string
-	GoalID string
+	ID          string
+	Title       string
+	Status      string
+	GoalID      string
+	GoalTitle   string
+	ProjectKey  string
+	Created     string
+	Tags        []string
+	Description string
+	Acceptance  []string
 }
 
 type EventRow struct {
@@ -367,7 +374,9 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 	for _, project := range projects {
 		goalRows := make([]GoalRow, 0, len(project.Goals))
 		ticketRows := make([]TicketRow, 0, len(project.Tickets))
+		eventRows := make([]EventRow, 0, len(project.Events))
 		ticketsByGoal := countObjectTicketsByGoal(project.Tickets)
+		goalsByID := objectGoalsByID(project.Goals)
 		openTickets, doneTickets := countObjectTickets(project.Tickets)
 		for _, goal := range project.Goals {
 			goalRows = append(goalRows, GoalRow{
@@ -378,12 +387,25 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 			})
 		}
 		for _, ticket := range project.Tickets {
+			goalTitle := ""
+			if goal, ok := goalsByID[ticket.GoalID]; ok {
+				goalTitle = goal.Title
+			}
 			ticketRows = append(ticketRows, TicketRow{
-				ID:     ticket.ID,
-				Title:  ticket.Title,
-				Status: ticket.Status,
-				GoalID: ticket.GoalID,
+				ID:          ticket.ID,
+				Title:       ticket.Title,
+				Status:      ticket.Status,
+				GoalID:      ticket.GoalID,
+				GoalTitle:   goalTitle,
+				ProjectKey:  ticket.ProjectKey,
+				Created:     ticket.Created,
+				Tags:        ticket.Tags,
+				Description: ticket.Description,
+				Acceptance:  ticket.Acceptance,
 			})
+		}
+		for _, event := range project.Events {
+			eventRows = append(eventRows, eventRowFromObject(project, event))
 		}
 		row := ProjectRow{
 			Key:         project.Key,
@@ -397,6 +419,7 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 			Updated:     project.Updated,
 			GoalRows:    goalRows,
 			TicketRows:  ticketRows,
+			EventRows:   sortedEventRows(eventRows),
 		}
 		rows = append(rows, row)
 		summary.Goals += len(project.Goals)
@@ -417,25 +440,10 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 			}
 		}
 		for _, event := range project.Events {
-			events = append(events, EventRow{
-				ID:          event.ID,
-				Time:        event.Time,
-				Actor:       event.Actor,
-				ProjectKey:  event.ProjectKey,
-				ProjectName: project.DisplayName,
-				Type:        event.Type,
-				ObjectID:    event.ObjectID,
-				Summary:     event.Summary,
-			})
+			events = append(events, eventRowFromObject(project, event))
 		}
 	}
-	sort.Slice(events, func(i, j int) bool {
-		if events[i].Time == events[j].Time {
-			return events[i].ID > events[j].ID
-		}
-		return events[i].Time > events[j].Time
-	})
-	return Dashboard{Projects: rows, Summary: summary, Events: events}
+	return Dashboard{Projects: rows, Summary: summary, Events: sortedEventRows(events)}
 }
 
 func RenderDashboard(dashboard Dashboard) string {
@@ -586,9 +594,10 @@ func RenderProjectTicketBoardWithSelection(project ProjectRow, width int, select
 		return b.String()
 	}
 	selected = clampSelection(selected, len(project.TicketRows))
+	ticket := selectedTicket(project.TicketRows, selected)
 	selectedID := ""
 	if focused {
-		selectedID = selectedTicket(project.TicketRows, selected).ID
+		selectedID = ticket.ID
 	}
 	columns := ticketBoardColumns(project.TicketRows)
 	if width <= 0 {
@@ -596,9 +605,69 @@ func RenderProjectTicketBoardWithSelection(project ProjectRow, width int, select
 	}
 	if width < 72 {
 		b.WriteString(renderStackedTicketBoard(columns, 56, selectedID))
+		if focused {
+			b.WriteString("\n")
+			b.WriteString(RenderFocusedTicketPane(project, ticket, width))
+		}
 		return strings.TrimRight(b.String(), "\n")
 	}
 	b.WriteString(renderColumnTicketBoard(columns, width, selectedID))
+	if focused {
+		b.WriteString("\n")
+		b.WriteString(RenderFocusedTicketPane(project, ticket, width))
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func RenderFocusedTicketPane(project ProjectRow, ticket TicketRow, width int) string {
+	if ticket.ID == "" && ticket.Title == "" {
+		return mutedStyle.Render("Select a ticket to see details.")
+	}
+	contentWidth := detailContentWidth(width)
+	projectName := project.DisplayName
+	if projectName == "" {
+		projectName = project.Key
+	}
+	if projectName == "" {
+		projectName = ticket.ProjectKey
+	}
+	goal := "standalone"
+	if ticket.GoalID != "" {
+		goal = ticket.GoalID
+		if ticket.GoalTitle != "" {
+			goal = fmt.Sprintf("%s - %s", ticket.GoalID, ticket.GoalTitle)
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString(headerStyle.Render("Ticket Detail"))
+	b.WriteString("\n")
+	b.WriteString(titleStyle.Render(wrapLine(ticket.Title, contentWidth)))
+	b.WriteString("\n")
+	b.WriteString(wrapLine(fmt.Sprintf("%s  status %s  owner %s", emptyFallback(ticket.ID, "ticket"), emptyFallback(ticket.Status, "open"), ticketOwner(project.EventRows, ticket.ID)), contentWidth))
+	b.WriteString("\n")
+	b.WriteString(wrapLine(fmt.Sprintf("Project: %s  Goal: %s", emptyFallback(projectName, "project"), goal), contentWidth))
+	b.WriteString("\n")
+	if ticket.Created != "" || len(ticket.Tags) > 0 {
+		b.WriteString(wrapLine(fmt.Sprintf("Created: %s  Tags: %s", emptyFallback(compactTime(ticket.Created), "unknown time"), tagsLabel(ticket.Tags)), contentWidth))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	b.WriteString(headerStyle.Render("Description"))
+	b.WriteString("\n")
+	b.WriteString(wrapText(emptyFallback(ticket.Description, "No description recorded."), contentWidth, 4))
+	b.WriteString("\n\n")
+	b.WriteString(headerStyle.Render("Acceptance"))
+	b.WriteString("\n")
+	b.WriteString(renderAcceptance(ticket.Acceptance, contentWidth, 4))
+	b.WriteString("\n\n")
+	b.WriteString(headerStyle.Render("Recent Activity"))
+	b.WriteString("\n")
+	b.WriteString(renderTicketActivity(project.EventRows, ticket.ID, contentWidth, 4))
+	b.WriteString("\n\n")
+	b.WriteString(headerStyle.Render("Actions"))
+	b.WriteString("\n")
+	b.WriteString(wrapText("r refresh | backspace back | up/down move | enter inspect", contentWidth, 2))
 	return strings.TrimRight(b.String(), "\n")
 }
 
@@ -745,6 +814,175 @@ func ticketBoardStatus(status string) string {
 	}
 }
 
+func detailContentWidth(width int) int {
+	if width <= 0 {
+		return 88
+	}
+	if width > 96 {
+		return 96
+	}
+	if width < 40 {
+		return 40
+	}
+	return width
+}
+
+func ticketOwner(events []EventRow, ticketID string) string {
+	for _, event := range events {
+		if event.ObjectID == ticketID && event.Type == "ticket.claimed" && event.Actor != "" {
+			return event.Actor
+		}
+	}
+	return "unassigned"
+}
+
+func tagsLabel(tags []string) string {
+	if len(tags) == 0 {
+		return "none"
+	}
+	return strings.Join(tags, ", ")
+}
+
+func renderAcceptance(items []string, width int, limit int) string {
+	if len(items) == 0 {
+		return mutedStyle.Render("No acceptance criteria recorded.")
+	}
+	var b strings.Builder
+	for index, item := range items {
+		if index >= limit {
+			if index > 0 {
+				b.WriteString("\n")
+			}
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("+ %d more criteria", len(items)-index)))
+			break
+		}
+		if index > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(wrapBullet(item, width))
+	}
+	return b.String()
+}
+
+func renderTicketActivity(events []EventRow, ticketID string, width int, limit int) string {
+	rendered := 0
+	var b strings.Builder
+	for _, event := range events {
+		if event.ObjectID != ticketID {
+			continue
+		}
+		if rendered >= limit {
+			b.WriteString("\n")
+			b.WriteString(mutedStyle.Render("+ more activity"))
+			break
+		}
+		if rendered > 0 {
+			b.WriteString("\n")
+		}
+		summary := event.Summary
+		if summary == "" {
+			summary = event.Type
+		}
+		line := fmt.Sprintf("- %s %s by %s: %s", compactTime(event.Time), event.Type, emptyFallback(event.Actor, "unknown"), summary)
+		b.WriteString(wrapLine(line, width))
+		rendered++
+	}
+	if rendered == 0 {
+		return mutedStyle.Render("No recent ticket activity.")
+	}
+	return b.String()
+}
+
+func wrapBullet(value string, width int) string {
+	prefix := "- "
+	available := width - len(prefix)
+	if available < 12 {
+		available = 12
+	}
+	lines := wrapWords(value, available, 3)
+	for index, line := range lines {
+		if index == 0 {
+			lines[index] = prefix + line
+			continue
+		}
+		lines[index] = "  " + line
+	}
+	return strings.Join(lines, "\n")
+}
+
+func wrapText(value string, width int, limit int) string {
+	paragraphs := strings.Split(strings.TrimSpace(value), "\n")
+	lines := make([]string, 0)
+	for _, paragraph := range paragraphs {
+		for _, line := range wrapWords(paragraph, width, limit-len(lines)) {
+			lines = append(lines, line)
+			if len(lines) >= limit {
+				break
+			}
+		}
+		if len(lines) >= limit {
+			break
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	return strings.Join(lines, "\n")
+}
+
+func wrapLine(value string, width int) string {
+	return strings.Join(wrapWords(value, width, 1), "\n")
+}
+
+func wrapWords(value string, width int, limit int) []string {
+	if width <= 0 {
+		width = 80
+	}
+	if limit <= 0 {
+		return nil
+	}
+	words := strings.Fields(value)
+	if len(words) == 0 {
+		return []string{""}
+	}
+	lines := make([]string, 0, limit)
+	current := ""
+	for _, word := range words {
+		for len(word) > width {
+			chunk := word[:width]
+			word = word[width:]
+			if current != "" {
+				lines = append(lines, current)
+				current = ""
+				if len(lines) >= limit {
+					return lines
+				}
+			}
+			lines = append(lines, chunk)
+			if len(lines) >= limit {
+				return lines
+			}
+		}
+		if current == "" {
+			current = word
+			continue
+		}
+		if len(current)+1+len(word) <= width {
+			current += " " + word
+			continue
+		}
+		lines = append(lines, current)
+		if len(lines) >= limit {
+			return lines
+		}
+		current = word
+	}
+	if current != "" && len(lines) < limit {
+		lines = append(lines, current)
+	}
+	return lines
+}
+
 func RenderTimeline(events []EventRow) string {
 	var b strings.Builder
 	b.WriteString(headerStyle.Render("Timeline"))
@@ -873,6 +1111,40 @@ func countObjectTicketsByGoal(tickets []maat.ObjectTicket) map[string]int {
 		counts[ticket.GoalID]++
 	}
 	return counts
+}
+
+func objectGoalsByID(goals []maat.ObjectGoal) map[string]maat.ObjectGoal {
+	byID := map[string]maat.ObjectGoal{}
+	for _, goal := range goals {
+		if goal.ID == "" {
+			continue
+		}
+		byID[goal.ID] = goal
+	}
+	return byID
+}
+
+func eventRowFromObject(project maat.ObjectProject, event maat.ObjectEvent) EventRow {
+	return EventRow{
+		ID:          event.ID,
+		Time:        event.Time,
+		Actor:       event.Actor,
+		ProjectKey:  event.ProjectKey,
+		ProjectName: project.DisplayName,
+		Type:        event.Type,
+		ObjectID:    event.ObjectID,
+		Summary:     event.Summary,
+	}
+}
+
+func sortedEventRows(events []EventRow) []EventRow {
+	sort.Slice(events, func(i, j int) bool {
+		if events[i].Time == events[j].Time {
+			return events[i].ID > events[j].ID
+		}
+		return events[i].Time > events[j].Time
+	})
+	return events
 }
 
 func emptyFallback(value, fallback string) string {

@@ -65,7 +65,17 @@ func TestDashboardFromObjectProjectsIncludesTicketRows(t *testing.T) {
 				{ID: "G-001", Status: "active", Title: "Improve monitor clarity"},
 			},
 			Tickets: []maat.ObjectTicket{
-				{ID: "T-001", Title: "Add status table", Status: "active", GoalID: "G-001"},
+				{
+					ID:          "T-001",
+					Title:       "Add status table",
+					Status:      "active",
+					GoalID:      "G-001",
+					ProjectKey:  "sample",
+					Created:     "2026-05-25T19:00:00+02:00",
+					Tags:        []string{"tui"},
+					Description: "Make status easier to scan.",
+					Acceptance:  []string{"Status is visible."},
+				},
 				{ID: "T-002", Title: "Fix deploy note", Status: "done"},
 			},
 			Events: []maat.ObjectEvent{
@@ -78,6 +88,15 @@ func TestDashboardFromObjectProjectsIncludesTicketRows(t *testing.T) {
 					ObjectID:   "T-001",
 					Summary:    "Created the status table ticket.",
 				},
+				{
+					ID:         "E-20260525-190800-codex-b222",
+					Time:       "2026-05-25T19:08:00+02:00",
+					Actor:      "codex-worker",
+					ProjectKey: "sample",
+					Type:       "ticket.claimed",
+					ObjectID:   "T-001",
+					Summary:    "Claimed ticket T-001.",
+				},
 			},
 		},
 	})
@@ -89,7 +108,13 @@ func TestDashboardFromObjectProjectsIncludesTicketRows(t *testing.T) {
 	if len(project.TicketRows) != 2 || project.TicketRows[0].GoalID != "G-001" || project.TicketRows[1].GoalID != "" {
 		t.Fatalf("ticket rows = %+v", project.TicketRows)
 	}
-	if len(dashboard.Events) != 1 || dashboard.Events[0].ProjectName != "Sample" || dashboard.Events[0].Type != "ticket.created" {
+	if project.TicketRows[0].GoalTitle != "Improve monitor clarity" || project.TicketRows[0].Description == "" || len(project.TicketRows[0].Acceptance) != 1 {
+		t.Fatalf("ticket detail fields = %+v", project.TicketRows[0])
+	}
+	if len(project.EventRows) != 2 || project.EventRows[0].Type != "ticket.claimed" {
+		t.Fatalf("project event rows = %+v", project.EventRows)
+	}
+	if len(dashboard.Events) != 2 || dashboard.Events[0].ProjectName != "Sample" || dashboard.Events[1].Type != "ticket.created" {
 		t.Fatalf("event rows = %+v", dashboard.Events)
 	}
 }
@@ -280,6 +305,77 @@ func TestRenderProjectTicketBoardKeepsSelectedTicketVisible(t *testing.T) {
 	}
 	if strings.Contains(got, "T-001") {
 		t.Fatalf("selected ticket window did not advance:\n%s", got)
+	}
+}
+
+func TestRenderProjectTicketBoardShowsFocusedTicketDetailPane(t *testing.T) {
+	got := RenderProjectTicketBoardWithSelection(ProjectRow{
+		Key:         "sample",
+		DisplayName: "Sample",
+		Tickets:     1,
+		OpenTickets: 1,
+		TicketRows: []TicketRow{
+			{
+				ID:          "T-001",
+				Title:       "Add focused ticket pane",
+				Status:      "active",
+				GoalID:      "G-001",
+				GoalTitle:   "Make TUI useful",
+				Created:     "2026-05-25T19:00:00+02:00",
+				Tags:        []string{"tui", "detail"},
+				Description: "Show enough ticket context to keep an agent oriented inside the terminal.",
+				Acceptance:  []string{"Ticket metadata is visible.", "Action affordances are visible."},
+			},
+		},
+		EventRows: []EventRow{
+			{
+				Time:     "2026-05-25T19:08:00+02:00",
+				Actor:    "codex-worker",
+				Type:     "ticket.claimed",
+				ObjectID: "T-001",
+				Summary:  "Claimed the focused pane work.",
+			},
+			{
+				Time:     "2026-05-25T19:09:00+02:00",
+				Actor:    "codex-worker",
+				Type:     "ticket.commented",
+				ObjectID: "T-001",
+				Summary:  "Added the first detail pane draft.",
+			},
+		},
+	}, 96, 0, true)
+
+	for _, want := range []string{"Tickets Board", "> T-001", "Ticket Detail", "Add focused ticket pane", "status active", "owner codex-worker", "G-001 - Make TUI useful", "Ticket metadata is visible.", "ticket.commented", "r refresh | backspace back | up/down move | enter inspect"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderProjectTicketBoardWithSelection() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderFocusedTicketPaneStaysCompactAtNarrowWidth(t *testing.T) {
+	got := RenderFocusedTicketPane(ProjectRow{
+		Key:         "sample",
+		DisplayName: "Sample",
+	}, TicketRow{
+		ID:          "T-001",
+		Title:       "Keep the focused ticket detail pane readable on compact terminals",
+		Status:      "active",
+		Description: "This description is intentionally long so the focused ticket detail pane has to wrap content instead of spilling across compact terminal layouts.",
+		Acceptance: []string{
+			"The detail pane wraps long acceptance criteria without breaking the board layout.",
+			"The action affordances remain visible.",
+		},
+	}, 48)
+
+	for _, want := range []string{"Ticket Detail", "Description", "Acceptance", "Actions", "compact terminal", "enter inspect"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderFocusedTicketPane() missing %q in:\n%s", want, got)
+		}
+	}
+	for _, line := range strings.Split(got, "\n") {
+		if len(line) > 52 {
+			t.Fatalf("narrow detail pane line is too wide (%d): %q\n%s", len(line), line, got)
+		}
 	}
 }
 
