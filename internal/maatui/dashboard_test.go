@@ -353,6 +353,56 @@ func TestModelRefreshReloadsDashboardAndPreservesSelection(t *testing.T) {
 	}
 }
 
+func TestModelManualReloadStartsImmediatelyAndKeepsDataVisible(t *testing.T) {
+	model := NewLiveModel("/tmp/maat-state", Dashboard{Projects: []ProjectRow{
+		{Key: "first", DisplayName: "First"},
+		{Key: "second", DisplayName: "Second"},
+	}}, nil)
+	model.selected = 1
+	model.mode = DetailModeTickets
+	model.load = func(storage string) dashboardLoadedMsg {
+		if storage != "/tmp/maat-state" {
+			return dashboardLoadedMsg{err: errors.New("unexpected storage")}
+		}
+		return dashboardLoadedMsg{dashboard: Dashboard{Projects: []ProjectRow{
+			{Key: "second", DisplayName: "Second Reloaded"},
+			{Key: "third", DisplayName: "Third"},
+		}}}
+	}
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	if cmd == nil {
+		t.Fatal("manual reload command is nil")
+	}
+	loading := updated.(Model)
+	if !loading.refreshing {
+		t.Fatal("manual reload did not mark model as refreshing")
+	}
+	loadingView := loading.View()
+	for _, want := range []string{"Second", "Refreshing..."} {
+		if !strings.Contains(loadingView, want) {
+			t.Fatalf("loading view missing %q:\n%s", want, loadingView)
+		}
+	}
+
+	msg := cmd()
+	loaded, ok := msg.(dashboardLoadedMsg)
+	if !ok {
+		t.Fatalf("unexpected reload message: %#v", msg)
+	}
+	updated, _ = loading.Update(loaded)
+	got := updated.(Model)
+	if got.refreshing {
+		t.Fatal("successful reload should clear refreshing state")
+	}
+	if got.mode != DetailModeTickets {
+		t.Fatalf("mode after manual reload = %v, want tickets", got.mode)
+	}
+	if got.selected != 0 || got.dashboard.Projects[got.selected].DisplayName != "Second Reloaded" {
+		t.Fatalf("manual reload did not preserve selected project: selected=%d projects=%+v", got.selected, got.dashboard.Projects)
+	}
+}
+
 func TestModelRefreshErrorKeepsExistingDashboardVisible(t *testing.T) {
 	model := NewLiveModel("/tmp/maat-state", Dashboard{Projects: []ProjectRow{
 		{Key: "sample", DisplayName: "Sample"},
@@ -368,6 +418,31 @@ func TestModelRefreshErrorKeepsExistingDashboardVisible(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Fatalf("view missing %q after refresh error:\n%s", want, view)
 		}
+	}
+}
+
+func TestModelFailedReloadPreservesSelectionAndMode(t *testing.T) {
+	model := NewLiveModel("/tmp/maat-state", Dashboard{Projects: []ProjectRow{
+		{Key: "first", DisplayName: "First"},
+		{Key: "second", DisplayName: "Second"},
+	}}, nil)
+	model.selected = 1
+	model.mode = DetailModeTimeline
+	model.refreshing = true
+
+	updated, _ := model.Update(dashboardLoadedMsg{err: errors.New("storage unavailable")})
+	got := updated.(Model)
+	if got.refreshing {
+		t.Fatal("failed reload should clear refreshing state")
+	}
+	if got.selected != 1 {
+		t.Fatalf("selected after failed reload = %d, want 1", got.selected)
+	}
+	if got.mode != DetailModeTimeline {
+		t.Fatalf("mode after failed reload = %v, want timeline", got.mode)
+	}
+	if len(got.dashboard.Projects) != 2 || got.dashboard.Projects[got.selected].Key != "second" {
+		t.Fatalf("failed reload should keep existing dashboard and selection, got %+v", got.dashboard.Projects)
 	}
 }
 

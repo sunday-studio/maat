@@ -70,6 +70,7 @@ type Model struct {
 	dashboard  Dashboard
 	err        error
 	refreshErr error
+	refreshing bool
 	width      int
 	selected   int
 	mode       DetailMode
@@ -158,6 +159,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = nextDetailMode(m.mode)
 		case "left", "h":
 			m.mode = previousDetailMode(m.mode)
+		case "r":
+			return m.startDashboardReload(false)
 		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -165,7 +168,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.storage == "" {
 			return m, nil
 		}
-		return m, tea.Batch(m.loadDashboardCmd(), refreshTickCmd())
+		return m.startDashboardReload(true)
 	case dashboardLoadedMsg:
 		m = m.withLoadedDashboard(msg)
 	}
@@ -177,6 +180,10 @@ func (m Model) View() string {
 		return errorStyle.Render(fmt.Sprintf("Maat TUI failed: %v", m.err)) + "\n\n" + mutedStyle.Render("Press q to quit.") + "\n"
 	}
 	view := RenderDashboardWithSelectionAndMode(m.dashboard, m.selected, m.mode)
+	if m.refreshing {
+		view += mutedStyle.Render("Refreshing...")
+		view += "\n"
+	}
 	if m.refreshErr != nil {
 		view += mutedStyle.Render(fmt.Sprintf("Auto-refresh warning: %v", m.refreshErr))
 		view += "\n"
@@ -201,7 +208,29 @@ func (m Model) loadDashboardCmd() tea.Cmd {
 	}
 }
 
+func (m Model) startDashboardReload(includeNextTick bool) (Model, tea.Cmd) {
+	if m.storage == "" {
+		if includeNextTick {
+			return m, refreshTickCmd()
+		}
+		return m, nil
+	}
+	if m.refreshing {
+		if includeNextTick {
+			return m, refreshTickCmd()
+		}
+		return m, nil
+	}
+	m.refreshing = true
+	cmd := m.loadDashboardCmd()
+	if includeNextTick {
+		cmd = tea.Batch(cmd, refreshTickCmd())
+	}
+	return m, cmd
+}
+
 func (m Model) withLoadedDashboard(msg dashboardLoadedMsg) Model {
+	m.refreshing = false
 	if msg.err != nil {
 		m.refreshErr = msg.err
 		return m
@@ -352,7 +381,7 @@ func RenderDashboardWithSelectionAndMode(dashboard Dashboard, selected int, mode
 		b.WriteString(RenderProjectDetail(project))
 	}
 	b.WriteString("\n\n")
-	b.WriteString(mutedStyle.Render("Use up/down or k/j to select, tab/right to switch project/tickets/timeline, left to go back, q to quit."))
+	b.WriteString(mutedStyle.Render("Use up/down or k/j to select, tab/right to switch project/tickets/timeline, left to go back, r to reload, q to quit."))
 	b.WriteString("\n")
 	return b.String()
 }
