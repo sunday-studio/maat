@@ -59,28 +59,8 @@ func IsGitRepository(ctx context.Context, store string) (bool, error) {
 	return GitSync{Store: store}.IsRepository(ctx)
 }
 
-func CurrentGitBranch(ctx context.Context, store string) (string, error) {
-	return GitSync{Store: store}.CurrentBranch(ctx)
-}
-
 func GitRemoteURL(ctx context.Context, store string) (string, error) {
 	return GitSync{Store: store}.RemoteURL(ctx)
-}
-
-func GitDirtyStatus(ctx context.Context, store string) ([]GitStatusEntry, error) {
-	return GitSync{Store: store}.DirtyStatus(ctx)
-}
-
-func GitPullRebase(ctx context.Context, store string) error {
-	return GitSync{Store: store}.PullRebase(ctx)
-}
-
-func GitCommit(ctx context.Context, store, message string, pathspecs ...string) error {
-	return GitSync{Store: store}.Commit(ctx, message, pathspecs...)
-}
-
-func GitPush(ctx context.Context, store, remote, branch string) error {
-	return GitSync{Store: store}.Push(ctx, remote, branch)
 }
 
 func (sync GitSync) IsRepository(ctx context.Context) (bool, error) {

@@ -5,7 +5,7 @@
 | ID | maat |
 | Status | done |
 | Owner | agents |
-| Updated | 2026-05-25 |
+| Updated | 2026-05-26 |
 | Tags | #agent-run #git-native #product |
 
 ## Current
@@ -15,6 +15,8 @@ Maat is being established as a Git-native Markdown project management system for
 The system is intentionally file-first: agents should be able to clone the repo, update Markdown, create events, and commit without needing a separate authoritative database or hosted app.
 
 The implementation now has a usable read CLI, validation, SQLite-backed search/indexing, target object parsing, write-path core operations, Git sync primitives, migration planning, a first Bubble Tea dashboard, and local install documentation.
+
+The latest cleanup removed stale public helper code that was no longer called by the CLI or internal workflows.
 
 ## Goals
 
@@ -168,6 +170,20 @@ The implementation now has a usable read CLI, validation, SQLite-backed search/i
 - [x] T-004: Add build and release setup.
 - [x] T-005: Rewrite README as a simple current product guide.
 - [x] T-006: Integrate and verify this packaging worker round.
+
+### G-010: Keep implementation surface tidy
+
+| Field | Value |
+|---|---|
+| Status | done |
+| Updated | 2026-05-26 |
+| Tags | #cleanup #go |
+
+#### Tasks
+
+- [x] T-001: Remove unused Git wrapper helpers superseded by `GitSync` methods.
+- [x] T-002: Remove the stale project ID prefix from generated ID validation.
+- [x] T-003: Re-run tests and vet after cleanup.
 
 ## Blockers
 

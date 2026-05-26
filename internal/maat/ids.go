@@ -12,10 +12,9 @@ import (
 type IDPrefix string
 
 const (
-	ProjectIDPrefix IDPrefix = "P"
-	GoalIDPrefix    IDPrefix = "G"
-	TicketIDPrefix  IDPrefix = "T"
-	EventIDPrefix   IDPrefix = "E"
+	GoalIDPrefix   IDPrefix = "G"
+	TicketIDPrefix IDPrefix = "T"
+	EventIDPrefix  IDPrefix = "E"
 )
 
 func NewID(prefix IDPrefix, at time.Time) (string, error) {
@@ -76,7 +75,7 @@ func NormalizeIDPart(value string) string {
 
 func validateIDPrefix(prefix IDPrefix) error {
 	switch prefix {
-	case ProjectIDPrefix, GoalIDPrefix, TicketIDPrefix, EventIDPrefix:
+	case GoalIDPrefix, TicketIDPrefix, EventIDPrefix:
 		return nil
 	default:
 		return fmt.Errorf("unknown id prefix %q", prefix)
