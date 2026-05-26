@@ -52,6 +52,8 @@ Keep the product repo clean. Do not commit local Maat state to this repository.
 
 For project-management actions, update the configured external Maat storage repo. For product changes here, update code or docs, run relevant checks, commit, and push.
 
+When you finish a change, always commit it before handing the work back unless the user explicitly asks you not to commit.
+
 ## Before You Change Anything
 
 1. Pull or inspect the latest repository state.
