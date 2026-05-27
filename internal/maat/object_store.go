@@ -25,6 +25,7 @@ type ObjectProject struct {
 	Goals       []ObjectGoal      `json:"goals,omitempty"`
 	Tickets     []ObjectTicket    `json:"tickets,omitempty"`
 	Events      []ObjectEvent     `json:"events,omitempty"`
+	Catalog     *Catalog          `json:"catalog,omitempty"`
 }
 
 type ObjectGoal struct {
@@ -128,10 +129,17 @@ func LoadObjectProject(store, projectKey string) (ObjectProject, error) {
 	if err != nil {
 		return ObjectProject{}, err
 	}
+	catalog, err := LoadProjectCatalog(store, projectKey)
+	if err != nil {
+		return ObjectProject{}, err
+	}
 
 	project.Goals = goals
 	project.Tickets = tickets
 	project.Events = events
+	if !catalog.Empty() {
+		project.Catalog = &catalog
+	}
 	return project, nil
 }
 

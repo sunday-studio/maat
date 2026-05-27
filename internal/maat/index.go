@@ -82,6 +82,16 @@ func documentType(store, path string) string {
 		return "ticket"
 	case isTargetEventFile(parts):
 		return "event"
+	case isTargetCatalogObjectFile(parts, "apps"):
+		return "catalog-app"
+	case isTargetCatalogObjectFile(parts, "patterns"):
+		return "catalog-pattern"
+	case isTargetCatalogObjectFile(parts, "decisions"):
+		return "catalog-decision"
+	case isTargetCatalogObjectFile(parts, "opportunities"):
+		return "catalog-opportunity"
+	case isTargetCatalogEventFile(parts):
+		return "catalog-event"
 	case isTargetObjectFile(parts, "decisions"):
 		return "decision"
 	case isTargetObjectFile(parts, "reports"):
@@ -116,6 +126,22 @@ func isTargetEventFile(parts []string) bool {
 	return len(parts) >= 6 &&
 		parts[0] == "projects" &&
 		parts[2] == "events" &&
+		strings.EqualFold(filepath.Ext(parts[len(parts)-1]), ".md")
+}
+
+func isTargetCatalogObjectFile(parts []string, dir string) bool {
+	return len(parts) == 5 &&
+		parts[0] == "projects" &&
+		parts[2] == "catalog" &&
+		parts[3] == dir &&
+		strings.EqualFold(filepath.Ext(parts[4]), ".md")
+}
+
+func isTargetCatalogEventFile(parts []string) bool {
+	return len(parts) >= 7 &&
+		parts[0] == "projects" &&
+		parts[2] == "catalog" &&
+		parts[3] == "events" &&
 		strings.EqualFold(filepath.Ext(parts[len(parts)-1]), ".md")
 }
 

@@ -162,6 +162,53 @@ func TestSQLiteIndexTypesTargetLayoutObjects(t *testing.T) {
 	assertSearchResultType(t, info.Path, "github.com/sunday-studio/sample", "project", "projects/sample/project.md")
 }
 
+func TestSQLiteIndexTypesCatalogObjects(t *testing.T) {
+	root := writeSQLiteTargetLayoutFixture(t)
+	mustWrite(t, filepath.Join(root, "projects", "sample", "catalog", "apps", "lazygit.md"), `# Catalog App: lazygit
+
+| Field | Value |
+|---|---|
+| App ID | lazygit |
+| Slug | lazygit |
+| Language | Go |
+
+## Summary
+
+Keyboard-first terminal git dashboard.
+`)
+	mustWrite(t, filepath.Join(root, "projects", "sample", "catalog", "patterns", "focused-detail-pane.md"), `# Catalog Pattern: Focused Detail Pane
+
+| Field | Value |
+|---|---|
+| Pattern ID | focused-detail-pane |
+| Related Tickets | T-20260527-104741-731b |
+
+## Problem
+
+Ticket detail pane context should remain readable while scanning the board.
+`)
+	mustWrite(t, filepath.Join(root, "projects", "sample", "catalog", "events", "2026", "05", "E-catalog-review.md"), `# Event: catalog.reviewed
+
+## Summary
+
+Reviewed terminal catalog observations.
+`)
+
+	info, err := RebuildSQLiteIndexWithOptions(SQLiteIndexOptions{
+		Store:      root,
+		DisableFTS: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Documents != 7 {
+		t.Fatalf("expected seven indexed documents, got %d", info.Documents)
+	}
+	assertSearchResultType(t, info.Path, "keyboard-first terminal git", "catalog-app", "projects/sample/catalog/apps/lazygit.md")
+	assertSearchResultType(t, info.Path, "ticket detail pane", "catalog-pattern", "projects/sample/catalog/patterns/focused-detail-pane.md")
+	assertSearchResultType(t, info.Path, "catalog observations", "catalog-event", "projects/sample/catalog/events/2026/05/E-catalog-review.md")
+}
+
 func TestOpenSQLiteIndexDetectsFallbackMetadata(t *testing.T) {
 	root := writeSQLiteIndexFixture(t)
 	path := filepath.Join(root, ".maat", "fallback.sqlite")

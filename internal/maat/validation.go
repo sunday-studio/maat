@@ -38,11 +38,16 @@ type validatedMarkdownObject struct {
 }
 
 type objectProjectValidation struct {
-	key       string
-	path      string
-	goalIDs   map[string]string
-	ticketIDs map[string]string
-	eventIDs  map[string]string
+	key             string
+	path            string
+	goalIDs         map[string]string
+	ticketIDs       map[string]string
+	eventIDs        map[string]string
+	catalogIDs      map[string]string
+	catalogSlugs    map[string]string
+	catalogAppSlugs map[string]string
+	catalogPatterns map[string]string
+	catalogEventIDs map[string]string
 }
 
 // ValidateStore checks project directories in the object-per-file layout.
@@ -71,10 +76,15 @@ func validateObjectProjectDirectories(store string, report *ValidationReport) er
 			continue
 		}
 		state := objectProjectValidation{
-			key:       entry.Name(),
-			goalIDs:   map[string]string{},
-			ticketIDs: map[string]string{},
-			eventIDs:  map[string]string{},
+			key:             entry.Name(),
+			goalIDs:         map[string]string{},
+			ticketIDs:       map[string]string{},
+			eventIDs:        map[string]string{},
+			catalogIDs:      map[string]string{},
+			catalogSlugs:    map[string]string{},
+			catalogAppSlugs: map[string]string{},
+			catalogPatterns: map[string]string{},
+			catalogEventIDs: map[string]string{},
 		}
 		projectPath := filepath.Join(projectsDir, entry.Name(), "project.md")
 		state.path = relPath(store, projectPath)
@@ -92,6 +102,9 @@ func validateObjectProjectDirectories(store string, report *ValidationReport) er
 			return err
 		}
 		if err := validateObjectTicketFiles(store, entry.Name(), &state, report); err != nil {
+			return err
+		}
+		if err := validateObjectCatalogFiles(store, entry.Name(), &state, report); err != nil {
 			return err
 		}
 		if err := validateObjectEventFiles(store, entry.Name(), &state, report); err != nil {

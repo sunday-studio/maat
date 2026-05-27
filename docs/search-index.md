@@ -44,6 +44,7 @@ Search documents include:
 - goal outcomes
 - ticket title, description, acceptance criteria, and status
 - event summaries and evidence
+- terminal app catalog apps, patterns, decisions, opportunities, and review events
 - linked repo metadata
 
 ## Cache Files

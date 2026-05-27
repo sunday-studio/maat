@@ -99,6 +99,8 @@ func run(args []string) error {
 		return nil
 	case "project":
 		return projectCommand(args[1:])
+	case "catalog":
+		return catalogCommand(args[1:])
 	case "goal":
 		return goalCommand(args[1:])
 	case "ticket":
@@ -152,6 +154,8 @@ Common:
   maat projects [--storage <path>] [--json]
   maat search <query> [--storage <path>] [--json]
   maat sync [--storage <path>] [--message <msg>] [--push] [--status] [--json]
+  maat catalog list [apps|patterns|decisions|opportunities] [--project <project-key>] [--storage <path>] [--json]
+  maat catalog show <id-or-slug> [--project <project-key>] [--storage <path>] [--json]
 
 Projects:
   maat project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]
@@ -1500,6 +1504,289 @@ func printObjectProject(project maat.ObjectProject) {
 			fmt.Printf("- %s [%s] %s (%s)\n", ticket.ID, ticket.Status, ticket.Title, goal)
 		}
 	}
+}
+
+func catalogCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: maat catalog <list|show>")
+	}
+	switch args[0] {
+	case "list":
+		return catalogListCommand(args[1:])
+	case "show":
+		return catalogShowCommand(args[1:])
+	default:
+		return fmt.Errorf("unknown catalog command %q", args[0])
+	}
+}
+
+func catalogListCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	store, rest, err := loadStoreAndRestForRead(filtered)
+	if err != nil {
+		return err
+	}
+	projectKey, rest, err := consumeFlagValue(rest, "--project", false)
+	if err != nil {
+		return err
+	}
+	kind := ""
+	if len(rest) > 1 {
+		return errors.New("usage: maat catalog list [apps|patterns|decisions|opportunities] [--project <project-key>] [--storage <path>] [--json]")
+	}
+	if len(rest) == 1 {
+		kind, err = normalizeCatalogKind(rest[0])
+		if err != nil {
+			return err
+		}
+	}
+	projectKey = resolveCatalogProjectKey(store, projectKey)
+	catalog, err := maat.LoadCatalog(store, projectKey)
+	if err != nil {
+		return err
+	}
+	if agentUse {
+		return agentUpdate("catalog.ready", "ok", "catalog loaded", map[string]any{
+			"kind":    kind,
+			"catalog": catalog,
+		})
+	}
+	if jsonOut {
+		if kind == "" {
+			return writeJSON(catalog)
+		}
+		return writeJSON(catalogCollection(catalog, kind))
+	}
+	printCatalogList(catalog, kind)
+	return nil
+}
+
+func catalogShowCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	store, rest, err := loadStoreAndRestForRead(filtered)
+	if err != nil {
+		return err
+	}
+	projectKey, rest, err := consumeFlagValue(rest, "--project", false)
+	if err != nil {
+		return err
+	}
+	if len(rest) != 1 {
+		return errors.New("usage: maat catalog show <id-or-slug> [--project <project-key>] [--storage <path>] [--json]")
+	}
+	projectKey = resolveCatalogProjectKey(store, projectKey)
+	object, err := maat.FindCatalogObject(store, projectKey, rest[0])
+	if err != nil {
+		return err
+	}
+	if agentUse {
+		return agentUpdate("catalog.object", "ok", "catalog object loaded", object)
+	}
+	if jsonOut {
+		return writeJSON(object)
+	}
+	printCatalogObject(object)
+	return nil
+}
+
+func resolveCatalogProjectKey(store, projectKey string) string {
+	if strings.TrimSpace(projectKey) != "" {
+		return strings.TrimSpace(projectKey)
+	}
+	if project, err := inferProjectFromWorkingDirectory(store); err == nil {
+		return project.Key
+	}
+	return ""
+}
+
+func normalizeCatalogKind(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "app", "apps":
+		return "apps", nil
+	case "pattern", "patterns":
+		return "patterns", nil
+	case "decision", "decisions":
+		return "decisions", nil
+	case "opportunity", "opportunities":
+		return "opportunities", nil
+	default:
+		return "", fmt.Errorf("unknown catalog kind %q; use apps, patterns, decisions, or opportunities", value)
+	}
+}
+
+func catalogCollection(catalog maat.Catalog, kind string) any {
+	switch kind {
+	case "apps":
+		return catalog.Apps
+	case "patterns":
+		return catalog.Patterns
+	case "decisions":
+		return catalog.Decisions
+	case "opportunities":
+		return catalog.Opportunities
+	default:
+		return catalog
+	}
+}
+
+func printCatalogList(catalog maat.Catalog, kind string) {
+	if kind == "" {
+		fmt.Printf("Catalog: %d apps, %d patterns, %d decisions, %d opportunities\n", len(catalog.Apps), len(catalog.Patterns), len(catalog.Decisions), len(catalog.Opportunities))
+		fmt.Println()
+		printCatalogList(catalog, "apps")
+		fmt.Println()
+		printCatalogList(catalog, "patterns")
+		fmt.Println()
+		printCatalogList(catalog, "decisions")
+		fmt.Println()
+		printCatalogList(catalog, "opportunities")
+		return
+	}
+	switch kind {
+	case "apps":
+		fmt.Println("Apps")
+		if len(catalog.Apps) == 0 {
+			fmt.Println("No catalog apps found.")
+			return
+		}
+		fmt.Printf("%-18s %-32s %-10s %-10s %-14s %-12s %s\n", "Slug", "Name", "Language", "License", "Category", "Reviewed", "Summary")
+		for _, app := range catalog.Apps {
+			fmt.Printf("%-18s %-32s %-10s %-10s %-14s %-12s %s\n", app.Slug, truncate(app.Name, 32), app.Language, app.License, app.Category, app.LastReviewed, app.Summary)
+		}
+	case "patterns":
+		fmt.Println("Patterns")
+		if len(catalog.Patterns) == 0 {
+			fmt.Println("No catalog patterns found.")
+			return
+		}
+		fmt.Printf("%-24s %-18s %-28s %s\n", "Slug", "Category", "Observed In", "Related Work")
+		for _, pattern := range catalog.Patterns {
+			fmt.Printf("%-24s %-18s %-28s %s\n", pattern.Slug, pattern.Category, truncate(strings.Join(pattern.ObservedIn, ", "), 28), strings.Join(append(pattern.RelatedGoals, pattern.RelatedTickets...), ", "))
+		}
+	case "decisions":
+		fmt.Println("Decisions")
+		if len(catalog.Decisions) == 0 {
+			fmt.Println("No catalog decisions found.")
+			return
+		}
+		fmt.Printf("%-24s %-14s %-24s %s\n", "ID", "Decision", "Pattern", "Title")
+		for _, decision := range catalog.Decisions {
+			fmt.Printf("%-24s %-14s %-24s %s\n", decision.ID, decision.Decision, decision.Pattern, decision.Title)
+		}
+	case "opportunities":
+		fmt.Println("Opportunities")
+		if len(catalog.Opportunities) == 0 {
+			fmt.Println("No catalog opportunities found.")
+			return
+		}
+		fmt.Printf("%-24s %-12s %-18s %-20s %s\n", "ID", "Status", "Area", "Suggested Ticket", "Title")
+		for _, opportunity := range catalog.Opportunities {
+			fmt.Printf("%-24s %-12s %-18s %-20s %s\n", opportunity.ID, opportunity.Status, opportunity.Area, opportunity.SuggestedTicket, opportunity.Title)
+		}
+	}
+}
+
+func printCatalogObject(object any) {
+	switch item := object.(type) {
+	case maat.CatalogApp:
+		fmt.Printf("# %s\n\n", item.Name)
+		printField("Kind", item.Kind)
+		printField("ID", item.ID)
+		printField("Slug", item.Slug)
+		printField("Source", item.SourceURL)
+		printField("Website", item.WebsiteURL)
+		printField("Stars", item.Stars)
+		printField("Language", item.Language)
+		printField("License", item.License)
+		printField("Category", item.Category)
+		printField("Reviewed", item.LastReviewed)
+		printStringSliceField("Tags", item.Tags)
+		printStringSliceField("Patterns", item.Patterns)
+		printStringSliceField("Goals", item.RelatedGoals)
+		printStringSliceField("Tickets", item.RelatedTickets)
+		printField("Path", item.Path)
+		printSection("Summary", item.Summary)
+		printSection("Notes", item.Notes)
+	case maat.CatalogPattern:
+		fmt.Printf("# %s\n\n", item.Title)
+		printField("Kind", item.Kind)
+		printField("ID", item.ID)
+		printField("Slug", item.Slug)
+		printField("Category", item.Category)
+		printStringSliceField("Observed", item.ObservedIn)
+		printStringSliceField("Goals", item.RelatedGoals)
+		printStringSliceField("Tickets", item.RelatedTickets)
+		printField("Path", item.Path)
+		printSection("Problem", item.Problem)
+		printSection("Maat Use", item.MaatUse)
+		printSection("Implementation Notes", item.ImplementationNotes)
+	case maat.CatalogDecision:
+		fmt.Printf("# %s\n\n", item.Title)
+		printField("Kind", item.Kind)
+		printField("ID", item.ID)
+		printField("Slug", item.Slug)
+		printField("Decision", item.Decision)
+		printField("Pattern", item.Pattern)
+		printField("App", item.SourceApp)
+		printField("Date", item.Date)
+		printStringSliceField("Goals", item.RelatedGoals)
+		printStringSliceField("Tickets", item.RelatedTickets)
+		printField("Path", item.Path)
+		printSection("Rationale", item.Rationale)
+		printBullets("Evidence", item.Evidence)
+	case maat.CatalogOpportunity:
+		fmt.Printf("# %s\n\n", item.Title)
+		printField("Kind", item.Kind)
+		printField("ID", item.ID)
+		printField("Slug", item.Slug)
+		printField("Status", item.Status)
+		printField("Pattern", item.SourcePattern)
+		printField("Area", item.Area)
+		printField("Effort", item.Effort)
+		printField("Risk", item.Risk)
+		printField("Goal", item.SuggestedGoal)
+		printField("Ticket", item.SuggestedTicket)
+		printField("Path", item.Path)
+		printSection("Summary", item.Summary)
+	}
+}
+
+func printStringSliceField(label string, values []string) {
+	if len(values) == 0 {
+		return
+	}
+	printField(label, strings.Join(values, ", "))
+}
+
+func printSection(title, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+	fmt.Printf("\n%s:\n%s\n", title, value)
+}
+
+func printBullets(title string, values []string) {
+	if len(values) == 0 {
+		return
+	}
+	fmt.Printf("\n%s:\n", title)
+	for _, value := range values {
+		fmt.Printf("- %s\n", value)
+	}
+}
+
+func truncate(value string, width int) string {
+	if width <= 0 || len(value) <= width {
+		return value
+	}
+	if width <= 1 {
+		return value[:width]
+	}
+	if width <= 3 {
+		return value[:width]
+	}
+	return value[:width-3] + "..."
 }
 
 func projectLinkCommand(args []string) error {
