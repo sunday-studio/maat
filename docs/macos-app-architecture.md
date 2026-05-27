@@ -1,6 +1,6 @@
 # macOS App Architecture
 
-This document sketches a Torii-based macOS app for Maat.
+This document sketches a Tauri-based macOS app for Maat.
 
 The app should be a desktop interface over the existing `maat` CLI. It should not
 reimplement Maat storage, validation, indexing, syncing, or update behavior.
@@ -27,7 +27,7 @@ the CLI remains the product API.
 
 ```mermaid
 flowchart TD
-    DMG[Downloaded macOS app] --> APP[Torii macOS app]
+    DMG[Downloaded macOS app] --> APP[Tauri macOS app]
     APP --> SETUP[First-run setup]
     SETUP --> CLIMGR[CLI manager]
     CLIMGR --> CLI[maat CLI]
@@ -47,7 +47,7 @@ The desktop app should have thin components around the CLI:
 
 | Component | Responsibility |
 | --- | --- |
-| Torii shell | Native macOS window, menu bar actions, app lifecycle, and update surface. |
+| Tauri shell | Native macOS window, menu bar actions, app lifecycle, and update surface. |
 | Frontend UI | Projects, goals, tickets, search, activity, catalog, and setup screens. |
 | Command runner | Spawns `maat` commands, captures stdout/stderr, parses JSON, maps errors to UI states. |
 | CLI manager | Finds, installs, verifies, updates, and records the `maat` binary path. |
@@ -92,7 +92,7 @@ update`.
 ```mermaid
 sequenceDiagram
     participant User
-    participant App as Torii app
+    participant App as Tauri app
     participant Manager as CLI manager
     participant CLI as maat CLI
     participant Store as Storage Git repo
@@ -129,7 +129,7 @@ or enabling auto-push should require an explicit user choice.
 
 ```mermaid
 sequenceDiagram
-    participant App as Torii app
+    participant App as Tauri app
     participant Runner as Command runner
     participant CLI as maat CLI
     participant Store as Markdown store
@@ -166,7 +166,7 @@ maat sync --status --json
 ```mermaid
 sequenceDiagram
     participant User
-    participant App as Torii app
+    participant App as Tauri app
     participant Runner as Command runner
     participant CLI as maat CLI
     participant Store as Markdown store
@@ -219,7 +219,7 @@ CLI it is using.
 
 ```mermaid
 flowchart LR
-    APP[Torii app update] --> BUNDLE[New bundled maat binary]
+    APP[Tauri app update] --> BUNDLE[New bundled maat binary]
     BUNDLE --> INSTALL[Install into app support]
     INSTALL --> VERSION[maat version --json]
     VERSION --> READY[App ready]
@@ -244,7 +244,7 @@ allow the user to run `maat update --json` against GitHub Releases.
 
 ## Implementation Sequence
 
-1. Build a Torii app shell with a command runner that can call a configured
+1. Build a Tauri app shell with a command runner that can call a configured
    `maat` binary.
 2. Add CLI manager support for bundled CLI install, version checks, and path
    recording.
