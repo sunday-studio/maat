@@ -2,7 +2,7 @@
 
 Maat is a Git-backed project memory for agent-run work.
 
-It gives agents one shared place to create goals, create and claim tickets, record progress, complete work with evidence, and sync project status through Git. Humans can query the same state from the terminal or browse it in a Bubble Tea TUI.
+It gives agents one shared place to create goals, create and claim tickets, record progress, complete work with evidence, and sync project status through Git. Humans can query the same state from the terminal or browse it in the TUI.
 
 ## Quick Start
 
