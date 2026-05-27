@@ -657,9 +657,6 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 			catalog = mergeCatalogs(catalog, catalogFromObject(*project.Catalog))
 		}
 	}
-	if catalogEmpty(catalog) {
-		catalog = DefaultTerminalAppsCatalog()
-	}
 	return Dashboard{Projects: rows, Summary: summary, Events: sortedEventRows(events), Catalog: catalog}
 }
 
@@ -1009,181 +1006,6 @@ type CatalogSelections struct {
 	Opportunity int
 }
 
-func DefaultTerminalAppsCatalog() Catalog {
-	return Catalog{
-		Apps: []CatalogEntry{
-			{
-				ID:       "app:lazygit",
-				Kind:     "app",
-				Title:    "lazygit",
-				Summary:  "Simple terminal UI for git commands.",
-				Category: "git",
-				Status:   "review",
-				Metadata: []string{"Go", "MIT", "stars unknown locally"},
-				Links:    []string{"github.com/jesseduffield/lazygit"},
-				Details: []string{
-					"Study dashboard density, keyboard-first navigation, and focused object inspection.",
-					"Maat relevance: project boards should keep selected work and detail context visible.",
-				},
-			},
-			{
-				ID:       "app:btop",
-				Kind:     "app",
-				Title:    "btop",
-				Summary:  "Terminal resource monitor with strong visual hierarchy.",
-				Category: "monitoring",
-				Status:   "review",
-				Metadata: []string{"C++", "Apache-2.0", "stars unknown locally"},
-				Links:    []string{"github.com/aristocratos/btop"},
-				Details: []string{
-					"Study compact summaries, stable regions, and readable state without opening files.",
-					"Maat relevance: status and ownership must remain legible at a glance.",
-				},
-			},
-			{
-				ID:       "app:gh-dash",
-				Kind:     "app",
-				Title:    "gh-dash",
-				Summary:  "GitHub dashboard for pull requests and issues.",
-				Category: "dashboard",
-				Status:   "review",
-				Metadata: []string{"Go", "license unknown", "stars unknown locally"},
-				Links:    []string{"github.com/dlvhdr/gh-dash"},
-				Details: []string{
-					"Study grouped work queues, filters, and detail panes for work review.",
-					"Maat relevance: ticket lists should bridge scanning and verification.",
-				},
-			},
-			{
-				ID:       "app:superfile",
-				Kind:     "app",
-				Title:    "superfile",
-				Summary:  "Modern terminal file manager with pane-based navigation.",
-				Category: "files",
-				Status:   "review",
-				Metadata: []string{"Go", "MIT", "stars unknown locally"},
-				Links:    []string{"github.com/yorukot/superfile"},
-				Details: []string{
-					"Study pane switching, selection markers, and compact detail affordances.",
-					"Maat relevance: catalog and project panes need predictable keyboard movement.",
-				},
-			},
-		},
-		Patterns: []CatalogEntry{
-			{
-				ID:       "pattern:focused-detail-pane",
-				Kind:     "pattern",
-				Title:    "Focused detail pane",
-				Summary:  "List views need adjacent detail to keep object context visible.",
-				Category: "inspection",
-				Status:   "adopt",
-				Metadata: []string{"observed in lazygit, gh-dash, superfile"},
-				Details: []string{
-					"Problem: list rows hide description, metadata, and recent activity.",
-					"Maat use: selected ticket detail pane with description, acceptance, status, owner, goal, and events.",
-					"Related ticket: T-20260527-104752-bb33.",
-				},
-			},
-			{
-				ID:       "pattern:keyboard-model",
-				Kind:     "pattern",
-				Title:    "Keyboard model",
-				Summary:  "Fast terminal apps make movement and inspection predictable.",
-				Category: "navigation",
-				Status:   "adopt",
-				Metadata: []string{"up/down, k/j, tab, enter, backspace"},
-				Details: []string{
-					"Problem: command-heavy navigation slows repeated scanning.",
-					"Maat use: project list -> board -> ticket detail, plus catalog pane navigation.",
-					"Related ticket: T-20260527-104802-f29d.",
-				},
-			},
-			{
-				ID:       "pattern:background-refresh",
-				Kind:     "pattern",
-				Title:    "Background refresh",
-				Summary:  "Long-running terminal sessions should show fresh state without losing context.",
-				Category: "refresh",
-				Status:   "adopt",
-				Metadata: []string{"manual r reload", "stable selected row"},
-				Details: []string{
-					"Problem: stale dashboards make agent handoffs harder to trust.",
-					"Maat use: refresh indicators, recoverable warnings, and selection preservation.",
-					"Related ticket: T-20260526-220322-65be.",
-				},
-			},
-			{
-				ID:       "pattern:empty-states",
-				Kind:     "pattern",
-				Title:    "Empty states",
-				Summary:  "Empty views should explain the next useful action.",
-				Category: "empty-state",
-				Status:   "adopt",
-				Metadata: []string{"no-color readable", "actionable copy"},
-				Details: []string{
-					"Problem: blank panes look broken and do not guide the user.",
-					"Maat use: filtered empty states, missing tickets, missing catalog rows, and storage errors all name next actions.",
-					"Related ticket: T-20260527-104802-f29d.",
-				},
-			},
-		},
-		Decisions: []CatalogEntry{
-			{
-				ID:       "decision:adopt-focused-detail-pane",
-				Kind:     "decision",
-				Title:    "Adopt focused detail panes",
-				Summary:  "Maat should keep selected ticket and catalog detail beside the list.",
-				Category: "inspection",
-				Status:   "adopt",
-				Metadata: []string{"pattern:focused-detail-pane", "2026-05-27"},
-				Details:  []string{"Rationale: the user wants to click into projects, scan boards, and read each item without opening Markdown files."},
-			},
-			{
-				ID:       "decision:adopt-keyboard-first-flow",
-				Kind:     "decision",
-				Title:    "Adopt keyboard-first flow",
-				Summary:  "Keep project and catalog movement available through predictable keys.",
-				Category: "navigation",
-				Status:   "adopt",
-				Metadata: []string{"pattern:keyboard-model", "2026-05-27"},
-				Details:  []string{"Rationale: terminal work should be fast enough for daily review and agent verification."},
-			},
-		},
-		Opportunities: []CatalogEntry{
-			{
-				ID:       "opportunity:catalog-mode",
-				Kind:     "opportunity",
-				Title:    "Catalog mode",
-				Summary:  "Expose terminal app examples and reusable patterns inside the TUI.",
-				Category: "catalog",
-				Status:   "in progress",
-				Metadata: []string{"T-20260527-104741-731b", "medium effort"},
-				Details:  []string{"Bridge IA observations into project work without making the user leave the dashboard."},
-			},
-			{
-				ID:       "opportunity:board-detail-flow",
-				Kind:     "opportunity",
-				Title:    "Board detail flow",
-				Summary:  "Make project list, board, and ticket detail the primary human path.",
-				Category: "project-board",
-				Status:   "in progress",
-				Metadata: []string{"T-20260527-104752-bb33", "low effort"},
-				Details:  []string{"Keep the first screen as projects, then use enter and backspace as terminal equivalents of click in and back out."},
-			},
-			{
-				ID:       "opportunity:no-color-verification",
-				Kind:     "opportunity",
-				Title:    "No-color verification",
-				Summary:  "Prove selected rows, statuses, and empty states are readable without color.",
-				Category: "accessibility",
-				Status:   "in progress",
-				Metadata: []string{"T-20260527-104802-f29d", "low effort"},
-				Details:  []string{"Selection markers, status labels, and empty-state copy must carry meaning without relying on color."},
-			},
-		},
-	}
-}
-
 func catalogFromObject(catalog maat.Catalog) Catalog {
 	converted := Catalog{
 		Apps:          make([]CatalogEntry, 0, len(catalog.Apps)),
@@ -1266,13 +1088,6 @@ func mergeCatalogs(left Catalog, right Catalog) Catalog {
 	left.Decisions = append(left.Decisions, right.Decisions...)
 	left.Opportunities = append(left.Opportunities, right.Opportunities...)
 	return left
-}
-
-func catalogEmpty(catalog Catalog) bool {
-	return len(catalog.Apps) == 0 &&
-		len(catalog.Patterns) == 0 &&
-		len(catalog.Decisions) == 0 &&
-		len(catalog.Opportunities) == 0
 }
 
 func firstCatalogValue(values ...string) string {

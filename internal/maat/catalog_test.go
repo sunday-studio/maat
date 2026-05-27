@@ -20,7 +20,7 @@ func TestLoadProjectCatalogParsesMarkdownObjects(t *testing.T) {
 	if len(project.Catalog.Apps) != 4 {
 		t.Fatalf("expected 4 catalog apps, got %d", len(project.Catalog.Apps))
 	}
-	if project.Catalog.Apps[0].Slug != "btop" || project.Catalog.Apps[0].SourceURL == "" {
+	if project.Catalog.Apps[0].Slug != "files-app" || project.Catalog.Apps[0].SourceURL == "" {
 		t.Fatalf("unexpected first app: %#v", project.Catalog.Apps[0])
 	}
 	if len(project.Catalog.Patterns) != 4 {
@@ -38,7 +38,7 @@ func TestLoadProjectCatalogParsesMarkdownObjects(t *testing.T) {
 	if len(project.Catalog.Opportunities) != 1 || project.Catalog.Opportunities[0].Status != "ticketed" {
 		t.Fatalf("unexpected opportunities: %#v", project.Catalog.Opportunities)
 	}
-	if len(project.Catalog.Events) != 1 || project.Catalog.Events[0].ObjectID != "lazygit" {
+	if len(project.Catalog.Events) != 1 || project.Catalog.Events[0].ObjectID != "sample-app" {
 		t.Fatalf("unexpected catalog events: %#v", project.Catalog.Events)
 	}
 }
@@ -60,14 +60,14 @@ func TestValidateStorePassesCatalogFixture(t *testing.T) {
 func TestValidateStoreDetectsCatalogIssues(t *testing.T) {
 	root := t.TempDir()
 	writeObjectFixture(t, root)
-	writeMinimalCatalogApp(t, root, "sample-a31f", "lazygit", "CA-lazygit")
+	writeMinimalCatalogApp(t, root, "sample-a31f", "sample-app", "CA-sample-app")
 	writeFile(t, filepath.Join(root, "projects", "sample-a31f", "catalog", "apps", "duplicate.md"), `# Catalog App: Duplicate
 
 | Field | Value |
 |---|---|
 | App ID | CA-duplicate |
 | Project | sample-a31f |
-| Slug | lazygit |
+| Slug | sample-app |
 | Name | Duplicate |
 | Summary | Duplicate slug for validation coverage. |
 | Source URL | not-a-url |
@@ -142,22 +142,22 @@ This should fail validation.
 
 func writeCatalogFixture(t *testing.T, root, projectKey string) {
 	t.Helper()
-	writeMinimalCatalogApp(t, root, projectKey, "lazygit", "CA-20260527-lazygit")
-	writeMinimalCatalogApp(t, root, projectKey, "btop", "CA-20260527-btop")
-	writeMinimalCatalogApp(t, root, projectKey, "gh-dash", "CA-20260527-gh-dash")
-	writeMinimalCatalogApp(t, root, projectKey, "superfile", "CA-20260527-superfile")
-	writeCatalogPattern(t, root, projectKey, "focused-detail-pane", "Focused detail pane", "inspection/detail panes", []string{"lazygit", "gh-dash", "superfile"})
-	writeCatalogPattern(t, root, projectKey, "keyboard-model", "Keyboard model", "keyboard model", []string{"lazygit", "btop", "gh-dash", "superfile"})
-	writeCatalogPattern(t, root, projectKey, "background-refresh", "Background refresh", "background refresh", []string{"btop", "gh-dash"})
-	writeCatalogPattern(t, root, projectKey, "empty-states", "Empty states", "error and empty states", []string{"lazygit", "superfile"})
-	writeFile(t, filepath.Join(root, "projects", projectKey, "catalog", "decisions", "CD-20260527-focused-detail-pane.md"), `# Catalog Decision: Adopt Focused Detail Pane
+	writeMinimalCatalogApp(t, root, projectKey, "sample-app", "CA-20260527-sample-app")
+	writeMinimalCatalogApp(t, root, projectKey, "status-app", "CA-20260527-status-app")
+	writeMinimalCatalogApp(t, root, projectKey, "review-app", "CA-20260527-review-app")
+	writeMinimalCatalogApp(t, root, projectKey, "files-app", "CA-20260527-files-app")
+	writeCatalogPattern(t, root, projectKey, "detail-pane", "Focused detail pane", "inspection/detail panes", []string{"sample-app", "review-app", "files-app"})
+	writeCatalogPattern(t, root, projectKey, "keyboard-model", "Keyboard model", "keyboard model", []string{"sample-app", "status-app", "review-app", "files-app"})
+	writeCatalogPattern(t, root, projectKey, "background-refresh", "Background refresh", "background refresh", []string{"status-app", "review-app"})
+	writeCatalogPattern(t, root, projectKey, "empty-states", "Empty states", "error and empty states", []string{"sample-app", "files-app"})
+	writeFile(t, filepath.Join(root, "projects", projectKey, "catalog", "decisions", "CD-20260527-detail-pane.md"), `# Catalog Decision: Adopt Detail Pane
 
 | Field | Value |
 |---|---|
-| Decision ID | CD-20260527-focused-detail-pane |
+| Decision ID | CD-20260527-detail-pane |
 | Project | sample-a31f |
 | State | adopt |
-| Pattern | focused-detail-pane |
+| Pattern | detail-pane |
 | Date | 2026-05-27 |
 | Related Goal | G-20260525-190533-a7f3 |
 | Related Ticket | T-20260525-190700-b91c |
@@ -177,7 +177,7 @@ Focused detail keeps reading close to navigation.
 | Opportunity ID | CO-20260527-project-board-detail-flow |
 | Project | sample-a31f |
 | Status | ticketed |
-| Source Pattern | focused-detail-pane |
+| Source Pattern | detail-pane |
 | Area | tui |
 | Effort | medium |
 | Risk | low |
@@ -197,11 +197,11 @@ Make project list, board navigation, and item detail feel like one terminal work
 | Actor | codex |
 | Project | sample-a31f |
 | Type | catalog.app.reviewed |
-| Object | lazygit |
+| Object | sample-app |
 
 ## Summary
 
-Reviewed lazygit as a terminal app catalog seed.
+Reviewed sample-app as a terminal app catalog seed.
 
 ## Evidence
 

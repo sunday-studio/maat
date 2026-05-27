@@ -917,7 +917,7 @@ func TestCatalogListAndShowCommands(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Apps", "lazygit", "Go", "MIT", "git", "Keyboard-first Git UI"} {
+	for _, want := range []string{"Apps", "sample-app", "Go", "MIT", "sample", "Keyboard-first sample UI"} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected app list output to include %q, got %q", want, output)
 		}
@@ -927,17 +927,17 @@ func TestCatalogListAndShowCommands(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Patterns", "focused-detail-pane", "navigation", "lazygit", "T-20260527-104741-731b"} {
+	for _, want := range []string{"Patterns", "detail-pane", "navigation", "sample-app", "T-20260527-104741-731b"} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected pattern list output to include %q, got %q", want, output)
 		}
 	}
 
-	output, err = captureRun("catalog", "show", "lazygit", "--project", "sample", "--storage", store)
+	output, err = captureRun("catalog", "show", "sample-app", "--project", "sample", "--storage", store)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"# lazygit", "Source:", "Patterns:", "focused-detail-pane", "Summary:", "Keyboard-first Git UI"} {
+	for _, want := range []string{"# sample-app", "Source:", "Patterns:", "detail-pane", "Summary:", "Keyboard-first sample UI"} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected catalog show output to include %q, got %q", want, output)
 		}
@@ -956,10 +956,10 @@ func TestCatalogListAndShowJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &catalog); err != nil {
 		t.Fatal(err)
 	}
-	if len(catalog.Apps) != 1 || catalog.Apps[0].ID != "lazygit" || catalog.Apps[0].SourceURL == "" {
+	if len(catalog.Apps) != 1 || catalog.Apps[0].ID != "sample-app" || catalog.Apps[0].SourceURL == "" {
 		t.Fatalf("unexpected catalog apps json: %#v", catalog.Apps)
 	}
-	if len(catalog.Patterns) != 1 || catalog.Patterns[0].ID != "focused-detail-pane" || len(catalog.Patterns[0].RelatedTickets) != 1 {
+	if len(catalog.Patterns) != 1 || catalog.Patterns[0].ID != "detail-pane" || len(catalog.Patterns[0].RelatedTickets) != 1 {
 		t.Fatalf("unexpected catalog patterns json: %#v", catalog.Patterns)
 	}
 	if len(catalog.Decisions) != 1 || catalog.Decisions[0].Decision != "adopt" {
@@ -969,7 +969,7 @@ func TestCatalogListAndShowJSON(t *testing.T) {
 		t.Fatalf("unexpected catalog opportunities json: %#v", catalog.Opportunities)
 	}
 
-	output, err = captureRun("catalog", "show", "focused-detail-pane", "--project", "sample", "--storage", store, "--json")
+	output, err = captureRun("catalog", "show", "detail-pane", "--project", "sample", "--storage", store, "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -977,7 +977,7 @@ func TestCatalogListAndShowJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &pattern); err != nil {
 		t.Fatal(err)
 	}
-	if pattern.Kind != "pattern" || pattern.ID != "focused-detail-pane" || pattern.RelatedTickets[0] != "T-20260527-104741-731b" {
+	if pattern.Kind != "pattern" || pattern.ID != "detail-pane" || pattern.RelatedTickets[0] != "T-20260527-104741-731b" {
 		t.Fatalf("unexpected catalog pattern json: %#v", pattern)
 	}
 }
@@ -990,7 +990,7 @@ func TestCatalogSearchUsesMarkdownAndSQLite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertSearchResult(t, results, "catalog-pattern", "projects/sample/catalog/patterns/focused-detail-pane.md")
+	assertSearchResult(t, results, "catalog-pattern", "projects/sample/catalog/patterns/detail-pane.md")
 
 	output, err := captureRun("search", "ticket detail pane", "--storage", store, "--json")
 	if err != nil {
@@ -1000,7 +1000,7 @@ func TestCatalogSearchUsesMarkdownAndSQLite(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &sqliteResults); err != nil {
 		t.Fatal(err)
 	}
-	assertSearchResult(t, sqliteResults, "catalog-pattern", "projects/sample/catalog/patterns/focused-detail-pane.md")
+	assertSearchResult(t, sqliteResults, "catalog-pattern", "projects/sample/catalog/patterns/detail-pane.md")
 }
 
 func TestProjectLinkCommand(t *testing.T) {
@@ -2126,40 +2126,40 @@ func createCommandTicket(t *testing.T, store string) string {
 
 func writeCatalogCommandFixture(t *testing.T, store string) {
 	t.Helper()
-	writeCommandFile(t, filepath.Join(store, "projects", "sample", "catalog", "apps", "lazygit.md"), `# Catalog App: lazygit
+	writeCommandFile(t, filepath.Join(store, "projects", "sample", "catalog", "apps", "sample-app.md"), `# Catalog App: sample-app
 
 | Field | Value |
 |---|---|
-| App ID | lazygit |
-| Slug | lazygit |
-| Name | lazygit |
-| Source URL | https://github.com/jesseduffield/lazygit |
-| Website URL | https://github.com/jesseduffield/lazygit |
+| App ID | sample-app |
+| Slug | sample-app |
+| Name | sample-app |
+| Source URL | https://example.test/sample-app |
+| Website URL | https://example.test/sample-app |
 | Stars | 57.5K |
 | Language | Go |
 | License | MIT |
-| Category | git |
+| Category | sample |
 | Tags | dashboard keyboard-first |
 | Last Reviewed | 2026-05-27 |
-| Patterns | focused-detail-pane |
+| Patterns | detail-pane |
 | Related Tickets | T-20260527-104741-731b |
 
 ## Summary
 
-Keyboard-first Git UI with a compact project dashboard.
+Keyboard-first sample UI with a compact project dashboard.
 
 ## Notes
 
 Good reference for keeping command-heavy terminal views readable.
 `)
-	writeCommandFile(t, filepath.Join(store, "projects", "sample", "catalog", "patterns", "focused-detail-pane.md"), `# Catalog Pattern: Focused Detail Pane
+	writeCommandFile(t, filepath.Join(store, "projects", "sample", "catalog", "patterns", "detail-pane.md"), `# Catalog Pattern: Detail Pane
 
 | Field | Value |
 |---|---|
-| Pattern ID | focused-detail-pane |
-| Slug | focused-detail-pane |
+| Pattern ID | detail-pane |
+| Slug | detail-pane |
 | Category | navigation |
-| Observed In | lazygit, posting |
+| Observed In | sample-app, second-app |
 | Related Tickets | T-20260527-104741-731b |
 
 ## Problem
@@ -2170,14 +2170,14 @@ Ticket detail pane context disappears when a list-only view hides metadata and n
 
 Selected tickets should keep summary, status, owner, events, and acceptance criteria readable beside the board.
 `)
-	writeCommandFile(t, filepath.Join(store, "projects", "sample", "catalog", "decisions", "D-focused-detail-pane.md"), `# Catalog Decision: Adopt Focused Detail Pane
+	writeCommandFile(t, filepath.Join(store, "projects", "sample", "catalog", "decisions", "D-detail-pane.md"), `# Catalog Decision: Adopt Detail Pane
 
 | Field | Value |
 |---|---|
-| Decision ID | D-focused-detail-pane |
+| Decision ID | D-detail-pane |
 | Decision | adopt |
-| Pattern | focused-detail-pane |
-| Source App | lazygit |
+| Pattern | detail-pane |
+| Source App | sample-app |
 | Related Tickets | T-20260527-104741-731b |
 | Date | 2026-05-27 |
 
@@ -2187,14 +2187,14 @@ Maat ticket review needs readable context without leaving the board.
 
 ## Evidence
 
-- lazygit keeps related context visible while navigation stays fast.
+- sample-app keeps related context visible while navigation stays fast.
 `)
 	writeCommandFile(t, filepath.Join(store, "projects", "sample", "catalog", "opportunities", "O-ticket-detail-pane.md"), `# Catalog Opportunity: Ticket Detail Pane
 
 | Field | Value |
 |---|---|
 | Opportunity ID | O-ticket-detail-pane |
-| Source Pattern | focused-detail-pane |
+| Source Pattern | detail-pane |
 | Area | tui |
 | Effort | medium |
 | Risk | low |

@@ -534,10 +534,10 @@ func TestRenderDashboardCanShowCatalogMode(t *testing.T) {
 	got := RenderDashboardWithFiltersAndCatalogState(Dashboard{
 		Projects: []ProjectRow{{Key: "sample", DisplayName: "Sample"}},
 		Summary:  maat.StatusSummary{Projects: 1},
-		Catalog:  DefaultTerminalAppsCatalog(),
+		Catalog:  testCatalog(),
 	}, 0, DetailModeCatalog, 96, 0, false, DashboardFilters{}, false, CatalogModeApps, CatalogSelections{App: 0, Pattern: 0}, "", false)
 
-	for _, want := range []string{"Terminal Apps Catalog", "Apps (4)", "Patterns (4)", "> lazygit", "Focused detail pane", "enter inspect", "f filter", "tab/right for timeline/catalog"} {
+	for _, want := range []string{"Terminal Apps Catalog", "Apps (2)", "Patterns (2)", "> sample app", "Detail pane", "enter inspect", "f filter", "tab/right for timeline/catalog"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderDashboardWithFiltersAndCatalogState() missing %q in:\n%s", want, got)
 		}
@@ -545,9 +545,9 @@ func TestRenderDashboardCanShowCatalogMode(t *testing.T) {
 }
 
 func TestRenderCatalogFiltersAndShowsPatterns(t *testing.T) {
-	got := RenderCatalog(DefaultTerminalAppsCatalog(), CatalogModePatterns, CatalogSelections{Pattern: 1}, 96, "keyboard", "", true)
+	got := RenderCatalog(testCatalog(), CatalogModePatterns, CatalogSelections{Pattern: 1}, 96, "keyboard", "", true)
 
-	for _, want := range []string{"Terminal Apps Catalog", "mode patterns", "query \"keyboard\"", "> Keyboard model", "Detail", "Problem:", "Related ticket"} {
+	for _, want := range []string{"Terminal Apps Catalog", "mode patterns", "query \"keyboard\"", "> Keyboard navigation", "Detail", "Problem:", "Related ticket"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderCatalog() missing %q in:\n%s", want, got)
 		}
@@ -555,7 +555,7 @@ func TestRenderCatalogFiltersAndShowsPatterns(t *testing.T) {
 }
 
 func TestRenderCatalogStacksAtNarrowWidth(t *testing.T) {
-	got := RenderCatalog(DefaultTerminalAppsCatalog(), CatalogModeOpportunities, CatalogSelections{Opportunity: 1}, 56, "", "", true)
+	got := RenderCatalog(testCatalog(), CatalogModeOpportunities, CatalogSelections{Opportunity: 1}, 56, "", "", true)
 
 	for _, want := range []string{"Terminal Apps Catalog", "Opportunities", "> Board detail flow", "Patterns", "Detail"} {
 		if !strings.Contains(got, want) {
@@ -695,7 +695,7 @@ func TestModelTogglesDetailMode(t *testing.T) {
 func TestModelCatalogKeyboardFlow(t *testing.T) {
 	model := NewModel(Dashboard{
 		Projects: []ProjectRow{{Key: "sample", DisplayName: "Sample"}},
-		Catalog:  DefaultTerminalAppsCatalog(),
+		Catalog:  testCatalog(),
 	}, nil)
 	model.mode = DetailModeCatalog
 
@@ -730,6 +730,16 @@ func TestModelCatalogKeyboardFlow(t *testing.T) {
 	got = updated.(Model)
 	if got.mode != DetailModeProject {
 		t.Fatalf("backspace should return to project mode, got %v", got.mode)
+	}
+}
+
+func TestDashboardFromObjectProjectsDoesNotInjectCatalog(t *testing.T) {
+	dashboard := DashboardFromObjectProjects([]maat.ObjectProject{
+		{Key: "sample", DisplayName: "Sample"},
+	})
+
+	if len(dashboard.Catalog.Apps) != 0 || len(dashboard.Catalog.Patterns) != 0 || len(dashboard.Catalog.Decisions) != 0 || len(dashboard.Catalog.Opportunities) != 0 {
+		t.Fatalf("dashboard should not inject default catalog data: %#v", dashboard.Catalog)
 	}
 }
 
@@ -1164,5 +1174,90 @@ func TestModelRefreshWarningKeepsNewDashboardVisible(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Fatalf("view missing %q after warning refresh:\n%s", want, view)
 		}
+	}
+}
+
+func testCatalog() Catalog {
+	return Catalog{
+		Apps: []CatalogEntry{
+			{
+				ID:       "app:sample",
+				Kind:     "app",
+				Title:    "sample app",
+				Summary:  "Reference terminal app used only by tests.",
+				Category: "sample",
+				Status:   "review",
+				Metadata: []string{"Go", "MIT"},
+				Details:  []string{"Test fixture detail."},
+			},
+			{
+				ID:       "app:second",
+				Kind:     "app",
+				Title:    "second app",
+				Summary:  "Second reference terminal app used only by tests.",
+				Category: "sample",
+				Status:   "review",
+				Metadata: []string{"Rust", "Apache-2.0"},
+				Details:  []string{"Second test fixture detail."},
+			},
+		},
+		Patterns: []CatalogEntry{
+			{
+				ID:       "pattern:detail-pane",
+				Kind:     "pattern",
+				Title:    "Detail pane",
+				Summary:  "Selected rows can expose detail without leaving the list.",
+				Category: "inspection",
+				Status:   "adopt",
+				Metadata: []string{"observed in sample app"},
+				Details: []string{
+					"Problem: list rows hide object context.",
+					"Related ticket: T-test-detail.",
+				},
+			},
+			{
+				ID:       "pattern:keyboard-navigation",
+				Kind:     "pattern",
+				Title:    "Keyboard navigation",
+				Summary:  "Keyboard paths keep repeated review fast.",
+				Category: "navigation",
+				Status:   "adopt",
+				Metadata: []string{"tab", "enter", "backspace"},
+				Details: []string{
+					"Problem: pointer-only navigation slows terminal review.",
+					"Related ticket: T-test-keyboard.",
+				},
+			},
+		},
+		Decisions: []CatalogEntry{
+			{
+				ID:       "decision:sample",
+				Kind:     "decision",
+				Title:    "Adopt sample pattern",
+				Summary:  "Use test-only catalog data for renderer coverage.",
+				Category: "inspection",
+				Status:   "adopt",
+			},
+		},
+		Opportunities: []CatalogEntry{
+			{
+				ID:       "opportunity:catalog-mode",
+				Kind:     "opportunity",
+				Title:    "Catalog mode",
+				Summary:  "Show catalog objects in the TUI.",
+				Category: "catalog",
+				Status:   "ticketed",
+				Details:  []string{"Test fixture opportunity."},
+			},
+			{
+				ID:       "opportunity:board-detail-flow",
+				Kind:     "opportunity",
+				Title:    "Board detail flow",
+				Summary:  "Show project board items with readable details.",
+				Category: "project-board",
+				Status:   "ticketed",
+				Details:  []string{"Test fixture opportunity."},
+			},
+		},
 	}
 }

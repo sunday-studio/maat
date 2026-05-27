@@ -164,23 +164,23 @@ func TestSQLiteIndexTypesTargetLayoutObjects(t *testing.T) {
 
 func TestSQLiteIndexTypesCatalogObjects(t *testing.T) {
 	root := writeSQLiteTargetLayoutFixture(t)
-	mustWrite(t, filepath.Join(root, "projects", "sample", "catalog", "apps", "lazygit.md"), `# Catalog App: lazygit
+	mustWrite(t, filepath.Join(root, "projects", "sample", "catalog", "apps", "sample-app.md"), `# Catalog App: sample-app
 
 | Field | Value |
 |---|---|
-| App ID | lazygit |
-| Slug | lazygit |
+| App ID | sample-app |
+| Slug | sample-app |
 | Language | Go |
 
 ## Summary
 
-Keyboard-first terminal git dashboard.
+Keyboard-first terminal sample dashboard.
 `)
-	mustWrite(t, filepath.Join(root, "projects", "sample", "catalog", "patterns", "focused-detail-pane.md"), `# Catalog Pattern: Focused Detail Pane
+	mustWrite(t, filepath.Join(root, "projects", "sample", "catalog", "patterns", "detail-pane.md"), `# Catalog Pattern: Detail Pane
 
 | Field | Value |
 |---|---|
-| Pattern ID | focused-detail-pane |
+| Pattern ID | detail-pane |
 | Related Tickets | T-20260527-104741-731b |
 
 ## Problem
@@ -204,8 +204,8 @@ Reviewed terminal catalog observations.
 	if info.Documents != 7 {
 		t.Fatalf("expected seven indexed documents, got %d", info.Documents)
 	}
-	assertSearchResultType(t, info.Path, "keyboard-first terminal git", "catalog-app", "projects/sample/catalog/apps/lazygit.md")
-	assertSearchResultType(t, info.Path, "ticket detail pane", "catalog-pattern", "projects/sample/catalog/patterns/focused-detail-pane.md")
+	assertSearchResultType(t, info.Path, "keyboard-first terminal sample", "catalog-app", "projects/sample/catalog/apps/sample-app.md")
+	assertSearchResultType(t, info.Path, "ticket detail pane", "catalog-pattern", "projects/sample/catalog/patterns/detail-pane.md")
 	assertSearchResultType(t, info.Path, "catalog observations", "catalog-event", "projects/sample/catalog/events/2026/05/E-catalog-review.md")
 }
 
