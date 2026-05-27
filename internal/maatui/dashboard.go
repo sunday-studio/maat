@@ -205,12 +205,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			filtered := FilterDashboard(m.dashboard, m.filters)
 			selected := selectedIndexByKey(filtered.Projects, selectedProject(m.dashboard.Projects, m.selected).Key, m.selected)
-			if m.mode == DetailModeTickets && len(selectedProject(filtered.Projects, selected).TicketRows) > 0 {
+			if m.mode == DetailModeProject && len(filtered.Projects) > 0 {
+				m.mode = DetailModeTickets
+				m.ticketFocus = false
+				m.selectedTicket = clampSelection(m.selectedTicket, len(selectedProject(filtered.Projects, selected).TicketRows))
+			} else if m.mode == DetailModeTickets && len(selectedProject(filtered.Projects, selected).TicketRows) > 0 {
 				m.ticketFocus = true
 				m.selectedTicket = clampSelection(m.selectedTicket, len(selectedProject(filtered.Projects, selected).TicketRows))
 			}
 		case "backspace":
-			m.ticketFocus = false
+			if m.mode == DetailModeTickets && m.ticketFocus {
+				m.ticketFocus = false
+			} else if m.mode == DetailModeTickets {
+				m.mode = DetailModeProject
+			} else {
+				m.ticketFocus = false
+			}
 		case "r":
 			return m.startDashboardReload(false)
 		case "/":
@@ -343,7 +353,7 @@ func (m Model) moveSelection(delta int) Model {
 	filtered := FilterDashboard(m.dashboard, m.filters)
 	selectedKey := selectedProject(m.dashboard.Projects, m.selected).Key
 	selectedIndex := selectedIndexByKey(filtered.Projects, selectedKey, m.selected)
-	if m.mode == DetailModeTickets && m.ticketFocus {
+	if m.mode == DetailModeTickets {
 		project := selectedProject(filtered.Projects, selectedIndex)
 		m.selectedTicket = clampSelection(m.selectedTicket+delta, len(project.TicketRows))
 		return m
@@ -725,7 +735,7 @@ func RenderDashboardWithFilters(dashboard Dashboard, selected int, mode DetailMo
 		b.WriteString(RenderProjectDetail(project))
 	}
 	b.WriteString("\n\n")
-	b.WriteString(mutedStyle.Render("Use up/down or k/j to select, tab/right to switch project/tickets/timeline, enter to select tickets, / query, s state, o owner, p project, c clear, r reload, q quit."))
+	b.WriteString(mutedStyle.Render("Use up/down or k/j to select, enter to open project board/detail, backspace back, tab/right for timeline, / query, s state, o owner, p project, c clear, r reload, q quit."))
 	b.WriteString("\n")
 	return b.String()
 }
@@ -888,10 +898,11 @@ func RenderProjectTicketBoardWithSelection(project ProjectRow, width int, select
 		b.WriteString(mutedStyle.Render("No tickets recorded. Create one with maat ticket create, adjust filters, or press r to reload."))
 		return b.String()
 	}
+	hasSelection := selected >= 0
 	selected = clampSelection(selected, len(project.TicketRows))
 	ticket := selectedTicket(project.TicketRows, selected)
 	selectedID := ""
-	if focused {
+	if hasSelection {
 		selectedID = ticket.ID
 	}
 	columns := ticketBoardColumns(project.TicketRows)

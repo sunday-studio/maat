@@ -419,7 +419,7 @@ func TestRenderDashboardCanShowTicketMode(t *testing.T) {
 		},
 	}}, 0, DetailModeTickets)
 
-	for _, want := range []string{"Tickets Board", "T-001", "project/tickets/timeline"} {
+	for _, want := range []string{"Tickets Board", "T-001", "enter to open project board/detail"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderDashboardWithSelectionAndMode() missing %q in:\n%s", want, got)
 		}
@@ -523,7 +523,7 @@ func TestRenderDashboardCanShowTimelineMode(t *testing.T) {
 		},
 	}, 0, DetailModeTimeline)
 
-	for _, want := range []string{"Timeline", "ticket.created", "T-001", "project/tickets/timeline"} {
+	for _, want := range []string{"Timeline", "ticket.created", "T-001", "tab/right for timeline"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderDashboardWithSelectionAndMode() missing %q in:\n%s", want, got)
 		}
@@ -535,7 +535,7 @@ func TestRenderDashboardShowsNavigationHelp(t *testing.T) {
 		{Key: "sample", DisplayName: "Sample", Status: "active"},
 	}}, 0)
 
-	for _, want := range []string{"up/down or k/j", "tab/right to switch project/tickets/timeline", "enter to select tickets", "/ query", "s state", "o owner", "p project", "c clear", "q quit"} {
+	for _, want := range []string{"up/down or k/j", "enter to open project board/detail", "backspace back", "tab/right for timeline", "/ query", "s state", "o owner", "p project", "c clear", "q quit"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderDashboardWithSelection() missing %q in:\n%s", want, got)
 		}
@@ -641,6 +641,32 @@ func TestModelTogglesDetailMode(t *testing.T) {
 	}
 }
 
+func TestModelEnterOpensProjectBoardThenTicketDetail(t *testing.T) {
+	model := NewModel(Dashboard{Projects: []ProjectRow{
+		{
+			Key: "sample",
+			TicketRows: []TicketRow{
+				{ID: "T-001", Title: "First"},
+			},
+		},
+	}}, nil)
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		t.Fatalf("enter command = %v, want nil", cmd)
+	}
+	got := updated.(Model)
+	if got.mode != DetailModeTickets || got.ticketFocus {
+		t.Fatalf("first enter mode=%v ticketFocus=%v, want tickets board without focused detail", got.mode, got.ticketFocus)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = updated.(Model)
+	if got.mode != DetailModeTickets || !got.ticketFocus {
+		t.Fatalf("second enter mode=%v ticketFocus=%v, want focused ticket detail", got.mode, got.ticketFocus)
+	}
+}
+
 func TestModelMovesTicketSelectionWhenTicketPaneFocused(t *testing.T) {
 	model := NewModel(Dashboard{Projects: []ProjectRow{
 		{
@@ -677,12 +703,17 @@ func TestModelMovesTicketSelectionWhenTicketPaneFocused(t *testing.T) {
 	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyBackspace})
 	got = updated.(Model)
 	if got.ticketFocus {
-		t.Fatal("backspace should return focus to projects")
+		t.Fatal("backspace should return focus to board")
 	}
 	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyDown})
 	got = updated.(Model)
-	if got.selected != 1 || got.selectedTicket != 0 {
-		t.Fatalf("down with project focus selected project=%d ticket=%d, want project 1 ticket 0", got.selected, got.selectedTicket)
+	if got.selected != 0 || got.selectedTicket != 1 {
+		t.Fatalf("down with board focus selected project=%d ticket=%d, want project 0 ticket 1", got.selected, got.selectedTicket)
+	}
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	got = updated.(Model)
+	if got.mode != DetailModeProject {
+		t.Fatalf("second backspace mode=%v, want project list/detail", got.mode)
 	}
 }
 

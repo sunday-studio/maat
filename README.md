@@ -171,7 +171,7 @@ Launch the terminal dashboard:
 maat tui
 ```
 
-The TUI shows projects, status totals, project detail, and ticket lists.
+The TUI starts with a project list. Press `enter` to open the selected project as a Kanban-style ticket board, move through tickets with the arrow keys, and press `enter` again to read the selected ticket's detail view.
 
 ## Agent Loop
 
