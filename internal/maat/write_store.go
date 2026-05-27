@@ -284,6 +284,9 @@ func (store WriteStore) CompleteTicket(input CompleteTicketInput) (ObjectEvent, 
 	if err := requireActor(input.Actor); err != nil {
 		return ObjectEvent{}, err
 	}
+	if err := store.setTicketStatus(projectKey, ticketID, "done"); err != nil {
+		return ObjectEvent{}, err
+	}
 	return store.writeEvent(projectKey, Event{
 		Time:     store.timeOrNow(input.At),
 		Actor:    input.Actor,
@@ -294,6 +297,25 @@ func (store WriteStore) CompleteTicket(input CompleteTicketInput) (ObjectEvent, 
 		Summary:  defaultText(input.Summary, fmt.Sprintf("Completed ticket %s.", ticketID)),
 		Evidence: input.Evidence,
 	})
+}
+
+func (store WriteStore) setTicketStatus(projectKey, ticketID, status string) error {
+	path := store.abs(filepath.ToSlash(filepath.Join("projects", projectKey, "tickets", ticketID+".md")))
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		key, _, ok := parseTableRow(strings.TrimSpace(line))
+		if !ok || !strings.EqualFold(key, "Status") {
+			continue
+		}
+		lines[i] = fmt.Sprintf("| Status | %s |", status)
+		content := strings.Join(lines, "\n")
+		return os.WriteFile(path, []byte(content), 0o644)
+	}
+	return fmt.Errorf("ticket %s is missing Status field", ticketID)
 }
 
 func (store WriteStore) ClaimTicket(input ClaimTicketInput) (ObjectEvent, error) {

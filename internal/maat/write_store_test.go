@@ -186,6 +186,13 @@ func TestWriteStoreCreatesTicketLifecycleEvents(t *testing.T) {
 	if !strings.Contains(completedContent, "## Evidence") || !strings.Contains(completedContent, "- go test ./... passed") {
 		t.Fatalf("expected completion evidence, got:\n%s", completedContent)
 	}
+	completedTicket, err := ParseObjectTicketFile(root, filepath.Join(root, "projects", "sample-a31f", "tickets", ticket.ID+".md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completedTicket.Status != "done" {
+		t.Fatalf("completed ticket status = %q, want done", completedTicket.Status)
+	}
 }
 
 func TestWriteStoreRequiresGoalOutcome(t *testing.T) {
