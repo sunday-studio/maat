@@ -29,6 +29,9 @@ func TestLoadProjectCatalogParsesMarkdownObjects(t *testing.T) {
 	if project.Catalog.Patterns[0].Slug != "background-refresh" {
 		t.Fatalf("unexpected first pattern: %#v", project.Catalog.Patterns[0])
 	}
+	if got := project.Catalog.Patterns[0].RelatedGoals; len(got) != 1 || got[0] != "G-20260525-190533-a7f3" {
+		t.Fatalf("unexpected related goals: %#v", got)
+	}
 	if len(project.Catalog.Decisions) != 1 || project.Catalog.Decisions[0].State != "adopt" {
 		t.Fatalf("unexpected decisions: %#v", project.Catalog.Decisions)
 	}

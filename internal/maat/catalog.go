@@ -472,6 +472,11 @@ func splitCatalogList(value string) []string {
 	if value == "" {
 		return nil
 	}
+	if strings.HasPrefix(value, "- ") || strings.Contains(value, "\n") {
+		if bullets := parseBulletList(value); len(bullets) > 0 {
+			return uniqueCatalogItems(bullets)
+		}
+	}
 	var parts []string
 	if strings.Contains(value, "\n") || strings.Contains(value, ",") || strings.Contains(value, ";") {
 		value = strings.ReplaceAll(value, "\n", ",")
@@ -480,6 +485,10 @@ func splitCatalogList(value string) []string {
 	} else {
 		parts = strings.Fields(value)
 	}
+	return uniqueCatalogItems(parts)
+}
+
+func uniqueCatalogItems(parts []string) []string {
 	items := make([]string, 0, len(parts))
 	seen := map[string]bool{}
 	for _, part := range parts {
