@@ -105,3 +105,6 @@ Write commands follow this shape:
 7. Push if configured.
 
 See [Storage Model](./storage-model.md), [Schema](./schema.md), and [Agent Protocol](./agent-protocol.md).
+
+For a proposed macOS desktop shell that keeps the CLI as the product API, see
+[macOS App Architecture](./macos-app-architecture.md).
