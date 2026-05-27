@@ -523,9 +523,48 @@ func TestRenderDashboardCanShowTimelineMode(t *testing.T) {
 		},
 	}, 0, DetailModeTimeline)
 
-	for _, want := range []string{"Timeline", "ticket.created", "T-001", "tab/right for timeline"} {
+	for _, want := range []string{"Timeline", "ticket.created", "T-001", "tab/right for timeline/catalog"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderDashboardWithSelectionAndMode() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderDashboardCanShowCatalogMode(t *testing.T) {
+	got := RenderDashboardWithFiltersAndCatalogState(Dashboard{
+		Projects: []ProjectRow{{Key: "sample", DisplayName: "Sample"}},
+		Summary:  maat.StatusSummary{Projects: 1},
+		Catalog:  DefaultTerminalAppsCatalog(),
+	}, 0, DetailModeCatalog, 96, 0, false, DashboardFilters{}, false, CatalogModeApps, CatalogSelections{App: 0, Pattern: 0}, "", false)
+
+	for _, want := range []string{"Terminal Apps Catalog", "Apps (4)", "Patterns (4)", "> lazygit", "Focused detail pane", "enter inspect", "f filter", "tab/right for timeline/catalog"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderDashboardWithFiltersAndCatalogState() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderCatalogFiltersAndShowsPatterns(t *testing.T) {
+	got := RenderCatalog(DefaultTerminalAppsCatalog(), CatalogModePatterns, CatalogSelections{Pattern: 1}, 96, "keyboard", "", true)
+
+	for _, want := range []string{"Terminal Apps Catalog", "mode patterns", "query \"keyboard\"", "> Keyboard model", "Detail", "Problem:", "Related ticket"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderCatalog() missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderCatalogStacksAtNarrowWidth(t *testing.T) {
+	got := RenderCatalog(DefaultTerminalAppsCatalog(), CatalogModeOpportunities, CatalogSelections{Opportunity: 1}, 56, "", "", true)
+
+	for _, want := range []string{"Terminal Apps Catalog", "Opportunities", "> Board detail flow", "Patterns", "Detail"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("RenderCatalog() missing %q in:\n%s", want, got)
+		}
+	}
+	for _, line := range strings.Split(got, "\n") {
+		if len(line) > 70 {
+			t.Fatalf("narrow catalog line is too wide (%d): %q\n%s", len(line), line, got)
 		}
 	}
 }
@@ -535,7 +574,7 @@ func TestRenderDashboardShowsNavigationHelp(t *testing.T) {
 		{Key: "sample", DisplayName: "Sample", Status: "active"},
 	}}, 0)
 
-	for _, want := range []string{"up/down or k/j", "enter to open project board/detail", "backspace back", "tab/right for timeline", "/ query", "s state", "o owner", "p project", "c clear", "q quit"} {
+	for _, want := range []string{"up/down or k/j", "enter to open project board/detail", "backspace back", "tab/right for timeline/catalog", "/ query", "f catalog filter", "s state", "o owner", "p project", "c clear", "q quit"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("RenderDashboardWithSelection() missing %q in:\n%s", want, got)
 		}
@@ -630,14 +669,67 @@ func TestModelTogglesDetailMode(t *testing.T) {
 
 	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyRight})
 	got = updated.(Model)
+	if got.mode != DetailModeCatalog {
+		t.Fatalf("mode after second right = %v, want catalog", got.mode)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyRight})
+	got = updated.(Model)
+	if got.mode != DetailModeCatalog || got.catalogMode != CatalogModePatterns {
+		t.Fatalf("right in catalog mode=%v catalogMode=%v, want catalog patterns", got.mode, got.catalogMode)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	got = updated.(Model)
 	if got.mode != DetailModeProject {
-		t.Fatalf("mode after second right = %v, want project", got.mode)
+		t.Fatalf("backspace from catalog mode = %v, want project", got.mode)
 	}
 
 	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyLeft})
 	got = updated.(Model)
-	if got.mode != DetailModeTimeline {
-		t.Fatalf("mode after left = %v, want timeline", got.mode)
+	if got.mode != DetailModeCatalog {
+		t.Fatalf("mode after left = %v, want catalog", got.mode)
+	}
+}
+
+func TestModelCatalogKeyboardFlow(t *testing.T) {
+	model := NewModel(Dashboard{
+		Projects: []ProjectRow{{Key: "sample", DisplayName: "Sample"}},
+		Catalog:  DefaultTerminalAppsCatalog(),
+	}, nil)
+	model.mode = DetailModeCatalog
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if cmd != nil {
+		t.Fatalf("down command = %v, want nil", cmd)
+	}
+	got := updated.(Model)
+	if got.selectedApp != 1 {
+		t.Fatalf("selected app after down = %d, want 1", got.selectedApp)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = updated.(Model)
+	if !got.catalogInspect {
+		t.Fatal("enter should inspect selected catalog item")
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyTab})
+	got = updated.(Model)
+	if got.catalogMode != CatalogModePatterns || got.catalogInspect {
+		t.Fatalf("tab should switch to patterns and clear inspect, catalogMode=%v inspect=%v", got.catalogMode, got.catalogInspect)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	got = updated.(Model)
+	if got.catalogFilter != "navigation" {
+		t.Fatalf("catalog filter = %q, want navigation", got.catalogFilter)
+	}
+
+	updated, _ = got.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	got = updated.(Model)
+	if got.mode != DetailModeProject {
+		t.Fatalf("backspace should return to project mode, got %v", got.mode)
 	}
 }
 

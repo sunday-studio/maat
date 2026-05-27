@@ -62,10 +62,30 @@ type EventRow struct {
 	Summary     string
 }
 
+type Catalog struct {
+	Apps          []CatalogEntry
+	Patterns      []CatalogEntry
+	Decisions     []CatalogEntry
+	Opportunities []CatalogEntry
+}
+
+type CatalogEntry struct {
+	ID       string
+	Kind     string
+	Title    string
+	Summary  string
+	Category string
+	Status   string
+	Metadata []string
+	Links    []string
+	Details  []string
+}
+
 type Dashboard struct {
 	Projects []ProjectRow
 	Summary  maat.StatusSummary
 	Events   []EventRow
+	Catalog  Catalog
 }
 
 type DashboardFilters struct {
@@ -81,24 +101,41 @@ const (
 	DetailModeProject DetailMode = iota
 	DetailModeTickets
 	DetailModeTimeline
+	DetailModeCatalog
+)
+
+type CatalogMode int
+
+const (
+	CatalogModeApps CatalogMode = iota
+	CatalogModePatterns
+	CatalogModeDecisions
+	CatalogModeOpportunities
 )
 
 type Model struct {
-	dashboard       Dashboard
-	err             error
-	refreshErr      error
-	refreshing      bool
-	nextRefreshID   int
-	activeRefreshID int
-	width           int
-	selected        int
-	selectedTicket  int
-	ticketFocus     bool
-	filters         DashboardFilters
-	filterEditing   bool
-	mode            DetailMode
-	storage         string
-	load            dashboardLoader
+	dashboard           Dashboard
+	err                 error
+	refreshErr          error
+	refreshing          bool
+	nextRefreshID       int
+	activeRefreshID     int
+	width               int
+	selected            int
+	selectedTicket      int
+	selectedApp         int
+	selectedPattern     int
+	selectedDecision    int
+	selectedOpportunity int
+	ticketFocus         bool
+	catalogInspect      bool
+	catalogFilter       string
+	filters             DashboardFilters
+	filterEditing       bool
+	mode                DetailMode
+	catalogMode         CatalogMode
+	storage             string
+	load                dashboardLoader
 }
 
 type dashboardLoader func(string) dashboardLoadedMsg
@@ -197,15 +234,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "down", "j":
 			m = m.moveSelection(1)
 		case "tab", "right", "l":
-			m.mode = nextDetailMode(m.mode)
-			m.ticketFocus = false
+			if m.mode == DetailModeCatalog {
+				m.catalogMode = nextCatalogMode(m.catalogMode)
+				m.catalogInspect = false
+				m = m.withCatalogSelection()
+			} else {
+				m.mode = nextDetailMode(m.mode)
+				m.ticketFocus = false
+			}
 		case "left", "h":
-			m.mode = previousDetailMode(m.mode)
-			m.ticketFocus = false
+			if m.mode == DetailModeCatalog {
+				m.catalogMode = previousCatalogMode(m.catalogMode)
+				m.catalogInspect = false
+				m = m.withCatalogSelection()
+			} else {
+				m.mode = previousDetailMode(m.mode)
+				m.ticketFocus = false
+			}
 		case "enter":
 			filtered := FilterDashboard(m.dashboard, m.filters)
 			selected := selectedIndexByKey(filtered.Projects, selectedProject(m.dashboard.Projects, m.selected).Key, m.selected)
-			if m.mode == DetailModeProject && len(filtered.Projects) > 0 {
+			if m.mode == DetailModeCatalog {
+				m.catalogInspect = true
+				m = m.withCatalogSelection()
+			} else if m.mode == DetailModeProject && len(filtered.Projects) > 0 {
 				m.mode = DetailModeTickets
 				m.ticketFocus = false
 				m.selectedTicket = clampSelection(m.selectedTicket, len(selectedProject(filtered.Projects, selected).TicketRows))
@@ -214,7 +266,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectedTicket = clampSelection(m.selectedTicket, len(selectedProject(filtered.Projects, selected).TicketRows))
 			}
 		case "backspace":
-			if m.mode == DetailModeTickets && m.ticketFocus {
+			if m.mode == DetailModeCatalog && m.catalogInspect {
+				m.catalogInspect = false
+			} else if m.mode == DetailModeCatalog {
+				m.mode = DetailModeProject
+			} else if m.mode == DetailModeTickets && m.ticketFocus {
 				m.ticketFocus = false
 			} else if m.mode == DetailModeTickets {
 				m.mode = DetailModeProject
@@ -227,6 +283,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.filterEditing = true
 		case "c":
 			m.filters = DashboardFilters{}
+			m.catalogFilter = ""
 			m.filterEditing = false
 			m = m.withFilterSelection()
 		case "s":
@@ -235,6 +292,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "o":
 			m.filters.Owner = nextOwnerFilter(m.filters.Owner)
 			m = m.withFilterSelection()
+		case "f":
+			if m.mode == DetailModeCatalog {
+				m.catalogFilter = nextCatalogFilter(m.catalogFilter)
+				m = m.withCatalogSelection()
+			}
 		case "p":
 			if m.filters.ProjectKey != "" {
 				m.filters.ProjectKey = ""
@@ -260,9 +322,31 @@ func (m Model) View() string {
 	if m.err != nil && len(m.dashboard.Projects) == 0 {
 		return RenderDashboardError(m.err, m.storage)
 	}
-	filtered := FilterDashboard(m.dashboard, m.filters)
+	projectFilters := m.filters
+	if m.mode == DetailModeCatalog {
+		projectFilters.Query = ""
+	}
+	filtered := FilterDashboard(m.dashboard, projectFilters)
 	selected := selectedIndexByKey(filtered.Projects, selectedProject(m.dashboard.Projects, m.selected).Key, m.selected)
-	view := RenderDashboardWithFilters(filtered, selected, m.mode, m.width, m.selectedTicket, m.ticketFocus, m.filters, m.filterEditing)
+	view := RenderDashboardWithFiltersAndCatalogState(
+		filtered,
+		selected,
+		m.mode,
+		m.width,
+		m.selectedTicket,
+		m.ticketFocus,
+		m.filters,
+		m.filterEditing,
+		m.catalogMode,
+		CatalogSelections{
+			App:         m.selectedApp,
+			Pattern:     m.selectedPattern,
+			Decision:    m.selectedDecision,
+			Opportunity: m.selectedOpportunity,
+		},
+		m.catalogFilter,
+		m.catalogInspect,
+	)
 	if m.refreshing {
 		view += mutedStyle.Render("Refreshing...")
 		view += "\n"
@@ -346,6 +430,7 @@ func (m Model) withLoadedDashboard(msg dashboardLoadedMsg) Model {
 	if len(project.TicketRows) == 0 || m.mode != DetailModeTickets {
 		m.ticketFocus = false
 	}
+	m = m.withCatalogSelection()
 	return m
 }
 
@@ -353,6 +438,10 @@ func (m Model) moveSelection(delta int) Model {
 	filtered := FilterDashboard(m.dashboard, m.filters)
 	selectedKey := selectedProject(m.dashboard.Projects, m.selected).Key
 	selectedIndex := selectedIndexByKey(filtered.Projects, selectedKey, m.selected)
+	if m.mode == DetailModeCatalog {
+		m = m.moveCatalogSelection(delta)
+		return m
+	}
 	if m.mode == DetailModeTickets {
 		project := selectedProject(filtered.Projects, selectedIndex)
 		m.selectedTicket = clampSelection(m.selectedTicket+delta, len(project.TicketRows))
@@ -364,6 +453,21 @@ func (m Model) moveSelection(delta int) Model {
 	m.selectedTicket = clampSelection(m.selectedTicket, len(project.TicketRows))
 	if len(project.TicketRows) == 0 {
 		m.ticketFocus = false
+	}
+	return m
+}
+
+func (m Model) moveCatalogSelection(delta int) Model {
+	catalog := FilterCatalog(m.dashboard.Catalog, m.filters.Query, m.catalogFilter)
+	switch m.catalogMode {
+	case CatalogModePatterns:
+		m.selectedPattern = clampSelection(m.selectedPattern+delta, len(catalog.Patterns))
+	case CatalogModeDecisions:
+		m.selectedDecision = clampSelection(m.selectedDecision+delta, len(catalog.Decisions))
+	case CatalogModeOpportunities:
+		m.selectedOpportunity = clampSelection(m.selectedOpportunity+delta, len(catalog.Opportunities))
+	default:
+		m.selectedApp = clampSelection(m.selectedApp+delta, len(catalog.Apps))
 	}
 	return m
 }
@@ -380,6 +484,16 @@ func (m Model) withFilterSelection() Model {
 	if len(project.TicketRows) == 0 {
 		m.ticketFocus = false
 	}
+	m = m.withCatalogSelection()
+	return m
+}
+
+func (m Model) withCatalogSelection() Model {
+	catalog := FilterCatalog(m.dashboard.Catalog, m.filters.Query, m.catalogFilter)
+	m.selectedApp = clampSelection(m.selectedApp, len(catalog.Apps))
+	m.selectedPattern = clampSelection(m.selectedPattern, len(catalog.Patterns))
+	m.selectedDecision = clampSelection(m.selectedDecision, len(catalog.Decisions))
+	m.selectedOpportunity = clampSelection(m.selectedOpportunity, len(catalog.Opportunities))
 	return m
 }
 
@@ -460,6 +574,7 @@ func LoadDashboard(storage string) (Dashboard, error) {
 func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 	rows := make([]ProjectRow, 0, len(projects))
 	events := make([]EventRow, 0)
+	catalog := Catalog{}
 	var summary maat.StatusSummary
 	summary.Projects = len(projects)
 	for _, project := range projects {
@@ -538,8 +653,14 @@ func DashboardFromObjectProjects(projects []maat.ObjectProject) Dashboard {
 		for _, event := range project.Events {
 			events = append(events, eventRowFromObject(project, event))
 		}
+		if project.Catalog != nil {
+			catalog = mergeCatalogs(catalog, catalogFromObject(*project.Catalog))
+		}
 	}
-	return Dashboard{Projects: rows, Summary: summary, Events: sortedEventRows(events)}
+	if catalogEmpty(catalog) {
+		catalog = DefaultTerminalAppsCatalog()
+	}
+	return Dashboard{Projects: rows, Summary: summary, Events: sortedEventRows(events), Catalog: catalog}
 }
 
 func FilterDashboard(dashboard Dashboard, filters DashboardFilters) Dashboard {
@@ -572,7 +693,7 @@ func FilterDashboard(dashboard Dashboard, filters DashboardFilters) Dashboard {
 		row.OpenTickets, row.DoneTickets = countTicketRows(tickets)
 		rows = append(rows, row)
 	}
-	return Dashboard{Projects: rows, Summary: summarizeProjectRows(rows), Events: filterEventRows(dashboard.Events, rows)}
+	return Dashboard{Projects: rows, Summary: summarizeProjectRows(rows), Events: filterEventRows(dashboard.Events, rows), Catalog: dashboard.Catalog}
 }
 
 func normalizeFilters(filters DashboardFilters) DashboardFilters {
@@ -705,6 +826,10 @@ func RenderDashboardWithState(dashboard Dashboard, selected int, mode DetailMode
 }
 
 func RenderDashboardWithFilters(dashboard Dashboard, selected int, mode DetailMode, width int, selectedTicket int, ticketFocus bool, filters DashboardFilters, editingFilter bool) string {
+	return RenderDashboardWithFiltersAndCatalogState(dashboard, selected, mode, width, selectedTicket, ticketFocus, filters, editingFilter, CatalogModeApps, CatalogSelections{}, "", false)
+}
+
+func RenderDashboardWithFiltersAndCatalogState(dashboard Dashboard, selected int, mode DetailMode, width int, selectedTicket int, ticketFocus bool, filters DashboardFilters, editingFilter bool, catalogMode CatalogMode, catalogSelections CatalogSelections, catalogFilter string, catalogInspect bool) string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Maat"))
 	b.WriteString("\n")
@@ -731,11 +856,13 @@ func RenderDashboardWithFilters(dashboard Dashboard, selected int, mode DetailMo
 		b.WriteString(RenderProjectTicketBoardWithSelection(project, width, selectedTicket, ticketFocus))
 	case DetailModeTimeline:
 		b.WriteString(RenderTimeline(dashboard.Events))
+	case DetailModeCatalog:
+		b.WriteString(RenderCatalog(dashboard.Catalog, catalogMode, catalogSelections, width, filters.Query, catalogFilter, catalogInspect))
 	default:
 		b.WriteString(RenderProjectDetail(project))
 	}
 	b.WriteString("\n\n")
-	b.WriteString(mutedStyle.Render("Use up/down or k/j to select, enter to open project board/detail, backspace back, tab/right for timeline, / query, s state, o owner, p project, c clear, r reload, q quit."))
+	b.WriteString(mutedStyle.Render("Use up/down or k/j to select, enter to open project board/detail, backspace back, tab/right for timeline/catalog, / query, f catalog filter, s state, o owner, p project, c clear, r reload, q quit."))
 	b.WriteString("\n")
 	return b.String()
 }
@@ -873,6 +1000,630 @@ func RenderProjectDetail(project ProjectRow) string {
 
 func RenderProjectTickets(project ProjectRow) string {
 	return RenderProjectTicketBoard(project, 0)
+}
+
+type CatalogSelections struct {
+	App         int
+	Pattern     int
+	Decision    int
+	Opportunity int
+}
+
+func DefaultTerminalAppsCatalog() Catalog {
+	return Catalog{
+		Apps: []CatalogEntry{
+			{
+				ID:       "app:lazygit",
+				Kind:     "app",
+				Title:    "lazygit",
+				Summary:  "Simple terminal UI for git commands.",
+				Category: "git",
+				Status:   "review",
+				Metadata: []string{"Go", "MIT", "stars unknown locally"},
+				Links:    []string{"github.com/jesseduffield/lazygit"},
+				Details: []string{
+					"Study dashboard density, keyboard-first navigation, and focused object inspection.",
+					"Maat relevance: project boards should keep selected work and detail context visible.",
+				},
+			},
+			{
+				ID:       "app:btop",
+				Kind:     "app",
+				Title:    "btop",
+				Summary:  "Terminal resource monitor with strong visual hierarchy.",
+				Category: "monitoring",
+				Status:   "review",
+				Metadata: []string{"C++", "Apache-2.0", "stars unknown locally"},
+				Links:    []string{"github.com/aristocratos/btop"},
+				Details: []string{
+					"Study compact summaries, stable regions, and readable state without opening files.",
+					"Maat relevance: status and ownership must remain legible at a glance.",
+				},
+			},
+			{
+				ID:       "app:gh-dash",
+				Kind:     "app",
+				Title:    "gh-dash",
+				Summary:  "GitHub dashboard for pull requests and issues.",
+				Category: "dashboard",
+				Status:   "review",
+				Metadata: []string{"Go", "license unknown", "stars unknown locally"},
+				Links:    []string{"github.com/dlvhdr/gh-dash"},
+				Details: []string{
+					"Study grouped work queues, filters, and detail panes for work review.",
+					"Maat relevance: ticket lists should bridge scanning and verification.",
+				},
+			},
+			{
+				ID:       "app:superfile",
+				Kind:     "app",
+				Title:    "superfile",
+				Summary:  "Modern terminal file manager with pane-based navigation.",
+				Category: "files",
+				Status:   "review",
+				Metadata: []string{"Go", "MIT", "stars unknown locally"},
+				Links:    []string{"github.com/yorukot/superfile"},
+				Details: []string{
+					"Study pane switching, selection markers, and compact detail affordances.",
+					"Maat relevance: catalog and project panes need predictable keyboard movement.",
+				},
+			},
+		},
+		Patterns: []CatalogEntry{
+			{
+				ID:       "pattern:focused-detail-pane",
+				Kind:     "pattern",
+				Title:    "Focused detail pane",
+				Summary:  "List views need adjacent detail to keep object context visible.",
+				Category: "inspection",
+				Status:   "adopt",
+				Metadata: []string{"observed in lazygit, gh-dash, superfile"},
+				Details: []string{
+					"Problem: list rows hide description, metadata, and recent activity.",
+					"Maat use: selected ticket detail pane with description, acceptance, status, owner, goal, and events.",
+					"Related ticket: T-20260527-104752-bb33.",
+				},
+			},
+			{
+				ID:       "pattern:keyboard-model",
+				Kind:     "pattern",
+				Title:    "Keyboard model",
+				Summary:  "Fast terminal apps make movement and inspection predictable.",
+				Category: "navigation",
+				Status:   "adopt",
+				Metadata: []string{"up/down, k/j, tab, enter, backspace"},
+				Details: []string{
+					"Problem: command-heavy navigation slows repeated scanning.",
+					"Maat use: project list -> board -> ticket detail, plus catalog pane navigation.",
+					"Related ticket: T-20260527-104802-f29d.",
+				},
+			},
+			{
+				ID:       "pattern:background-refresh",
+				Kind:     "pattern",
+				Title:    "Background refresh",
+				Summary:  "Long-running terminal sessions should show fresh state without losing context.",
+				Category: "refresh",
+				Status:   "adopt",
+				Metadata: []string{"manual r reload", "stable selected row"},
+				Details: []string{
+					"Problem: stale dashboards make agent handoffs harder to trust.",
+					"Maat use: refresh indicators, recoverable warnings, and selection preservation.",
+					"Related ticket: T-20260526-220322-65be.",
+				},
+			},
+			{
+				ID:       "pattern:empty-states",
+				Kind:     "pattern",
+				Title:    "Empty states",
+				Summary:  "Empty views should explain the next useful action.",
+				Category: "empty-state",
+				Status:   "adopt",
+				Metadata: []string{"no-color readable", "actionable copy"},
+				Details: []string{
+					"Problem: blank panes look broken and do not guide the user.",
+					"Maat use: filtered empty states, missing tickets, missing catalog rows, and storage errors all name next actions.",
+					"Related ticket: T-20260527-104802-f29d.",
+				},
+			},
+		},
+		Decisions: []CatalogEntry{
+			{
+				ID:       "decision:adopt-focused-detail-pane",
+				Kind:     "decision",
+				Title:    "Adopt focused detail panes",
+				Summary:  "Maat should keep selected ticket and catalog detail beside the list.",
+				Category: "inspection",
+				Status:   "adopt",
+				Metadata: []string{"pattern:focused-detail-pane", "2026-05-27"},
+				Details:  []string{"Rationale: the user wants to click into projects, scan boards, and read each item without opening Markdown files."},
+			},
+			{
+				ID:       "decision:adopt-keyboard-first-flow",
+				Kind:     "decision",
+				Title:    "Adopt keyboard-first flow",
+				Summary:  "Keep project and catalog movement available through predictable keys.",
+				Category: "navigation",
+				Status:   "adopt",
+				Metadata: []string{"pattern:keyboard-model", "2026-05-27"},
+				Details:  []string{"Rationale: terminal work should be fast enough for daily review and agent verification."},
+			},
+		},
+		Opportunities: []CatalogEntry{
+			{
+				ID:       "opportunity:catalog-mode",
+				Kind:     "opportunity",
+				Title:    "Catalog mode",
+				Summary:  "Expose terminal app examples and reusable patterns inside the TUI.",
+				Category: "catalog",
+				Status:   "in progress",
+				Metadata: []string{"T-20260527-104741-731b", "medium effort"},
+				Details:  []string{"Bridge IA observations into project work without making the user leave the dashboard."},
+			},
+			{
+				ID:       "opportunity:board-detail-flow",
+				Kind:     "opportunity",
+				Title:    "Board detail flow",
+				Summary:  "Make project list, board, and ticket detail the primary human path.",
+				Category: "project-board",
+				Status:   "in progress",
+				Metadata: []string{"T-20260527-104752-bb33", "low effort"},
+				Details:  []string{"Keep the first screen as projects, then use enter and backspace as terminal equivalents of click in and back out."},
+			},
+			{
+				ID:       "opportunity:no-color-verification",
+				Kind:     "opportunity",
+				Title:    "No-color verification",
+				Summary:  "Prove selected rows, statuses, and empty states are readable without color.",
+				Category: "accessibility",
+				Status:   "in progress",
+				Metadata: []string{"T-20260527-104802-f29d", "low effort"},
+				Details:  []string{"Selection markers, status labels, and empty-state copy must carry meaning without relying on color."},
+			},
+		},
+	}
+}
+
+func catalogFromObject(catalog maat.Catalog) Catalog {
+	converted := Catalog{
+		Apps:          make([]CatalogEntry, 0, len(catalog.Apps)),
+		Patterns:      make([]CatalogEntry, 0, len(catalog.Patterns)),
+		Decisions:     make([]CatalogEntry, 0, len(catalog.Decisions)),
+		Opportunities: make([]CatalogEntry, 0, len(catalog.Opportunities)),
+	}
+	for _, app := range catalog.Apps {
+		converted.Apps = append(converted.Apps, CatalogEntry{
+			ID:       firstCatalogValue(app.ID, app.Slug),
+			Kind:     "app",
+			Title:    firstCatalogValue(app.Name, app.Slug, app.ID),
+			Summary:  app.Summary,
+			Category: app.Category,
+			Status:   "reviewed",
+			Metadata: compactCatalogMetadata(app.Stars, app.Language, app.License, "reviewed "+app.LastReviewed),
+			Links:    compactCatalogMetadata(app.SourceURL, app.WebsiteURL),
+			Details: compactCatalogMetadata(
+				catalogDetail("Notes", app.Notes),
+				catalogDetail("Patterns", strings.Join(app.Patterns, ", ")),
+				catalogDetail("Related goals", strings.Join(app.RelatedGoals, ", ")),
+				catalogDetail("Related tickets", strings.Join(app.RelatedTickets, ", ")),
+			),
+		})
+	}
+	for _, pattern := range catalog.Patterns {
+		converted.Patterns = append(converted.Patterns, CatalogEntry{
+			ID:       firstCatalogValue(pattern.ID, pattern.Slug),
+			Kind:     "pattern",
+			Title:    firstCatalogValue(pattern.Title, pattern.Slug, pattern.ID),
+			Summary:  pattern.Problem,
+			Category: pattern.Category,
+			Status:   "pattern",
+			Metadata: compactCatalogMetadata("observed in " + strings.Join(pattern.ObservedIn, ", ")),
+			Details: compactCatalogMetadata(
+				catalogDetail("Maat use", pattern.MaatUse),
+				catalogDetail("Implementation", pattern.ImplementationNotes),
+				catalogDetail("Related goals", strings.Join(pattern.RelatedGoals, ", ")),
+				catalogDetail("Related tickets", strings.Join(pattern.RelatedTickets, ", ")),
+			),
+		})
+	}
+	for _, decision := range catalog.Decisions {
+		converted.Decisions = append(converted.Decisions, CatalogEntry{
+			ID:       firstCatalogValue(decision.ID, decision.Slug),
+			Kind:     "decision",
+			Title:    firstCatalogValue(decision.Title, decision.Slug, decision.ID),
+			Summary:  decision.Rationale,
+			Category: decision.Pattern,
+			Status:   firstCatalogValue(decision.State, decision.Decision),
+			Metadata: compactCatalogMetadata(decision.Date, "source "+decision.SourceApp),
+			Details: compactCatalogMetadata(
+				catalogDetail("Evidence", strings.Join(decision.Evidence, ", ")),
+				catalogDetail("Related goals", strings.Join(decision.RelatedGoals, ", ")),
+				catalogDetail("Related tickets", strings.Join(decision.RelatedTickets, ", ")),
+			),
+		})
+	}
+	for _, opportunity := range catalog.Opportunities {
+		converted.Opportunities = append(converted.Opportunities, CatalogEntry{
+			ID:       firstCatalogValue(opportunity.ID, opportunity.Slug),
+			Kind:     "opportunity",
+			Title:    firstCatalogValue(opportunity.Title, opportunity.Slug, opportunity.ID),
+			Summary:  opportunity.Summary,
+			Category: opportunity.Area,
+			Status:   opportunity.Status,
+			Metadata: compactCatalogMetadata(opportunity.Effort, "risk "+opportunity.Risk, "pattern "+opportunity.SourcePattern),
+			Details: compactCatalogMetadata(
+				catalogDetail("Suggested goal", opportunity.SuggestedGoal),
+				catalogDetail("Suggested ticket", opportunity.SuggestedTicket),
+			),
+		})
+	}
+	return converted
+}
+
+func mergeCatalogs(left Catalog, right Catalog) Catalog {
+	left.Apps = append(left.Apps, right.Apps...)
+	left.Patterns = append(left.Patterns, right.Patterns...)
+	left.Decisions = append(left.Decisions, right.Decisions...)
+	left.Opportunities = append(left.Opportunities, right.Opportunities...)
+	return left
+}
+
+func catalogEmpty(catalog Catalog) bool {
+	return len(catalog.Apps) == 0 &&
+		len(catalog.Patterns) == 0 &&
+		len(catalog.Decisions) == 0 &&
+		len(catalog.Opportunities) == 0
+}
+
+func firstCatalogValue(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func compactCatalogMetadata(values ...string) []string {
+	items := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || strings.EqualFold(value, "unknown") || strings.EqualFold(value, "reviewed unknown") {
+			continue
+		}
+		items = append(items, value)
+	}
+	return items
+}
+
+func catalogDetail(label, value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	return label + ": " + value
+}
+
+func RenderCatalog(catalog Catalog, mode CatalogMode, selections CatalogSelections, width int, query string, filter string, inspected bool) string {
+	catalog = FilterCatalog(catalog, query, filter)
+	if width <= 0 {
+		width = 120
+	}
+	if width < 72 {
+		return renderStackedCatalog(catalog, mode, selections, query, filter, inspected, width)
+	}
+	return renderPaneCatalog(catalog, mode, selections, query, filter, inspected, width)
+}
+
+func renderPaneCatalog(catalog Catalog, mode CatalogMode, selections CatalogSelections, query string, filter string, inspected bool, width int) string {
+	gap := "  "
+	listWidth := (width - len(gap)*2) / 4
+	if listWidth < 24 {
+		listWidth = 24
+	}
+	if listWidth > 34 {
+		listWidth = 34
+	}
+	detailWidth := width - listWidth*2 - len(gap)*2
+	if detailWidth < 36 {
+		detailWidth = 36
+	}
+
+	primaryTitle, primaryRows, primarySelected := catalogPrimaryList(catalog, mode, selections)
+	patternSelected := selections.Pattern
+	if mode == CatalogModePatterns {
+		patternSelected = selections.Pattern
+	}
+	detail := selectedCatalogEntry(catalog, mode, selections)
+	linesA := renderCatalogListLines(primaryTitle, primaryRows, primarySelected, listWidth, 8)
+	linesB := renderCatalogListLines("Patterns", catalog.Patterns, patternSelected, listWidth, 8)
+	linesC := renderCatalogDetailLines(detail, mode, query, filter, inspected, detailWidth)
+	maxLines := maxInt(len(linesA), maxInt(len(linesB), len(linesC)))
+
+	var b strings.Builder
+	b.WriteString(headerStyle.Render("Terminal Apps Catalog"))
+	b.WriteString("\n")
+	b.WriteString(truncate(catalogSummaryLine(catalog, mode, query, filter), width))
+	b.WriteString("\n\n")
+	for row := 0; row < maxLines; row++ {
+		b.WriteString(fmt.Sprintf("%-*s", listWidth, truncate(lineAt(linesA, row), listWidth)))
+		b.WriteString(gap)
+		b.WriteString(fmt.Sprintf("%-*s", listWidth, truncate(lineAt(linesB, row), listWidth)))
+		b.WriteString(gap)
+		b.WriteString(truncate(lineAt(linesC, row), detailWidth))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	b.WriteString(mutedStyle.Render(truncate("Catalog keys: tab/right mode, left previous mode, / search, f filter, enter inspect, backspace back.", width)))
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func renderStackedCatalog(catalog Catalog, mode CatalogMode, selections CatalogSelections, query string, filter string, inspected bool, width int) string {
+	primaryTitle, primaryRows, primarySelected := catalogPrimaryList(catalog, mode, selections)
+	var b strings.Builder
+	b.WriteString(headerStyle.Render("Terminal Apps Catalog"))
+	b.WriteString("\n")
+	b.WriteString(truncate(catalogSummaryLine(catalog, mode, query, filter), width))
+	b.WriteString("\n\n")
+	for _, line := range renderCatalogListLines(primaryTitle, primaryRows, primarySelected, width, 6) {
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	for _, line := range renderCatalogListLines("Patterns", catalog.Patterns, selections.Pattern, width, 5) {
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	for _, line := range renderCatalogDetailLines(selectedCatalogEntry(catalog, mode, selections), mode, query, filter, inspected, width) {
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	b.WriteString(mutedStyle.Render(truncate("Catalog keys: tab/right mode, left previous mode, / search, f filter, enter inspect, backspace back.", width)))
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func catalogSummaryLine(catalog Catalog, mode CatalogMode, query string, filter string) string {
+	parts := []string{
+		fmt.Sprintf("%d apps", len(catalog.Apps)),
+		fmt.Sprintf("%d patterns", len(catalog.Patterns)),
+		fmt.Sprintf("%d decisions", len(catalog.Decisions)),
+		fmt.Sprintf("%d opportunities", len(catalog.Opportunities)),
+		"mode " + catalogModeLabel(mode),
+	}
+	if strings.TrimSpace(filter) != "" {
+		parts = append(parts, "filter "+filter)
+	}
+	if strings.TrimSpace(query) != "" {
+		parts = append(parts, fmt.Sprintf("query %q", strings.TrimSpace(query)))
+	}
+	return strings.Join(parts, " | ")
+}
+
+func catalogPrimaryList(catalog Catalog, mode CatalogMode, selections CatalogSelections) (string, []CatalogEntry, int) {
+	switch mode {
+	case CatalogModePatterns:
+		return "Patterns", catalog.Patterns, selections.Pattern
+	case CatalogModeDecisions:
+		return "Decisions", catalog.Decisions, selections.Decision
+	case CatalogModeOpportunities:
+		return "Opportunities", catalog.Opportunities, selections.Opportunity
+	default:
+		return "Apps", catalog.Apps, selections.App
+	}
+}
+
+func renderCatalogListLines(title string, rows []CatalogEntry, selected int, width int, limit int) []string {
+	lines := []string{headerStyle.Render(fmt.Sprintf("%s (%d)", title, len(rows)))}
+	if len(rows) == 0 {
+		lines = append(lines, mutedStyle.Render("No catalog items"))
+		return lines
+	}
+	selected = clampSelection(selected, len(rows))
+	start := visibleCatalogStart(len(rows), limit, selected)
+	if start > 0 {
+		lines = append(lines, mutedStyle.Render(fmt.Sprintf("+ %d earlier", start)))
+	}
+	end := start + limit
+	if end > len(rows) {
+		end = len(rows)
+	}
+	for index := start; index < end; index++ {
+		row := rows[index]
+		prefix := "-"
+		if index == selected {
+			prefix = ">"
+		}
+		label := row.Title
+		if label == "" {
+			label = row.ID
+		}
+		if row.Status != "" {
+			label = fmt.Sprintf("%s [%s]", label, row.Status)
+		}
+		lines = append(lines, truncate(fmt.Sprintf("%s %s", prefix, label), width))
+		if row.Summary != "" {
+			lines = append(lines, truncate("  "+row.Summary, width))
+		}
+	}
+	if end < len(rows) {
+		lines = append(lines, mutedStyle.Render(fmt.Sprintf("+ %d more", len(rows)-end)))
+	}
+	return lines
+}
+
+func renderCatalogDetailLines(entry CatalogEntry, mode CatalogMode, query string, filter string, inspected bool, width int) []string {
+	lines := []string{headerStyle.Render("Detail")}
+	if entry.ID == "" && entry.Title == "" {
+		lines = append(lines, "No "+catalogModeLabel(mode)+" match the current catalog filters.")
+		lines = append(lines, "Use / to search, f to change the category filter, or tab to switch modes.")
+		return lines
+	}
+	title := entry.Title
+	if title == "" {
+		title = entry.ID
+	}
+	lines = append(lines, titleStyle.Render(truncate(title, width)))
+	metadata := []string{entry.Kind}
+	if entry.Category != "" {
+		metadata = append(metadata, entry.Category)
+	}
+	if entry.Status != "" {
+		metadata = append(metadata, "status "+entry.Status)
+	}
+	metadata = append(metadata, entry.Metadata...)
+	lines = append(lines, wrapLine(strings.Join(metadata, " | "), width))
+	if entry.Summary != "" {
+		lines = append(lines, "")
+		lines = appendRenderedLines(lines, wrapText(entry.Summary, width, 2))
+	}
+	if inspected {
+		if len(entry.Details) > 0 {
+			lines = append(lines, "")
+			lines = append(lines, headerStyle.Render("Notes"))
+			for _, detail := range entry.Details {
+				lines = appendRenderedLines(lines, wrapBullet(detail, width))
+			}
+		}
+		if len(entry.Links) > 0 {
+			lines = append(lines, "")
+			lines = append(lines, headerStyle.Render("Links"))
+			for _, link := range entry.Links {
+				lines = appendRenderedLines(lines, wrapBullet(link, width))
+			}
+		}
+	} else {
+		lines = append(lines, "")
+		lines = append(lines, mutedStyle.Render("Press enter to inspect notes and links."))
+	}
+	return lines
+}
+
+func appendRenderedLines(lines []string, rendered string) []string {
+	for _, line := range strings.Split(rendered, "\n") {
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+func selectedCatalogEntry(catalog Catalog, mode CatalogMode, selections CatalogSelections) CatalogEntry {
+	switch mode {
+	case CatalogModePatterns:
+		return selectedCatalogRow(catalog.Patterns, selections.Pattern)
+	case CatalogModeDecisions:
+		return selectedCatalogRow(catalog.Decisions, selections.Decision)
+	case CatalogModeOpportunities:
+		return selectedCatalogRow(catalog.Opportunities, selections.Opportunity)
+	default:
+		return selectedCatalogRow(catalog.Apps, selections.App)
+	}
+}
+
+func selectedCatalogRow(rows []CatalogEntry, selected int) CatalogEntry {
+	if len(rows) == 0 {
+		return CatalogEntry{}
+	}
+	return rows[clampSelection(selected, len(rows))]
+}
+
+func visibleCatalogStart(count int, limit int, selected int) int {
+	if count <= 0 || limit <= 0 || selected < limit {
+		return 0
+	}
+	return selected - limit + 1
+}
+
+func FilterCatalog(catalog Catalog, query string, filter string) Catalog {
+	query = strings.ToLower(strings.TrimSpace(query))
+	filter = strings.ToLower(strings.TrimSpace(filter))
+	return Catalog{
+		Apps:          filterCatalogEntries(catalog.Apps, query, filter),
+		Patterns:      filterCatalogEntries(catalog.Patterns, query, filter),
+		Decisions:     filterCatalogEntries(catalog.Decisions, query, filter),
+		Opportunities: filterCatalogEntries(catalog.Opportunities, query, filter),
+	}
+}
+
+func filterCatalogEntries(rows []CatalogEntry, query string, filter string) []CatalogEntry {
+	filtered := make([]CatalogEntry, 0, len(rows))
+	for _, row := range rows {
+		haystack := strings.ToLower(strings.Join([]string{
+			row.ID,
+			row.Kind,
+			row.Title,
+			row.Summary,
+			row.Category,
+			row.Status,
+			strings.Join(row.Metadata, " "),
+			strings.Join(row.Links, " "),
+			strings.Join(row.Details, " "),
+		}, " "))
+		if query != "" && !strings.Contains(haystack, query) {
+			continue
+		}
+		if filter != "" && !strings.Contains(haystack, filter) {
+			continue
+		}
+		filtered = append(filtered, row)
+	}
+	return filtered
+}
+
+func catalogModeLabel(mode CatalogMode) string {
+	switch mode {
+	case CatalogModePatterns:
+		return "patterns"
+	case CatalogModeDecisions:
+		return "decisions"
+	case CatalogModeOpportunities:
+		return "opportunities"
+	default:
+		return "apps"
+	}
+}
+
+func nextCatalogMode(mode CatalogMode) CatalogMode {
+	if mode == CatalogModeOpportunities {
+		return CatalogModeApps
+	}
+	return mode + 1
+}
+
+func previousCatalogMode(mode CatalogMode) CatalogMode {
+	if mode == CatalogModeApps {
+		return CatalogModeOpportunities
+	}
+	return mode - 1
+}
+
+func nextCatalogFilter(filter string) string {
+	switch strings.ToLower(strings.TrimSpace(filter)) {
+	case "":
+		return "navigation"
+	case "navigation":
+		return "inspection"
+	case "inspection":
+		return "refresh"
+	case "refresh":
+		return "empty-state"
+	default:
+		return ""
+	}
+}
+
+func lineAt(lines []string, index int) string {
+	if index < 0 || index >= len(lines) {
+		return ""
+	}
+	return lines[index]
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func RenderProjectTicketBoard(project ProjectRow, width int) string {
@@ -1473,7 +2224,7 @@ func selectedTicketIndexByID(tickets []TicketRow, id string, fallback int) int {
 }
 
 func nextDetailMode(mode DetailMode) DetailMode {
-	if mode == DetailModeTimeline {
+	if mode == DetailModeCatalog {
 		return DetailModeProject
 	}
 	return mode + 1
@@ -1481,7 +2232,7 @@ func nextDetailMode(mode DetailMode) DetailMode {
 
 func previousDetailMode(mode DetailMode) DetailMode {
 	if mode == DetailModeProject {
-		return DetailModeTimeline
+		return DetailModeCatalog
 	}
 	return mode - 1
 }

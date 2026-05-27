@@ -91,6 +91,8 @@ maat project show <project-key>
 maat status
 maat projects
 maat project show <project-key>
+maat catalog list apps --project <project-key>
+maat catalog show <id-or-slug> --project <project-key>
 maat search "blocked deploy"
 maat validate
 ```
@@ -171,7 +173,7 @@ Launch the terminal dashboard:
 maat tui
 ```
 
-The TUI starts with a project list. Press `enter` to open the selected project as a Kanban-style ticket board, move through tickets with the arrow keys, and press `enter` again to read the selected ticket's detail view.
+The TUI starts with a project list. Press `enter` to open the selected project as a Kanban-style ticket board, move through tickets with the arrow keys, and press `enter` again to read the selected ticket's detail view. Press `tab` or `right` to move through timeline and terminal app catalog views; in the catalog, use `tab` or `right` to switch apps, patterns, decisions, and opportunities, `/` to search, `f` to filter, and `enter` to inspect details.
 
 ## Agent Loop
 
