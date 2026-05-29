@@ -196,6 +196,7 @@ maat initialize --storage /absolute/path/to/maat-state
 
 - [Architecture](docs/architecture.md)
 - [macOS App Architecture](docs/macos-app-architecture.md)
+- [Desktop First Release Decisions](docs/desktop-first-release-decisions.md)
 - [Storage Model](docs/storage-model.md)
 - [Schema](docs/schema.md)
 - [Workflows](docs/workflows.md)

@@ -257,13 +257,17 @@ allow the user to run `maat update --json` against GitHub Releases.
 6. Add background refresh and explicit sync controls.
 7. Add optional terminal CLI installation into a PATH directory.
 
+Detailed first-release slices:
+
+- [Desktop Dashboard Views](./desktop-dashboard-views.md)
+- [Desktop Write Actions](./desktop-write-actions.md)
+- [Desktop Sync Controls](./desktop-sync-controls.md)
+- [Desktop Error States](./desktop-error-states.md)
+- [Desktop Update Behavior](./desktop-update-behavior.md)
+- [Desktop Signing Permissions](./desktop-signing-permissions.md)
+- [Desktop First Release Decisions](./desktop-first-release-decisions.md)
+
 ## Open Product Decisions
 
-- Whether the app should install the CLI only into app support, or also offer a
-  default terminal install during setup.
-- Whether cloning a storage repo should be built into the first release or
-  deferred in favor of selecting an existing local repo.
-- Whether the app should expose auto-push during first-run setup or keep it in
-  advanced settings.
-- Whether the first release should embed a read-only terminal/TUI view, or focus
-  on native views backed by CLI JSON.
+The first-release defaults are recorded in
+[Desktop First Release Decisions](./desktop-first-release-decisions.md).

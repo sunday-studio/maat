@@ -67,6 +67,30 @@ TARGETS="darwin/arm64 linux/amd64" scripts/build-release.sh
 
 GitHub Actions runs the same test and release build path on `v*` tags and manual dispatch. Tag builds publish the generated tarballs and checksum file to the matching GitHub Release and mark it as the latest release; manual dispatch uploads artifacts only.
 
+## Desktop App
+
+The Tauri desktop shell lives in `apps/desktop`. It uses the `maat` CLI as its
+product API and does not read or write Markdown state directly.
+
+```sh
+cd apps/desktop
+npm install
+npm run typecheck
+npm run build
+cd src-tauri
+cargo check
+```
+
+Run the app during development with:
+
+```sh
+cd apps/desktop
+MAAT_DESKTOP_CLI=/absolute/path/to/maat npm run tauri:dev
+```
+
+If `MAAT_DESKTOP_CLI` is not set, the app checks its app-private CLI path and
+then falls back to `maat` on `PATH`.
+
 ## Current Implementation Scope
 
 The current executable slice includes:
