@@ -32,86 +32,129 @@ var latestReleaseURL = "https://api.github.com/repos/sunday-studio/maat/releases
 var updateHTTPClient = http.DefaultClient
 
 type cliCommand struct {
-	Name    string
-	Group   string
-	Summary string
-	Usage   string
-	Run     func([]string) error
+	Name             string
+	Group            string
+	Summary          string
+	Usage            string
+	SupportsJSON     bool
+	SupportsAgentUse bool
+}
+
+type cliSurface struct {
+	Name        string           `json:"name"`
+	Summary     string           `json:"summary"`
+	Usage       string           `json:"usage"`
+	GlobalFlags []cliFlagSpec    `json:"global_flags"`
+	Commands    []cliCommandSpec `json:"commands"`
+}
+
+type cliFlagSpec struct {
+	Name         string `json:"name"`
+	Summary      string `json:"summary"`
+	Incompatible string `json:"incompatible,omitempty"`
+}
+
+type cliCommandSpec struct {
+	Name             string `json:"name"`
+	Group            string `json:"group"`
+	Summary          string `json:"summary"`
+	Usage            string `json:"usage"`
+	SupportsJSON     bool   `json:"supports_json"`
+	SupportsAgentUse bool   `json:"supports_agent_use"`
 }
 
 var cliCommands = []cliCommand{
 	{
-		Name:    "setup",
-		Group:   "Start",
-		Summary: "configure the local Maat storage repo",
+		Name:             "setup",
+		Group:            "Start",
+		Summary:          "configure the local Maat storage repo",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat setup [--storage <absolute-git-repo-path>] [--actor <name>] [--auto-pull|--no-auto-pull] [--auto-commit|--no-auto-commit] [--auto-push|--no-auto-push] [--json]
   maat setup rules [--storage <path>] [--json]
   maat setup doctor [--storage <path>] [--fix] [--json]`,
-		Run: setupCommand,
 	},
 	{
-		Name:    "initialize",
-		Group:   "Start",
-		Summary: "register the current repo and print agent instructions",
+		Name:             "initialize",
+		Group:            "Start",
+		Summary:          "register the current repo and print agent instructions",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat initialize [--project <project-key>] [--storage <path>] [--json]`,
-		Run: agentInitializeCommand,
 	},
 	{
-		Name:    "status",
-		Group:   "Inspect",
-		Summary: "show storage totals",
+		Name:             "commands",
+		Group:            "Start",
+		Summary:          "list the CLI command surface",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
+		Usage: `Usage:
+  maat commands [--json]`,
+	},
+	{
+		Name:             "status",
+		Group:            "Inspect",
+		Summary:          "show storage totals",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat status [--storage <path>] [--json]`,
-		Run: statusCommand,
 	},
 	{
-		Name:    "projects",
-		Group:   "Inspect",
-		Summary: "list projects",
+		Name:             "projects",
+		Group:            "Inspect",
+		Summary:          "list projects",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat projects [--storage <path>] [--json]`,
-		Run: projectsCommand,
 	},
 	{
-		Name:    "project",
-		Group:   "Inspect",
-		Summary: "show or link a project",
+		Name:             "project",
+		Group:            "Inspect",
+		Summary:          "show or link a project",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat project show <project-id> [--storage <path>] [--json]
   maat project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]`,
-		Run: projectCommand,
 	},
 	{
-		Name:    "catalog",
-		Group:   "Inspect",
-		Summary: "list or show catalog objects",
+		Name:             "catalog",
+		Group:            "Inspect",
+		Summary:          "list or show catalog objects",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat catalog list [apps|patterns|decisions|opportunities] [--project <project-key>] [--storage <path>] [--json]
   maat catalog show <id-or-slug> [--project <project-key>] [--storage <path>] [--json]`,
-		Run: catalogCommand,
 	},
 	{
-		Name:    "search",
-		Group:   "Inspect",
-		Summary: "search storage",
+		Name:             "search",
+		Group:            "Inspect",
+		Summary:          "search storage",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat search <query> [--storage <path>] [--json]`,
-		Run: searchCommand,
 	},
 	{
-		Name:    "goal",
-		Group:   "Write",
-		Summary: "create goals",
+		Name:             "goal",
+		Group:            "Write",
+		Summary:          "create goals",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat goal create [project-key] <title> --outcome <text> [--storage <path>] [--json]`,
-		Run: goalCommand,
 	},
 	{
-		Name:    "ticket",
-		Group:   "Write",
-		Summary: "create, claim, comment on, or complete tickets",
+		Name:             "ticket",
+		Group:            "Write",
+		Summary:          "create, claim, comment on, or complete tickets",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat ticket create [project-key] <title> [--goal <goal-id>] --description <text> --acceptance <text>... [--storage <path>] [--json]
   maat ticket list [--project <project-key>] [--storage <path>] [--json]
@@ -119,31 +162,33 @@ var cliCommands = []cliCommand{
   maat ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
   maat ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
   maat ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]`,
-		Run: ticketCommand,
 	},
 	{
-		Name:    "sync",
-		Group:   "Maintain",
-		Summary: "validate, index, commit, and optionally push storage",
+		Name:             "sync",
+		Group:            "Maintain",
+		Summary:          "validate, index, commit, and optionally push storage",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat sync [--storage <path>] [--message <msg>] [--push] [--status] [--json]`,
-		Run: syncCommand,
 	},
 	{
-		Name:    "validate",
-		Group:   "Maintain",
-		Summary: "validate storage Markdown",
+		Name:             "validate",
+		Group:            "Maintain",
+		Summary:          "validate storage Markdown",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat validate [--storage <path>] [--json]`,
-		Run: validateCommand,
 	},
 	{
-		Name:    "index",
-		Group:   "Maintain",
-		Summary: "rebuild local indexes",
+		Name:             "index",
+		Group:            "Maintain",
+		Summary:          "rebuild local indexes",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
-  maat index rebuild [--storage <path>]`,
-		Run: indexCommand,
+  maat index rebuild [--storage <path>] [--json]`,
 	},
 	{
 		Name:    "tui",
@@ -151,31 +196,33 @@ var cliCommands = []cliCommand{
 		Summary: "open the terminal dashboard",
 		Usage: `Usage:
   maat tui [--storage <path>]`,
-		Run: tuiCommand,
 	},
 	{
-		Name:    "update",
-		Group:   "Install",
-		Summary: "update the installed binary",
+		Name:             "update",
+		Group:            "Install",
+		Summary:          "update the installed binary",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat update [--source <path>] [--install-dir <path>] [--binary-name <name>] [--json]`,
-		Run: updateCommand,
 	},
 	{
-		Name:    "uninstall",
-		Group:   "Install",
-		Summary: "remove the installed binary",
+		Name:             "uninstall",
+		Group:            "Install",
+		Summary:          "remove the installed binary",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat uninstall [--install-dir <path>] [--binary-name <name>] [--purge-config] [--json]`,
-		Run: uninstallCommand,
 	},
 	{
-		Name:    "version",
-		Group:   "Install",
-		Summary: "print version information",
+		Name:             "version",
+		Group:            "Install",
+		Summary:          "print version information",
+		SupportsJSON:     true,
+		SupportsAgentUse: true,
 		Usage: `Usage:
   maat version [--json]`,
-		Run: versionCommand,
 	},
 }
 
@@ -195,6 +242,9 @@ func run(args []string) error {
 		return err
 	}
 	if len(args) == 0 {
+		if jsonUse {
+			return writeJSON(cliSurfaceSpec())
+		}
 		printHelp()
 		return nil
 	}
@@ -203,6 +253,9 @@ func run(args []string) error {
 	case args[0] == "help":
 		return helpCommand(args[1:])
 	case args[0] == "-h" || args[0] == "--help":
+		if jsonUse {
+			return writeJSON(cliSurfaceSpec())
+		}
 		printHelp()
 		return nil
 	}
@@ -212,10 +265,60 @@ func run(args []string) error {
 		return unknownCommandError(args[0])
 	}
 	if len(args) > 1 && isHelpFlag(args[1]) {
+		if jsonUse {
+			return writeJSON(cliCommandSpecFor(command))
+		}
 		printCommandHelp(command)
 		return nil
 	}
-	return command.Run(args[1:])
+	if jsonUse && !command.SupportsJSON {
+		return fmt.Errorf("command %q does not support --json", command.Name)
+	}
+	if agentUse && !command.SupportsAgentUse {
+		return fmt.Errorf("command %q does not support --agent-use", command.Name)
+	}
+	return runCLICommand(command.Name, args[1:])
+}
+
+func runCLICommand(name string, args []string) error {
+	switch name {
+	case "setup":
+		return setupCommand(args)
+	case "initialize":
+		return agentInitializeCommand(args)
+	case "commands":
+		return commandsCommand(args)
+	case "status":
+		return statusCommand(args)
+	case "projects":
+		return projectsCommand(args)
+	case "project":
+		return projectCommand(args)
+	case "catalog":
+		return catalogCommand(args)
+	case "search":
+		return searchCommand(args)
+	case "goal":
+		return goalCommand(args)
+	case "ticket":
+		return ticketCommand(args)
+	case "sync":
+		return syncCommand(args)
+	case "validate":
+		return validateCommand(args)
+	case "index":
+		return indexCommand(args)
+	case "tui":
+		return tuiCommand(args)
+	case "update":
+		return updateCommand(args)
+	case "uninstall":
+		return uninstallCommand(args)
+	case "version":
+		return versionCommand(args)
+	default:
+		return unknownCommandError(name)
+	}
 }
 
 func printHelp() {
@@ -224,11 +327,13 @@ func printHelp() {
 	fmt.Println("Usage:")
 	fmt.Println("  maat <command> [flags]")
 	fmt.Println("  maat help <command>")
+	fmt.Println("  maat commands --json")
 	fmt.Println()
 	fmt.Println("Commands:")
 	printCommandSummary()
 	fmt.Println()
 	fmt.Println("Global flags:")
+	fmt.Println("  --json        emit structured JSON where supported")
 	fmt.Println("  --agent-use   emit newline-delimited JSON updates for agents")
 	fmt.Println()
 	fmt.Println("Markdown plus Git is the source of truth. The SQLite index is a rebuildable local cache.")
@@ -248,6 +353,9 @@ func printCommandSummary() {
 func helpCommand(args []string) error {
 	switch len(args) {
 	case 0:
+		if jsonUse {
+			return writeJSON(cliSurfaceSpec())
+		}
 		printHelp()
 		return nil
 	case 1:
@@ -255,10 +363,64 @@ func helpCommand(args []string) error {
 		if !ok {
 			return unknownCommandError(args[0])
 		}
+		if jsonUse {
+			return writeJSON(cliCommandSpecFor(command))
+		}
 		printCommandHelp(command)
 		return nil
 	default:
 		return errors.New("usage: maat help [command]")
+	}
+}
+
+func commandsCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	if len(filtered) > 0 {
+		return errors.New("usage: maat commands [--json]")
+	}
+	spec := cliSurfaceSpec()
+	if agentUse {
+		return agentUpdate("commands.ready", "ok", "commands ready", spec)
+	}
+	if jsonOut {
+		return writeJSON(spec)
+	}
+	printHelp()
+	return nil
+}
+
+func cliSurfaceSpec() cliSurface {
+	commands := make([]cliCommandSpec, 0, len(cliCommands))
+	for _, command := range cliCommands {
+		commands = append(commands, cliCommandSpecFor(command))
+	}
+	return cliSurface{
+		Name:    "maat",
+		Summary: "Git-backed project state for agents",
+		Usage:   "maat <command> [flags]",
+		GlobalFlags: []cliFlagSpec{
+			{
+				Name:    "--json",
+				Summary: "emit structured JSON where supported",
+			},
+			{
+				Name:         "--agent-use",
+				Summary:      "emit newline-delimited JSON updates for agents",
+				Incompatible: "--json",
+			},
+		},
+		Commands: commands,
+	}
+}
+
+func cliCommandSpecFor(command cliCommand) cliCommandSpec {
+	return cliCommandSpec{
+		Name:             command.Name,
+		Group:            command.Group,
+		Summary:          command.Summary,
+		Usage:            command.Usage,
+		SupportsJSON:     command.SupportsJSON,
+		SupportsAgentUse: command.SupportsAgentUse,
 	}
 }
 
@@ -1495,10 +1657,11 @@ func validateSetupStoragePath(storagePath string) (string, error) {
 }
 
 func indexCommand(args []string) error {
-	if len(args) == 0 || args[0] != "rebuild" {
-		return errors.New("usage: maat index rebuild [--storage <path>]")
+	filtered, jsonOut := splitJSONFlag(args)
+	if len(filtered) == 0 || filtered[0] != "rebuild" {
+		return errors.New("usage: maat index rebuild [--storage <path>] [--json]")
 	}
-	store, err := loadStore(args[1:])
+	store, err := loadStore(filtered[1:])
 	if err != nil {
 		return err
 	}
@@ -1519,6 +1682,15 @@ func indexCommand(args []string) error {
 	}
 	if agentUse {
 		return agentUpdate("index.ready", "ok", "index rebuilt", map[string]any{
+			"projects":     len(idx.Projects),
+			"documents":    len(idx.Documents),
+			"json_path":    path,
+			"sqlite_index": sqliteInfo,
+		})
+	}
+	if jsonOut {
+		return writeJSON(map[string]any{
+			"action":       "index.rebuilt",
 			"projects":     len(idx.Projects),
 			"documents":    len(idx.Documents),
 			"json_path":    path,
@@ -2576,7 +2748,7 @@ func agentInitializeCommand(args []string) error {
 }
 
 func searchCommand(args []string) error {
-	jsonOut := false
+	jsonOut := jsonUse
 	filtered := make([]string, 0, len(args))
 	for _, arg := range args {
 		if arg == "--json" {
@@ -3123,7 +3295,7 @@ func defaultSystemActor() string {
 
 func splitJSONFlag(args []string) ([]string, bool) {
 	filtered := make([]string, 0, len(args))
-	jsonOut := false
+	jsonOut := jsonUse
 	for _, arg := range args {
 		if arg == "--json" {
 			jsonOut = true
@@ -3144,18 +3316,18 @@ func writeJSON(value any) error {
 func splitGlobalFlags(args []string) ([]string, error) {
 	filtered := make([]string, 0, len(args))
 	for _, arg := range args {
-		if arg == "--agent-use" {
+		switch arg {
+		case "--agent-use":
 			agentUse = true
+			continue
+		case "--json":
+			jsonUse = true
 			continue
 		}
 		filtered = append(filtered, arg)
 	}
-	if agentUse {
-		for _, arg := range filtered {
-			if arg == "--json" {
-				return nil, errors.New("--agent-use cannot be combined with --json")
-			}
-		}
+	if agentUse && jsonUse {
+		return nil, errors.New("--agent-use cannot be combined with --json")
 	}
 	return filtered, nil
 }

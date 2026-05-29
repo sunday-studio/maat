@@ -35,6 +35,7 @@ Check that your shell can find it:
 ```sh
 maat version
 maat help
+maat commands --json
 ```
 
 If `maat` is not found, add the install directory to `PATH` in your shell profile:

@@ -107,6 +107,8 @@ func TestRootHelpShowsCuratedCommandGroups(t *testing.T) {
 		"Maintain:",
 		"Install:",
 		"maat help <command>",
+		"maat commands --json",
+		"--json",
 		"--agent-use",
 	} {
 		if !strings.Contains(output, want) {
@@ -130,6 +132,71 @@ func TestCommandHelpUsesCommandUsage(t *testing.T) {
 	}
 	if !strings.Contains(output, "maat ticket create [project-key] <title>") {
 		t.Fatalf("expected command --help to print ticket usage, got %q", output)
+	}
+}
+
+func TestCommandSurfaceJSON(t *testing.T) {
+	output, err := captureRun("commands", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var surface cliSurface
+	if err := json.Unmarshal([]byte(output), &surface); err != nil {
+		t.Fatal(err)
+	}
+	if surface.Name != "maat" || len(surface.Commands) == 0 || len(surface.GlobalFlags) == 0 {
+		t.Fatalf("unexpected command surface: %#v", surface)
+	}
+	foundStatus := false
+	foundJSON := false
+	for _, command := range surface.Commands {
+		if command.Name == "status" {
+			foundStatus = command.SupportsJSON && command.SupportsAgentUse && strings.Contains(command.Usage, "maat status")
+		}
+	}
+	for _, flag := range surface.GlobalFlags {
+		if flag.Name == "--json" {
+			foundJSON = true
+		}
+	}
+	if !foundStatus || !foundJSON {
+		t.Fatalf("expected status command and json flag in surface: %#v", surface)
+	}
+}
+
+func TestHelpJSONReturnsCommandSpec(t *testing.T) {
+	output, err := captureRun("help", "ticket", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var command cliCommandSpec
+	if err := json.Unmarshal([]byte(output), &command); err != nil {
+		t.Fatal(err)
+	}
+	if command.Name != "ticket" || !command.SupportsJSON || !strings.Contains(command.Usage, "ticket complete") {
+		t.Fatalf("unexpected ticket command spec: %#v", command)
+	}
+}
+
+func TestGlobalJSONFlagWorksBeforeCommand(t *testing.T) {
+	store := writeCommandFixture(t)
+
+	output, err := captureRun("--json", "status", "--storage", store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var summary maat.StatusSummary
+	if err := json.Unmarshal([]byte(output), &summary); err != nil {
+		t.Fatal(err)
+	}
+	if summary.Projects != 1 {
+		t.Fatalf("unexpected status summary: %#v", summary)
+	}
+}
+
+func TestUnsupportedJSONCommandFailsBeforeRunning(t *testing.T) {
+	if _, err := captureRun("tui", "--json"); err == nil || !strings.Contains(err.Error(), "does not support --json") {
+		t.Fatalf("expected tui --json to fail, got %v", err)
 	}
 }
 
@@ -1008,6 +1075,18 @@ func TestIndexRebuildAndSearchCommand(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(store, ".maat", "index.sqlite")); err != nil {
 		t.Fatalf("expected sqlite index: %v", err)
+	}
+
+	output, err = captureRun("index", "rebuild", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rebuild map[string]any
+	if err := json.Unmarshal([]byte(output), &rebuild); err != nil {
+		t.Fatal(err)
+	}
+	if rebuild["action"] != "index.rebuilt" || rebuild["json_path"] == "" || rebuild["sqlite_index"] == nil {
+		t.Fatalf("unexpected index rebuild json: %#v", rebuild)
 	}
 
 	output, err = captureRun("search", "agent health", "--storage", store)

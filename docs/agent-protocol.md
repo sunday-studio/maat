@@ -64,6 +64,14 @@ maat sync --message "status(<project-key>): update maat" --push
 
 ## Commands
 
+Agents can discover the supported top-level surface with:
+
+```sh
+maat commands --json
+```
+
+`--json` can be placed before or after commands that support a single structured result, such as `maat --json status` or `maat status --json`.
+
 Read commands:
 
 ```sh
@@ -74,6 +82,7 @@ maat ticket list [--project <project-key>] [--storage <path>] [--json]
 maat ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]
 maat search <query> [--storage <path>] [--json]
 maat validate [--storage <path>] [--json]
+maat index rebuild [--storage <path>] [--json]
 ```
 
 Write commands:
@@ -89,7 +98,7 @@ maat sync [--storage <path>] [--message <msg>] [--push] [--status] [--json]
 maat setup rules [--storage <path>] [--json]
 ```
 
-Use `--agent-use` when an agent needs newline-delimited progress updates instead of human-readable output.
+Use `--agent-use` when an agent needs newline-delimited progress updates instead of human-readable output. Do not combine `--agent-use` with `--json`.
 
 ## Rules
 

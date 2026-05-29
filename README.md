@@ -104,7 +104,7 @@ maat search "blocked deploy"
 maat validate
 ```
 
-Use `maat help <command>` for the focused usage of any top-level command, for example `maat help ticket`.
+Use `maat help <command>` for focused human usage, or `maat commands --json` for the machine-readable command surface.
 
 Human output is colored when the terminal supports it. Set `MAAT_COLOR=always` or `MAAT_COLOR=never` to force color behavior.
 
@@ -114,7 +114,7 @@ Agents that need parseable progress should use `--agent-use` instead of scraping
 maat status --agent-use
 ```
 
-`--agent-use` emits newline-delimited JSON updates and cannot be combined with `--json`.
+Agents that need a single JSON result can put `--json` before or after the command, for example `maat --json status`. `--agent-use` emits newline-delimited JSON updates and cannot be combined with `--json`.
 
 ### 5. Create Goals And Tickets
 
