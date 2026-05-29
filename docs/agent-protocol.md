@@ -12,6 +12,12 @@ Run setup once on the machine:
 maat setup --storage /absolute/path/to/maat-state
 ```
 
+Setup creates `setup.md` in the storage root when it is missing or blank. To backfill the default rules into an existing storage repo, run:
+
+```sh
+maat setup rules --storage /absolute/path/to/maat-state
+```
+
 From a project repo, teach the agent by running:
 
 ```sh
@@ -46,6 +52,8 @@ maat ticket comment <ticket-id> "short factual progress note" --project <project
 maat search "<query>"
 ```
 
+Store generated plans in Maat only when they are durable coordination material: use a ticket comment for plans that affect handoff, sequencing, or future work. Keep private scratch reasoning and noisy step-by-step deliberation out of storage.
+
 Finish with evidence:
 
 ```sh
@@ -78,6 +86,7 @@ maat ticket claim <ticket-id> [--agent <agent-id>] [--ttl <duration>] [--project
 maat ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
 maat ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]
 maat sync [--storage <path>] [--message <msg>] [--push] [--status] [--json]
+maat setup rules [--storage <path>] [--json]
 ```
 
 Use `--agent-use` when an agent needs newline-delimited progress updates instead of human-readable output.
@@ -88,6 +97,8 @@ Use `--agent-use` when an agent needs newline-delimited progress updates instead
 - Never create title-only goals or tickets.
 - Every new goal must include a concrete outcome.
 - Every new ticket must include a concrete description and at least one acceptance criterion.
+- Store durable plans as ticket comments when they affect coordination, handoff, or future work.
+- Do not store private scratch reasoning or noisy step-by-step deliberation in Maat.
 - Add comments for meaningful progress, blockers, and handoffs.
 - Complete tickets only with clear evidence.
 - Do not retry a write just because index refresh failed; rebuild the index later.

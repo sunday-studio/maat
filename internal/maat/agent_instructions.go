@@ -2,13 +2,79 @@ package maat
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
-const agentInstructionsSnippet = `Use Maat as the canonical project memory for this repo. Before work, run ` + "`maat status`" + ` and ` + "`maat project show <project>`" + `. Create or claim a ticket before material work. New goals must include an outcome; new tickets must include a description and acceptance criteria. Add short progress comments when useful. Complete tickets only with evidence. Validate and sync when done.`
+const StorageSetupFilename = "setup.md"
+
+const agentInstructionsSnippet = `Use Maat as the canonical project memory for this repo. Before work, run ` + "`maat status`" + ` and ` + "`maat project show <project>`" + `. Create or claim a ticket before material work. New goals must include an outcome; new tickets must include a description and acceptance criteria. Store durable plans as ticket comments when they matter for handoff, but keep private scratch reasoning out of Maat. Add short progress comments when useful. Complete tickets only with evidence. Validate and sync when done.`
+
+const defaultStorageSetupDocument = `# Maat Setup
+
+Maat storage is the canonical project memory for agents. Markdown plus Git is the source of truth; SQLite and rendered views are rebuildable local caches.
+
+## Agent Rules
+
+- Run ` + "`maat status`" + ` and inspect the relevant project before material work.
+- Create or claim a ticket before material work.
+- Never create title-only goals or tickets.
+- Every new goal must include a concrete outcome.
+- Every new ticket must include a concrete description and at least one acceptance criterion.
+- Store durable plans as ticket comments when they affect coordination, handoff, or future work.
+- Do not store private scratch reasoning, hidden chain-of-thought, or noisy step-by-step deliberation in Maat.
+- Add comments for meaningful progress, blockers, handoffs, and decisions.
+- Complete a ticket only when there is clear evidence.
+- Validate storage before sharing changes.
+- Commit finished product changes in the product repo.
+- Commit Maat storage changes in the storage repo, and push only when the remote is confirmed.
+- Do not commit Maat storage files into product repos.
+- Do not store primary project state outside Markdown.
+`
 
 func agentInstructionsSnippetText() string {
 	return agentInstructionsSnippet
+}
+
+type StorageSetupDocumentResult struct {
+	Path     string `json:"path"`
+	Created  bool   `json:"created"`
+	Updated  bool   `json:"updated"`
+	Existing bool   `json:"existing"`
+}
+
+func DefaultStorageSetupDocument() string {
+	return defaultStorageSetupDocument
+}
+
+func EnsureStorageSetupDocument(store string) (StorageSetupDocumentResult, error) {
+	store = strings.TrimSpace(store)
+	if store == "" {
+		return StorageSetupDocumentResult{}, fmt.Errorf("storage path is required")
+	}
+	path := filepath.Join(store, StorageSetupFilename)
+	result := StorageSetupDocumentResult{Path: path}
+	data, err := os.ReadFile(path)
+	switch {
+	case os.IsNotExist(err):
+		if err := os.WriteFile(path, []byte(DefaultStorageSetupDocument()), 0o644); err != nil {
+			return StorageSetupDocumentResult{}, err
+		}
+		result.Created = true
+		return result, nil
+	case err != nil:
+		return StorageSetupDocumentResult{}, err
+	case strings.TrimSpace(string(data)) == "":
+		if err := os.WriteFile(path, []byte(DefaultStorageSetupDocument()), 0o644); err != nil {
+			return StorageSetupDocumentResult{}, err
+		}
+		result.Updated = true
+		return result, nil
+	default:
+		result.Existing = true
+		return result, nil
+	}
 }
 
 type AgentSetupOptions struct {
@@ -39,6 +105,7 @@ Maat is the project memory. Markdown plus Git is the source of truth. SQLite is 
 
 This repo is registered as `+"`%[1]s`"+`.
 Maat storage lives in `+"`%[2]s`"+`; keep those Markdown state files in that storage repo, not in this product repo.
+Default storage rules live in `+"`%[2]s/%[5]s`"+`.
 Maat binary: %[4]s.
 
 ## First Run
@@ -92,6 +159,8 @@ maat sync --storage %[2]s --message "status(%[1]s): update maat" --push
 - Never create title-only goals or tickets.
 - Every new goal must include a concrete outcome.
 - Every new ticket must include a concrete description and at least one acceptance criterion.
+- Store durable plans as ticket comments when they affect coordination, handoff, or future work.
+- Do not store private scratch reasoning, hidden chain-of-thought, or noisy step-by-step deliberation in Maat.
 - Add comments for meaningful progress, blockers, handoffs, and decisions.
 - Complete a ticket only when there is clear evidence.
 - Commit finished product changes in the product repo.
@@ -99,5 +168,5 @@ maat sync --storage %[2]s --message "status(%[1]s): update maat" --push
 - Do not commit Maat storage files into the product repo.
 - Do not store primary project state outside Markdown.
 `,
-		project, storage, agentInstructionsSnippetText(), binaryVersion)
+		project, storage, agentInstructionsSnippetText(), binaryVersion, StorageSetupFilename)
 }

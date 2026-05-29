@@ -61,6 +61,12 @@ For agents and scripts, use the non-interactive form:
 maat setup --storage "$HOME/maat-state"
 ```
 
+Setup creates `setup.md` in the storage root when it is missing or blank. To add the default rules to an existing storage repo later:
+
+```sh
+maat setup rules --storage "$HOME/maat-state"
+```
+
 You can also pass storage explicitly on any command:
 
 ```sh

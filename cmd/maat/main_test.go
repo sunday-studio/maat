@@ -465,6 +465,16 @@ func TestSetupCommandWritesConfig(t *testing.T) {
 	if result.Action != "setup.configured" || result.StoragePath != store || result.ConfigPath != configFile {
 		t.Fatalf("unexpected setup result: %#v", result)
 	}
+	if result.SetupPath != filepath.Join(store, maat.StorageSetupFilename) || !result.SetupCreated || result.SetupUpdated || result.SetupExisting {
+		t.Fatalf("unexpected setup rules result: %#v", result)
+	}
+	setupData, err := os.ReadFile(result.SetupPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(setupData), "# Maat Setup") || !strings.Contains(string(setupData), "Store durable plans as ticket comments") {
+		t.Fatalf("unexpected setup rules document: %q", setupData)
+	}
 	if result.DefaultActor != "test-agent" || !result.AutoPullBeforeRead || !result.AutoCommitAfterWrite || result.AutoPushAfterCommit {
 		t.Fatalf("unexpected setup defaults: %#v", result)
 	}
@@ -477,6 +487,42 @@ func TestSetupCommandWritesConfig(t *testing.T) {
 	}
 	if cfg.InstallDir != existing.InstallDir || cfg.BinaryName != existing.BinaryName || cfg.BinaryPath != existing.BinaryPath {
 		t.Fatalf("setup should preserve install location: %#v", cfg)
+	}
+}
+
+func TestSetupRulesCommandCreatesMissingSetupDocument(t *testing.T) {
+	store := t.TempDir()
+	runGit(t, store, "init", "-b", "main")
+
+	output, err := captureRun("setup", "rules", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result setupRulesCommandResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Action != "setup.rules" || result.StoragePath != store || result.SetupPath != filepath.Join(store, maat.StorageSetupFilename) || !result.SetupCreated {
+		t.Fatalf("unexpected setup rules result: %#v", result)
+	}
+	data, err := os.ReadFile(result.SetupPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "Maat storage is the canonical project memory") {
+		t.Fatalf("unexpected setup rules document: %q", data)
+	}
+
+	output, err = captureRun("setup", "rules", "--storage", store, "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.SetupExisting || result.SetupCreated || result.SetupUpdated {
+		t.Fatalf("expected idempotent setup rules result, got %#v", result)
 	}
 }
 
@@ -1772,6 +1818,9 @@ func TestInitializeCommandJSON(t *testing.T) {
 	}
 	if payload.ProjectKey != "maat" || payload.StoragePath != store || payload.LinkedProject.ProjectKey != "maat" {
 		t.Fatalf("unexpected initialize payload: %#v", payload)
+	}
+	if payload.SetupPath != filepath.Join(store, maat.StorageSetupFilename) || !payload.SetupCreated {
+		t.Fatalf("expected initialize to create setup rules, got %#v", payload)
 	}
 	if payload.Version.Version != "dev" {
 		t.Fatalf("expected initialize version context, got %#v", payload.Version)

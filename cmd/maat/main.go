@@ -148,6 +148,7 @@ Usage:
 
 Common:
   maat setup [--storage <absolute-git-repo-path>] [--actor <name>] [--json]
+  maat setup rules [--storage <path>] [--json]
   maat setup doctor [--storage <path>] [--fix] [--json]
   maat initialize [--project <project-key>] [--storage <path>] [--json]
   maat status [--storage <path>] [--json]
@@ -172,6 +173,7 @@ Tickets:
 
 Setup and maintenance:
   maat setup [--storage <absolute-git-repo-path>] [--actor <name>] [--auto-pull|--no-auto-pull] [--auto-commit|--no-auto-commit] [--auto-push|--no-auto-push] [--json]
+  maat setup rules [--storage <path>] [--json]
   maat setup doctor [--storage <path>] [--fix] [--json]
   maat update [--source <path>] [--install-dir <path>] [--binary-name <name>] [--json]
   maat uninstall [--install-dir <path>] [--binary-name <name>] [--purge-config] [--json]
@@ -545,6 +547,19 @@ type setupCommandResult struct {
 	AutoPullBeforeRead   bool   `json:"auto_pull_before_read"`
 	AutoCommitAfterWrite bool   `json:"auto_commit_after_write"`
 	AutoPushAfterCommit  bool   `json:"auto_push_after_commit"`
+	SetupPath            string `json:"setup_path"`
+	SetupCreated         bool   `json:"setup_created"`
+	SetupUpdated         bool   `json:"setup_updated"`
+	SetupExisting        bool   `json:"setup_existing"`
+}
+
+type setupRulesCommandResult struct {
+	Action        string `json:"action"`
+	StoragePath   string `json:"storage_path"`
+	SetupPath     string `json:"setup_path"`
+	SetupCreated  bool   `json:"setup_created"`
+	SetupUpdated  bool   `json:"setup_updated"`
+	SetupExisting bool   `json:"setup_existing"`
 }
 
 type setupDoctorResult struct {
@@ -572,6 +587,9 @@ func setupCommand(args []string) error {
 	filtered, jsonOut := splitJSONFlag(args)
 	if len(filtered) > 0 && filtered[0] == "doctor" {
 		return setupDoctorCommand(filtered[1:], jsonOut)
+	}
+	if len(filtered) > 0 && filtered[0] == "rules" {
+		return setupRulesCommand(filtered[1:], jsonOut)
 	}
 	cfg := defaultConfig()
 	storagePath := ""
@@ -622,6 +640,10 @@ func setupCommand(args []string) error {
 	if err != nil {
 		return reportStorageAccessError("setup.storage", storagePath, "inspect setup storage", err)
 	}
+	setupDoc, err := maat.EnsureStorageSetupDocument(abs)
+	if err != nil {
+		return reportStorageAccessError("setup.rules", abs, "write storage setup rules", err)
+	}
 	cfg.StoragePath = abs
 	preserveInstalledBinaryConfig(&cfg)
 	configFile, err := persistConfig(cfg)
@@ -636,6 +658,10 @@ func setupCommand(args []string) error {
 		AutoPullBeforeRead:   cfg.AutoPullBeforeRead,
 		AutoCommitAfterWrite: cfg.AutoCommitAfterWrite,
 		AutoPushAfterCommit:  cfg.AutoPushAfterCommit,
+		SetupPath:            setupDoc.Path,
+		SetupCreated:         setupDoc.Created,
+		SetupUpdated:         setupDoc.Updated,
+		SetupExisting:        setupDoc.Existing,
 	}
 	if agentUse {
 		return agentUpdate("setup.configured", "ok", "setup complete", result)
@@ -650,6 +676,46 @@ func setupCommand(args []string) error {
 	printField("Auto-pull before reads", formatBool(result.AutoPullBeforeRead))
 	printField("Auto-commit after writes", formatBool(result.AutoCommitAfterWrite))
 	printField("Auto-push after commits", formatBool(result.AutoPushAfterCommit))
+	printField("Setup rules", result.SetupPath)
+	return nil
+}
+
+func setupRulesCommand(args []string, jsonOut bool) error {
+	store, err := loadStore(args)
+	if err != nil {
+		return err
+	}
+	abs, err := validateSetupStoragePath(store)
+	if err != nil {
+		return reportStorageAccessError("setup.rules", store, "inspect setup storage", err)
+	}
+	setupDoc, err := maat.EnsureStorageSetupDocument(abs)
+	if err != nil {
+		return reportStorageAccessError("setup.rules", abs, "write storage setup rules", err)
+	}
+	result := setupRulesCommandResult{
+		Action:        "setup.rules",
+		StoragePath:   abs,
+		SetupPath:     setupDoc.Path,
+		SetupCreated:  setupDoc.Created,
+		SetupUpdated:  setupDoc.Updated,
+		SetupExisting: setupDoc.Existing,
+	}
+	if agentUse {
+		return agentUpdate("setup.rules", "ok", "storage setup rules ready", result)
+	}
+	if jsonOut {
+		return writeJSON(result)
+	}
+	if result.SetupCreated {
+		ok("setup.rules", "created storage setup rules", nil)
+	} else if result.SetupUpdated {
+		ok("setup.rules", "filled empty storage setup rules", nil)
+	} else {
+		ok("setup.rules", "storage setup rules already exist", nil)
+	}
+	printField("Storage", result.StoragePath)
+	printField("Setup rules", result.SetupPath)
 	return nil
 }
 
@@ -2207,6 +2273,10 @@ type initializeCommandResult struct {
 	LinkedProject  maat.LinkedProject `json:"linked_project"`
 	ProjectKey     string             `json:"project_key"`
 	StoragePath    string             `json:"storage_path"`
+	SetupPath      string             `json:"setup_path"`
+	SetupCreated   bool               `json:"setup_created"`
+	SetupUpdated   bool               `json:"setup_updated"`
+	SetupExisting  bool               `json:"setup_existing"`
 	Version        version.Info       `json:"version"`
 	IndexRefreshed bool               `json:"index_refreshed"`
 	IndexWarning   string             `json:"index_warning,omitempty"`
@@ -2241,6 +2311,10 @@ func agentInitializeCommand(args []string) error {
 	if err != nil {
 		return reportStorageAccessError("initialize.project", store, "write project registration", err)
 	}
+	setupDoc, err := maat.EnsureStorageSetupDocument(store)
+	if err != nil {
+		return reportStorageAccessError("initialize.rules", store, "write storage setup rules", err)
+	}
 	progress("initialize.index", "refreshing indexes", nil)
 	refreshResult := refreshIndexesBestEffort(store)
 	warnIndexRefresh(refreshResult)
@@ -2259,6 +2333,10 @@ func agentInitializeCommand(args []string) error {
 		LinkedProject:  linked,
 		ProjectKey:     linked.ProjectKey,
 		StoragePath:    store,
+		SetupPath:      setupDoc.Path,
+		SetupCreated:   setupDoc.Created,
+		SetupUpdated:   setupDoc.Updated,
+		SetupExisting:  setupDoc.Existing,
 		Version:        binaryVersion,
 		IndexRefreshed: refreshResult.Refreshed,
 		IndexWarning:   refreshResult.Warning,

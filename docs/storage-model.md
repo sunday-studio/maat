@@ -17,6 +17,7 @@ The current storage model is object-oriented and conflict-resistant. Most agent 
 
 ```text
 maat-state/
+├── setup.md
 ├── projects/
 │   └── maat/
 │       ├── project.md
@@ -34,6 +35,18 @@ maat-state/
 ```
 
 The product repository ignores `state/` so local smoke data and nested storage experiments do not clutter the source tree. Storage repos use the root layout above.
+
+## Storage Setup File
+
+Path:
+
+```text
+setup.md
+```
+
+The storage root may include `setup.md` with default agent rules for that storage repo. `maat setup --storage <path>` creates it when missing or blank, and `maat setup rules --storage <path>` can backfill an existing storage repo.
+
+Use it for durable coordination rules, including the expectation that agents store useful plans as ticket comments when those plans matter for handoff or future work. Do not use it for private scratch reasoning or generated summaries that can be rebuilt.
 
 ## Local Cache Layout
 
