@@ -93,6 +93,52 @@ func TestAgentUseRejectsJSONFlag(t *testing.T) {
 	}
 }
 
+func TestRootHelpShowsCuratedCommandGroups(t *testing.T) {
+	output, err := captureRun("help")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{
+		"maat - Git-backed project state for agents",
+		"Start:",
+		"Inspect:",
+		"Write:",
+		"Maintain:",
+		"Install:",
+		"maat help <command>",
+		"--agent-use",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected root help to include %q, got %q", want, output)
+		}
+	}
+}
+
+func TestCommandHelpUsesCommandUsage(t *testing.T) {
+	output, err := captureRun("help", "ticket")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "maat ticket - create, claim, comment on, or complete tickets") || !strings.Contains(output, "maat ticket complete <ticket-id> --evidence <text>") {
+		t.Fatalf("unexpected ticket help output: %q", output)
+	}
+
+	output, err = captureRun("ticket", "--help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, "maat ticket create [project-key] <title>") {
+		t.Fatalf("expected command --help to print ticket usage, got %q", output)
+	}
+}
+
+func TestUnknownCommandSuggestsHelp(t *testing.T) {
+	if _, err := captureRun("agent", "initialize"); err == nil || !strings.Contains(err.Error(), "run maat help") {
+		t.Fatalf("expected unknown command to suggest help, got %v", err)
+	}
+}
+
 func TestHumanOutputCanUseColor(t *testing.T) {
 	t.Setenv("MAAT_COLOR", "always")
 	store := writeCommandFixture(t)

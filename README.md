@@ -20,6 +20,7 @@ Check the binary:
 
 ```sh
 maat version
+maat help
 ```
 
 You do not need to clone this repository to use Maat. Clone it only if you want to contribute or build from source.
@@ -102,6 +103,8 @@ maat catalog show <id-or-slug> --project <project-key>
 maat search "blocked deploy"
 maat validate
 ```
+
+Use `maat help <command>` for the focused usage of any top-level command, for example `maat help ticket`.
 
 Human output is colored when the terminal supports it. Set `MAAT_COLOR=always` or `MAAT_COLOR=never` to force color behavior.
 

@@ -31,6 +31,154 @@ var jsonUse bool
 var latestReleaseURL = "https://api.github.com/repos/sunday-studio/maat/releases/latest"
 var updateHTTPClient = http.DefaultClient
 
+type cliCommand struct {
+	Name    string
+	Group   string
+	Summary string
+	Usage   string
+	Run     func([]string) error
+}
+
+var cliCommands = []cliCommand{
+	{
+		Name:    "setup",
+		Group:   "Start",
+		Summary: "configure the local Maat storage repo",
+		Usage: `Usage:
+  maat setup [--storage <absolute-git-repo-path>] [--actor <name>] [--auto-pull|--no-auto-pull] [--auto-commit|--no-auto-commit] [--auto-push|--no-auto-push] [--json]
+  maat setup rules [--storage <path>] [--json]
+  maat setup doctor [--storage <path>] [--fix] [--json]`,
+		Run: setupCommand,
+	},
+	{
+		Name:    "initialize",
+		Group:   "Start",
+		Summary: "register the current repo and print agent instructions",
+		Usage: `Usage:
+  maat initialize [--project <project-key>] [--storage <path>] [--json]`,
+		Run: agentInitializeCommand,
+	},
+	{
+		Name:    "status",
+		Group:   "Inspect",
+		Summary: "show storage totals",
+		Usage: `Usage:
+  maat status [--storage <path>] [--json]`,
+		Run: statusCommand,
+	},
+	{
+		Name:    "projects",
+		Group:   "Inspect",
+		Summary: "list projects",
+		Usage: `Usage:
+  maat projects [--storage <path>] [--json]`,
+		Run: projectsCommand,
+	},
+	{
+		Name:    "project",
+		Group:   "Inspect",
+		Summary: "show or link a project",
+		Usage: `Usage:
+  maat project show <project-id> [--storage <path>] [--json]
+  maat project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]`,
+		Run: projectCommand,
+	},
+	{
+		Name:    "catalog",
+		Group:   "Inspect",
+		Summary: "list or show catalog objects",
+		Usage: `Usage:
+  maat catalog list [apps|patterns|decisions|opportunities] [--project <project-key>] [--storage <path>] [--json]
+  maat catalog show <id-or-slug> [--project <project-key>] [--storage <path>] [--json]`,
+		Run: catalogCommand,
+	},
+	{
+		Name:    "search",
+		Group:   "Inspect",
+		Summary: "search storage",
+		Usage: `Usage:
+  maat search <query> [--storage <path>] [--json]`,
+		Run: searchCommand,
+	},
+	{
+		Name:    "goal",
+		Group:   "Write",
+		Summary: "create goals",
+		Usage: `Usage:
+  maat goal create [project-key] <title> --outcome <text> [--storage <path>] [--json]`,
+		Run: goalCommand,
+	},
+	{
+		Name:    "ticket",
+		Group:   "Write",
+		Summary: "create, claim, comment on, or complete tickets",
+		Usage: `Usage:
+  maat ticket create [project-key] <title> [--goal <goal-id>] --description <text> --acceptance <text>... [--storage <path>] [--json]
+  maat ticket list [--project <project-key>] [--storage <path>] [--json]
+  maat ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]
+  maat ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
+  maat ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
+  maat ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]`,
+		Run: ticketCommand,
+	},
+	{
+		Name:    "sync",
+		Group:   "Maintain",
+		Summary: "validate, index, commit, and optionally push storage",
+		Usage: `Usage:
+  maat sync [--storage <path>] [--message <msg>] [--push] [--status] [--json]`,
+		Run: syncCommand,
+	},
+	{
+		Name:    "validate",
+		Group:   "Maintain",
+		Summary: "validate storage Markdown",
+		Usage: `Usage:
+  maat validate [--storage <path>] [--json]`,
+		Run: validateCommand,
+	},
+	{
+		Name:    "index",
+		Group:   "Maintain",
+		Summary: "rebuild local indexes",
+		Usage: `Usage:
+  maat index rebuild [--storage <path>]`,
+		Run: indexCommand,
+	},
+	{
+		Name:    "tui",
+		Group:   "Maintain",
+		Summary: "open the terminal dashboard",
+		Usage: `Usage:
+  maat tui [--storage <path>]`,
+		Run: tuiCommand,
+	},
+	{
+		Name:    "update",
+		Group:   "Install",
+		Summary: "update the installed binary",
+		Usage: `Usage:
+  maat update [--source <path>] [--install-dir <path>] [--binary-name <name>] [--json]`,
+		Run: updateCommand,
+	},
+	{
+		Name:    "uninstall",
+		Group:   "Install",
+		Summary: "remove the installed binary",
+		Usage: `Usage:
+  maat uninstall [--install-dir <path>] [--binary-name <name>] [--purge-config] [--json]`,
+		Run: uninstallCommand,
+	},
+	{
+		Name:    "version",
+		Group:   "Install",
+		Summary: "print version information",
+		Usage: `Usage:
+  maat version [--json]`,
+		Run: versionCommand,
+	},
+}
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintf(os.Stderr, "maat: %v\n", err)
@@ -51,142 +199,89 @@ func run(args []string) error {
 		return nil
 	}
 
-	switch args[0] {
-	case "help", "-h", "--help":
+	switch {
+	case args[0] == "help":
+		return helpCommand(args[1:])
+	case args[0] == "-h" || args[0] == "--help":
 		printHelp()
 		return nil
-	case "version":
-		return versionCommand(args[1:])
-	case "update":
-		return updateCommand(args[1:])
-	case "uninstall":
-		return uninstallCommand(args[1:])
-	case "setup":
-		return setupCommand(args[1:])
-	case "initialize":
-		return agentInitializeCommand(args[1:])
-	case "index":
-		return indexCommand(args[1:])
-	case "projects":
-		filtered, jsonOut := splitJSONFlag(args[1:])
-		store, err := loadStoreForRead(filtered)
-		if err != nil {
-			return err
-		}
-		progress("projects.load", "loading projects", map[string]string{"storage": store})
-		projects, err := loadProjectListItems(store)
-		if err != nil {
-			return reportStorageAccessError("projects.load", store, "read projects", err)
-		}
-		if agentUse {
-			return agentUpdate("projects.loaded", "ok", "projects loaded", map[string]any{
-				"projects": projects,
-				"count":    len(projects),
-			})
-		}
-		if jsonOut {
-			return writeJSON(projects)
-		}
-		ok("projects.loaded", fmt.Sprintf("loaded %d projects", len(projects)), nil)
-		if len(projects) == 0 {
-			fmt.Println("No projects found.")
-			return nil
-		}
-		fmt.Printf("%-18s %-9s %-8s %s\n", "Project", "Status", "Layout", "Title")
-		for _, project := range projects {
-			fmt.Printf("%-18s %-9s %-8s %s\n", project.ID, colorStatus(project.Status), project.Layout, project.Title)
-		}
-		return nil
-	case "project":
-		return projectCommand(args[1:])
-	case "catalog":
-		return catalogCommand(args[1:])
-	case "goal":
-		return goalCommand(args[1:])
-	case "ticket":
-		return ticketCommand(args[1:])
-	case "status":
-		filtered, jsonOut := splitJSONFlag(args[1:])
-		store, err := loadStoreForRead(filtered)
-		if err != nil {
-			return err
-		}
-		summary, err := maat.Status(store)
-		if err != nil {
-			return reportStorageAccessError("status.load", store, "read status", err)
-		}
-		if agentUse {
-			return agentUpdate("status.ready", "ok", "status ready", summary)
-		}
-		if jsonOut {
-			return writeJSON(summary)
-		}
-		ok("status.ready", "status ready", nil)
-		fmt.Println("Maat status")
-		printField("Projects", colorNumber(summary.Projects))
-		printField("Goals", fmt.Sprintf("%s active, %s done, %s total", colorNumber(summary.ActiveGoals), colorNumber(summary.DoneGoals), colorNumber(summary.Goals)))
-		printField("Tickets", fmt.Sprintf("%s open, %s done, %s total", colorNumber(summary.OpenTickets), colorNumber(summary.DoneTickets), colorNumber(summary.Tickets)))
-		return nil
-	case "validate":
-		return validateCommand(args[1:])
-	case "sync":
-		return syncCommand(args[1:])
-	case "search":
-		return searchCommand(args[1:])
-	case "tui":
-		return tuiCommand(args[1:])
-	default:
-		return fmt.Errorf("unknown command %q", args[0])
 	}
+
+	command, ok := findCLICommand(args[0])
+	if !ok {
+		return unknownCommandError(args[0])
+	}
+	if len(args) > 1 && isHelpFlag(args[1]) {
+		printCommandHelp(command)
+		return nil
+	}
+	return command.Run(args[1:])
 }
 
 func printHelp() {
-	fmt.Print(`maat - Git-backed project state for agents
+	fmt.Println("maat - Git-backed project state for agents")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  maat <command> [flags]")
+	fmt.Println("  maat help <command>")
+	fmt.Println()
+	fmt.Println("Commands:")
+	printCommandSummary()
+	fmt.Println()
+	fmt.Println("Global flags:")
+	fmt.Println("  --agent-use   emit newline-delimited JSON updates for agents")
+	fmt.Println()
+	fmt.Println("Markdown plus Git is the source of truth. The SQLite index is a rebuildable local cache.")
+}
 
-Usage:
-  maat <command> [flags]
+func printCommandSummary() {
+	currentGroup := ""
+	for _, command := range cliCommands {
+		if command.Group != currentGroup {
+			currentGroup = command.Group
+			fmt.Printf("  %s:\n", currentGroup)
+		}
+		fmt.Printf("    %-10s %s\n", command.Name, command.Summary)
+	}
+}
 
-Common:
-  maat setup [--storage <absolute-git-repo-path>] [--actor <name>] [--json]
-  maat setup rules [--storage <path>] [--json]
-  maat setup doctor [--storage <path>] [--fix] [--json]
-  maat initialize [--project <project-key>] [--storage <path>] [--json]
-  maat status [--storage <path>] [--json]
-  maat projects [--storage <path>] [--json]
-  maat search <query> [--storage <path>] [--json]
-  maat sync [--storage <path>] [--message <msg>] [--push] [--status] [--json]
-  maat catalog list [apps|patterns|decisions|opportunities] [--project <project-key>] [--storage <path>] [--json]
-  maat catalog show <id-or-slug> [--project <project-key>] [--storage <path>] [--json]
+func helpCommand(args []string) error {
+	switch len(args) {
+	case 0:
+		printHelp()
+		return nil
+	case 1:
+		command, ok := findCLICommand(args[0])
+		if !ok {
+			return unknownCommandError(args[0])
+		}
+		printCommandHelp(command)
+		return nil
+	default:
+		return errors.New("usage: maat help [command]")
+	}
+}
 
-Projects:
-  maat project link [source-path] [--storage <path>] [--key <project-key>] [--name <display-name>] [--json]
-  maat project show <project-id> [--storage <path>] [--json]
-  maat goal create [project-key] <title> --outcome <text> [--storage <path>] [--json]
+func printCommandHelp(command cliCommand) {
+	fmt.Printf("maat %s - %s\n\n", command.Name, command.Summary)
+	fmt.Println(command.Usage)
+}
 
-Tickets:
-  maat ticket create [project-key] <title> [--goal <goal-id>] --description <text> --acceptance <text>... [--storage <path>] [--json]
-  maat ticket list [--project <project-key>] [--storage <path>] [--json]
-  maat ticket show <ticket-id> [--project <project-key>] [--storage <path>] [--json]
-  maat ticket claim <ticket-id> [--agent <agent>] [--ttl <duration>] [--project <project-key>] [--storage <path>] [--json]
-  maat ticket comment <ticket-id> <comment> [--project <project-key>] [--storage <path>] [--json]
-  maat ticket complete <ticket-id> --evidence <text> [--project <project-key>] [--storage <path>] [--json]
+func findCLICommand(name string) (cliCommand, bool) {
+	for _, command := range cliCommands {
+		if command.Name == name {
+			return command, true
+		}
+	}
+	return cliCommand{}, false
+}
 
-Setup and maintenance:
-  maat setup [--storage <absolute-git-repo-path>] [--actor <name>] [--auto-pull|--no-auto-pull] [--auto-commit|--no-auto-commit] [--auto-push|--no-auto-push] [--json]
-  maat setup rules [--storage <path>] [--json]
-  maat setup doctor [--storage <path>] [--fix] [--json]
-  maat update [--source <path>] [--install-dir <path>] [--binary-name <name>] [--json]
-  maat uninstall [--install-dir <path>] [--binary-name <name>] [--purge-config] [--json]
-  maat index rebuild [--storage <path>]
-  maat validate [--storage <path>] [--json]
-  maat tui [--storage <path>]
-  maat version [--json]
+func isHelpFlag(arg string) bool {
+	return arg == "-h" || arg == "--help"
+}
 
-Global flags:
-  --agent-use   emit newline-delimited JSON updates for agents
-
-Markdown plus Git is the source of truth. The SQLite index is a rebuildable local cache.
-`)
+func unknownCommandError(name string) error {
+	return fmt.Errorf("unknown command %q; run maat help for available commands", name)
 }
 
 func versionCommand(args []string) error {
@@ -202,6 +297,62 @@ func versionCommand(args []string) error {
 		return writeJSON(info)
 	}
 	fmt.Println(info.String())
+	return nil
+}
+
+func statusCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	store, err := loadStoreForRead(filtered)
+	if err != nil {
+		return err
+	}
+	summary, err := maat.Status(store)
+	if err != nil {
+		return reportStorageAccessError("status.load", store, "read status", err)
+	}
+	if agentUse {
+		return agentUpdate("status.ready", "ok", "status ready", summary)
+	}
+	if jsonOut {
+		return writeJSON(summary)
+	}
+	ok("status.ready", "status ready", nil)
+	fmt.Println("Maat status")
+	printField("Projects", colorNumber(summary.Projects))
+	printField("Goals", fmt.Sprintf("%s active, %s done, %s total", colorNumber(summary.ActiveGoals), colorNumber(summary.DoneGoals), colorNumber(summary.Goals)))
+	printField("Tickets", fmt.Sprintf("%s open, %s done, %s total", colorNumber(summary.OpenTickets), colorNumber(summary.DoneTickets), colorNumber(summary.Tickets)))
+	return nil
+}
+
+func projectsCommand(args []string) error {
+	filtered, jsonOut := splitJSONFlag(args)
+	store, err := loadStoreForRead(filtered)
+	if err != nil {
+		return err
+	}
+	progress("projects.load", "loading projects", map[string]string{"storage": store})
+	projects, err := loadProjectListItems(store)
+	if err != nil {
+		return reportStorageAccessError("projects.load", store, "read projects", err)
+	}
+	if agentUse {
+		return agentUpdate("projects.loaded", "ok", "projects loaded", map[string]any{
+			"projects": projects,
+			"count":    len(projects),
+		})
+	}
+	if jsonOut {
+		return writeJSON(projects)
+	}
+	ok("projects.loaded", fmt.Sprintf("loaded %d projects", len(projects)), nil)
+	if len(projects) == 0 {
+		fmt.Println("No projects found.")
+		return nil
+	}
+	fmt.Printf("%-18s %-9s %-8s %s\n", "Project", "Status", "Layout", "Title")
+	for _, project := range projects {
+		fmt.Printf("%-18s %-9s %-8s %s\n", project.ID, colorStatus(project.Status), project.Layout, project.Title)
+	}
 	return nil
 }
 
