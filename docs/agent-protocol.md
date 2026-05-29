@@ -12,7 +12,7 @@ Run setup once on the machine:
 maat setup --storage /absolute/path/to/maat-state
 ```
 
-Setup creates `setup.md` in the storage root when it is missing or blank. To backfill the default rules into an existing storage repo, run:
+Setup creates `setup.md` in the storage root when it is missing or blank, commits it to the storage repo, and tells the user they can edit it to change the default agent rules. To backfill the default rules into an existing storage repo, run:
 
 ```sh
 maat setup rules --storage /absolute/path/to/maat-state

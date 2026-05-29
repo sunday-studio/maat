@@ -551,6 +551,9 @@ type setupCommandResult struct {
 	SetupCreated         bool   `json:"setup_created"`
 	SetupUpdated         bool   `json:"setup_updated"`
 	SetupExisting        bool   `json:"setup_existing"`
+	SetupCommitted       bool   `json:"setup_committed"`
+	SetupCommitMessage   string `json:"setup_commit_message,omitempty"`
+	SetupNote            string `json:"setup_note"`
 }
 
 type setupRulesCommandResult struct {
@@ -560,6 +563,9 @@ type setupRulesCommandResult struct {
 	SetupCreated  bool   `json:"setup_created"`
 	SetupUpdated  bool   `json:"setup_updated"`
 	SetupExisting bool   `json:"setup_existing"`
+	Committed     bool   `json:"committed"`
+	CommitMessage string `json:"commit_message,omitempty"`
+	Note          string `json:"note"`
 }
 
 type setupDoctorResult struct {
@@ -644,6 +650,10 @@ func setupCommand(args []string) error {
 	if err != nil {
 		return reportStorageAccessError("setup.rules", abs, "write storage setup rules", err)
 	}
+	setupCommit, err := commitStorageSetupDocument(abs, setupDoc)
+	if err != nil {
+		return reportStorageAccessError("setup.rules", abs, "commit storage setup rules", err)
+	}
 	cfg.StoragePath = abs
 	preserveInstalledBinaryConfig(&cfg)
 	configFile, err := persistConfig(cfg)
@@ -662,6 +672,9 @@ func setupCommand(args []string) error {
 		SetupCreated:         setupDoc.Created,
 		SetupUpdated:         setupDoc.Updated,
 		SetupExisting:        setupDoc.Existing,
+		SetupCommitted:       setupCommit.Committed,
+		SetupCommitMessage:   setupCommit.Message,
+		SetupNote:            storageSetupNote(setupDoc.Path),
 	}
 	if agentUse {
 		return agentUpdate("setup.configured", "ok", "setup complete", result)
@@ -677,6 +690,8 @@ func setupCommand(args []string) error {
 	printField("Auto-commit after writes", formatBool(result.AutoCommitAfterWrite))
 	printField("Auto-push after commits", formatBool(result.AutoPushAfterCommit))
 	printField("Setup rules", result.SetupPath)
+	printField("Setup rules committed", formatBool(result.SetupCommitted))
+	fmt.Println(result.SetupNote)
 	return nil
 }
 
@@ -693,6 +708,10 @@ func setupRulesCommand(args []string, jsonOut bool) error {
 	if err != nil {
 		return reportStorageAccessError("setup.rules", abs, "write storage setup rules", err)
 	}
+	setupCommit, err := commitStorageSetupDocument(abs, setupDoc)
+	if err != nil {
+		return reportStorageAccessError("setup.rules", abs, "commit storage setup rules", err)
+	}
 	result := setupRulesCommandResult{
 		Action:        "setup.rules",
 		StoragePath:   abs,
@@ -700,6 +719,9 @@ func setupRulesCommand(args []string, jsonOut bool) error {
 		SetupCreated:  setupDoc.Created,
 		SetupUpdated:  setupDoc.Updated,
 		SetupExisting: setupDoc.Existing,
+		Committed:     setupCommit.Committed,
+		CommitMessage: setupCommit.Message,
+		Note:          storageSetupNote(setupDoc.Path),
 	}
 	if agentUse {
 		return agentUpdate("setup.rules", "ok", "storage setup rules ready", result)
@@ -716,7 +738,40 @@ func setupRulesCommand(args []string, jsonOut bool) error {
 	}
 	printField("Storage", result.StoragePath)
 	printField("Setup rules", result.SetupPath)
+	printField("Setup rules committed", formatBool(result.Committed))
+	fmt.Println(result.Note)
 	return nil
+}
+
+type setupCommitResult struct {
+	Committed bool
+	Message   string
+}
+
+func commitStorageSetupDocument(store string, setupDoc maat.StorageSetupDocumentResult) (setupCommitResult, error) {
+	if !setupDoc.Created && !setupDoc.Updated {
+		return setupCommitResult{}, nil
+	}
+	git := maat.GitSync{Store: store}
+	isRepository, err := git.IsRepository(context.Background())
+	if err != nil {
+		return setupCommitResult{}, err
+	}
+	if !isRepository {
+		return setupCommitResult{}, nil
+	}
+	message := "chore(storage): add setup rules"
+	if setupDoc.Updated {
+		message = "chore(storage): update setup rules"
+	}
+	if err := git.Commit(context.Background(), message, maat.StorageSetupFilename); err != nil {
+		return setupCommitResult{}, err
+	}
+	return setupCommitResult{Committed: true, Message: message}, nil
+}
+
+func storageSetupNote(path string) string {
+	return fmt.Sprintf("You can update %s to change the default rules agents should follow in this storage repo.", path)
 }
 
 func setupDoctorCommand(args []string, jsonOut bool) error {
@@ -2269,17 +2324,20 @@ func ticketCompleteCommand(args []string) error {
 }
 
 type initializeCommandResult struct {
-	Document       string             `json:"document"`
-	LinkedProject  maat.LinkedProject `json:"linked_project"`
-	ProjectKey     string             `json:"project_key"`
-	StoragePath    string             `json:"storage_path"`
-	SetupPath      string             `json:"setup_path"`
-	SetupCreated   bool               `json:"setup_created"`
-	SetupUpdated   bool               `json:"setup_updated"`
-	SetupExisting  bool               `json:"setup_existing"`
-	Version        version.Info       `json:"version"`
-	IndexRefreshed bool               `json:"index_refreshed"`
-	IndexWarning   string             `json:"index_warning,omitempty"`
+	Document           string             `json:"document"`
+	LinkedProject      maat.LinkedProject `json:"linked_project"`
+	ProjectKey         string             `json:"project_key"`
+	StoragePath        string             `json:"storage_path"`
+	SetupPath          string             `json:"setup_path"`
+	SetupCreated       bool               `json:"setup_created"`
+	SetupUpdated       bool               `json:"setup_updated"`
+	SetupExisting      bool               `json:"setup_existing"`
+	SetupCommitted     bool               `json:"setup_committed"`
+	SetupCommitMessage string             `json:"setup_commit_message,omitempty"`
+	SetupNote          string             `json:"setup_note"`
+	Version            version.Info       `json:"version"`
+	IndexRefreshed     bool               `json:"index_refreshed"`
+	IndexWarning       string             `json:"index_warning,omitempty"`
 }
 
 func agentInitializeCommand(args []string) error {
@@ -2315,6 +2373,10 @@ func agentInitializeCommand(args []string) error {
 	if err != nil {
 		return reportStorageAccessError("initialize.rules", store, "write storage setup rules", err)
 	}
+	setupCommit, err := commitStorageSetupDocument(store, setupDoc)
+	if err != nil {
+		return reportStorageAccessError("initialize.rules", store, "commit storage setup rules", err)
+	}
 	progress("initialize.index", "refreshing indexes", nil)
 	refreshResult := refreshIndexesBestEffort(store)
 	warnIndexRefresh(refreshResult)
@@ -2329,17 +2391,20 @@ func agentInitializeCommand(args []string) error {
 		BinaryVersion: binaryVersion.String(),
 	})
 	result := initializeCommandResult{
-		Document:       document,
-		LinkedProject:  linked,
-		ProjectKey:     linked.ProjectKey,
-		StoragePath:    store,
-		SetupPath:      setupDoc.Path,
-		SetupCreated:   setupDoc.Created,
-		SetupUpdated:   setupDoc.Updated,
-		SetupExisting:  setupDoc.Existing,
-		Version:        binaryVersion,
-		IndexRefreshed: refreshResult.Refreshed,
-		IndexWarning:   refreshResult.Warning,
+		Document:           document,
+		LinkedProject:      linked,
+		ProjectKey:         linked.ProjectKey,
+		StoragePath:        store,
+		SetupPath:          setupDoc.Path,
+		SetupCreated:       setupDoc.Created,
+		SetupUpdated:       setupDoc.Updated,
+		SetupExisting:      setupDoc.Existing,
+		SetupCommitted:     setupCommit.Committed,
+		SetupCommitMessage: setupCommit.Message,
+		SetupNote:          storageSetupNote(setupDoc.Path),
+		Version:            binaryVersion,
+		IndexRefreshed:     refreshResult.Refreshed,
+		IndexWarning:       refreshResult.Warning,
 	}
 	if agentUse {
 		return agentUpdate("initialize.ready", "ok", "agent setup document ready", result)
@@ -2352,6 +2417,9 @@ func agentInitializeCommand(args []string) error {
 	} else {
 		ok("initialize.project", "project "+linked.ProjectKey+" already registered", nil)
 	}
+	printField("Setup rules", result.SetupPath)
+	printField("Setup rules committed", formatBool(result.SetupCommitted))
+	fmt.Println(result.SetupNote)
 	fmt.Println(document)
 	return nil
 }

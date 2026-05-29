@@ -44,7 +44,7 @@ Path:
 setup.md
 ```
 
-The storage root may include `setup.md` with default agent rules for that storage repo. `maat setup --storage <path>` creates it when missing or blank, and `maat setup rules --storage <path>` can backfill an existing storage repo.
+The storage root may include `setup.md` with default agent rules for that storage repo. `maat setup --storage <path>` creates and commits it when missing or blank, and `maat setup rules --storage <path>` can backfill an existing storage repo. The CLI tells the user they can edit the file to change the default rules agents should follow in that storage repo.
 
 Use it for durable coordination rules, including the expectation that agents store useful plans as ticket comments when those plans matter for handoff or future work. Do not use it for private scratch reasoning or generated summaries that can be rebuilt.
 

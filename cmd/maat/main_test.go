@@ -442,6 +442,7 @@ func TestUninstallCommandUsesRememberedInstallLocation(t *testing.T) {
 func TestSetupCommandWritesConfig(t *testing.T) {
 	store := t.TempDir()
 	runGit(t, store, "init", "-b", "main")
+	configureGitUser(t, store)
 	configFile := filepath.Join(t.TempDir(), "config.json")
 	t.Setenv("MAAT_CONFIG", configFile)
 	t.Setenv("MAAT_ACTOR", "test-agent")
@@ -465,8 +466,11 @@ func TestSetupCommandWritesConfig(t *testing.T) {
 	if result.Action != "setup.configured" || result.StoragePath != store || result.ConfigPath != configFile {
 		t.Fatalf("unexpected setup result: %#v", result)
 	}
-	if result.SetupPath != filepath.Join(store, maat.StorageSetupFilename) || !result.SetupCreated || result.SetupUpdated || result.SetupExisting {
+	if result.SetupPath != filepath.Join(store, maat.StorageSetupFilename) || !result.SetupCreated || result.SetupUpdated || result.SetupExisting || !result.SetupCommitted {
 		t.Fatalf("unexpected setup rules result: %#v", result)
+	}
+	if result.SetupCommitMessage != "chore(storage): add setup rules" || !strings.Contains(result.SetupNote, "You can update") {
+		t.Fatalf("unexpected setup commit details: %#v", result)
 	}
 	setupData, err := os.ReadFile(result.SetupPath)
 	if err != nil {
@@ -488,11 +492,18 @@ func TestSetupCommandWritesConfig(t *testing.T) {
 	if cfg.InstallDir != existing.InstallDir || cfg.BinaryName != existing.BinaryName || cfg.BinaryPath != existing.BinaryPath {
 		t.Fatalf("setup should preserve install location: %#v", cfg)
 	}
+	if status := runGit(t, store, "status", "--porcelain=v1"); status != "" {
+		t.Fatalf("expected storage setup rules to be committed, got status %q", status)
+	}
+	if log := strings.TrimSpace(runGit(t, store, "log", "-1", "--pretty=%s")); log != "chore(storage): add setup rules" {
+		t.Fatalf("unexpected setup rules commit message: %q", log)
+	}
 }
 
 func TestSetupRulesCommandCreatesMissingSetupDocument(t *testing.T) {
 	store := t.TempDir()
 	runGit(t, store, "init", "-b", "main")
+	configureGitUser(t, store)
 
 	output, err := captureRun("setup", "rules", "--storage", store, "--json")
 	if err != nil {
@@ -503,8 +514,11 @@ func TestSetupRulesCommandCreatesMissingSetupDocument(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Action != "setup.rules" || result.StoragePath != store || result.SetupPath != filepath.Join(store, maat.StorageSetupFilename) || !result.SetupCreated {
+	if result.Action != "setup.rules" || result.StoragePath != store || result.SetupPath != filepath.Join(store, maat.StorageSetupFilename) || !result.SetupCreated || !result.Committed {
 		t.Fatalf("unexpected setup rules result: %#v", result)
+	}
+	if result.CommitMessage != "chore(storage): add setup rules" || !strings.Contains(result.Note, "You can update") {
+		t.Fatalf("unexpected setup rules commit details: %#v", result)
 	}
 	data, err := os.ReadFile(result.SetupPath)
 	if err != nil {
@@ -524,11 +538,15 @@ func TestSetupRulesCommandCreatesMissingSetupDocument(t *testing.T) {
 	if !result.SetupExisting || result.SetupCreated || result.SetupUpdated {
 		t.Fatalf("expected idempotent setup rules result, got %#v", result)
 	}
+	if result.Committed {
+		t.Fatalf("did not expect existing setup rules to be committed again: %#v", result)
+	}
 }
 
 func TestSetupCommandPromptsWhenStorageOmitted(t *testing.T) {
 	store := t.TempDir()
 	runGit(t, store, "init", "-b", "main")
+	configureGitUser(t, store)
 	configFile := filepath.Join(t.TempDir(), "config.json")
 	t.Setenv("MAAT_CONFIG", configFile)
 	t.Setenv("MAAT_ACTOR", "prompt-agent")
@@ -2039,10 +2057,15 @@ func withWorkingDir(t *testing.T, dir string) {
 func initGitStore(t *testing.T, store string) {
 	t.Helper()
 	runGit(t, store, "init", "-b", "main")
-	runGit(t, store, "config", "user.email", "maat@example.test")
-	runGit(t, store, "config", "user.name", "Maat Test")
+	configureGitUser(t, store)
 	runGit(t, store, "add", ".")
 	runGit(t, store, "commit", "-m", "test: seed store")
+}
+
+func configureGitUser(t *testing.T, store string) {
+	t.Helper()
+	runGit(t, store, "config", "user.email", "maat@example.test")
+	runGit(t, store, "config", "user.name", "Maat Test")
 }
 
 func addGitUpstream(t *testing.T, store string) {
